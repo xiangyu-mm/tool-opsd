@@ -1,0 +1,1 @@
+{"answer": "C14H14KN3O6S"}

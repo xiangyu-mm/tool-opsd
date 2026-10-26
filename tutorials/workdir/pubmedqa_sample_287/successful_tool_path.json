@@ -1,0 +1,358 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_pxCqnd0fadoTVZekpSnXGlrM",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether payer formulary alerts and related payer-imposed medication management mechanisms (prior authorization, formulary restrictions, non-covered medication alerts, step therapy, quantity limits, formulary changes) are documented causes of patient harm. Find evidence on clinical outcomes such as medication delays, treatment abandonment, adverse events, reduced adherence, inequities, and costs, and identify documented interventions or policy/workflow changes used to modify or mitigate these alerts. Focus on peer-reviewed studies, systematic reviews, and policy evaluations; distinguish direct patient harm from clinician administrative burden."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_vZSIlXS0YqbYxDsiMASnUBoj",
+    "parent_tool_call_id": "call_pxCqnd0fadoTVZekpSnXGlrM",
+    "round": 1,
+    "tool_input": {
+      "task_name": "alert interventions",
+      "boolean_query_text": "electronic health record formulary alert intervention override prior authorization workflow policy evaluation",
+      "top_k": 20
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='electronic health record formulary alert intervention override prior authorization workflow policy evaluation',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='electronic health record formulary alert intervention override prior authorization workflow policy evaluation',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/alert_interventions.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/alert_interventions.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/alert_interventions.csv'\nTotal results found: 3\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 35774070\nTitle: Antimicrobial stewardship using electronic prescribing systems in hospital settings: a scoping review of interventions and outcome measures\nSource: JAC Antimicrob Resist (2022)\nAbstract: There were 28 different <m>interventions</m> grouped into the six themes. <m>Alerts</m> visible to the practitioner in the <m>electronic</m> <m>health</m> <m>record</m> (EHR) were most frequently implemented (n = 11/28).\n--------------------------------------------------------------------------------\nPMID: 34843036\nTitle: 49th ESCP virtual symposium on clinical pharmacy 19.10.2021-21.10.2021 Clinical pharmacy, working collaboratively in mental health care\nSource: Int J Clin Pharm (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 22915962\nTitle: Potential value of electronic prescribing in health economic and outcomes research\nSource: Patient Relat Outcome Meas (2010)\nAbstract: ERx capabilities can exist within simple standalone systems or integrated within <m>electronic</m> <m>health</m> <m>record</m> (EHR) or <m>electronic</m> medical <m>record</m> (EMR) systems.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_RUWj3lFIzg3QV3TdB3Usibis",
+    "parent_tool_call_id": "call_vZSIlXS0YqbYxDsiMASnUBoj",
+    "round": 2,
+    "tool_input": {
+      "task_name": "formulary alerts EHR",
+      "boolean_query_text": "formulary alert electronic prescribing prior authorization study",
+      "top_k": 20
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='formulary alert electronic prescribing prior authorization study',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='formulary alert electronic prescribing prior authorization study',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/formulary_alerts_EHR.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/formulary_alerts_EHR.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/formulary_alerts_EHR.csv'\nTotal results found: 21\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 30279130\nTitle: Medication prior authorization from the providers perspective: A prospective observational study.\nSource: Research in social & administrative pharmacy : RSAP (2019)\nAbstract: BACKGROUND: The prior authorization (PA) process for medications used by community providers requires modernization. Therefore, a deeper understanding of current state of PA from the community provider perspective is imperative to inform and modernize this managed care tool. OBJECTIVES: Objectives of this study were to identify, analyze and categorize the issues associated with the medication PA process from provider practice perspective. METHODS: A prospective non-experimental, cross sectional, observational study was performed using semi-structured interviews and direct observation at a convenience sample of eight primary care and medicine subspecialty group practices in Tucson, Arizona, USA. Participating practices were required to have an established medication PA process. The participant feedback from each site was analyzed using the Richards qualitative coding technique that includes descriptive coding, topic coding, and analytical coding. RESULTS: Data were obtained from eight unique community provider offices (8 sites) at which 29 prescribers practice. The pain points identified represented five main categories: 1) information transfer gaps; 2) format disparities; 3) outdat ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 38713809\nTitle: Price transparency at the point of prescribing with real-time prescription benefits\nSource: Am J Health Syst Pharm (2024)\nAbstract: RTPB was implemented in February 2022 using external vendor interfaces. <m>Prescribing</m> data from March 2022 to March 2023 were analyzed. RTPB displayed <m>alerts</m> for medications requiring <m>prior</m> <m>authorization</m> or when alternative medications would result in cost savings.\n--------------------------------------------------------------------------------\nPMID: 36057577\nTitle: Electronic prescription system requirements: a scoping review\nSource: BMC Med Inform Decis Mak (2022)\nAbstract: One of the requirements of <m>electronic</m> prescription system identified in this <m>study</m> is safety <m>alerts</m> and filtering of user-selectable <m>alerts</m> for possible <m>prescribing</m> problems.\n--------------------------------------------------------------------------------\nPMID: 36168471\nTitle: Interventions to optimize antimicrobial stewardship\nSource: Antimicrob Steward Healthc Epidemiol (2021)\nAbstract: ...<m>Prior</m> <m>authorization</m>\n--------------------------------------------------------------------------------\nPMID: 41499120\nTitle: Treatment Modifications After Drug Shortages Among Primary Care Physicians\nSource: JAMA Netw Open (2026)\nAbstract: Drug shortages result in more <m>prior</m> <m>authorization</m> requests because alternate medications may differ from the standard of care or may not have included a @SPECIES_9606 @@@patient@@@'s <m>formulary</m>.\n--------------------------------------------------------------------------------\nPMID: 35774070\nTitle: Antimicrobial stewardship using electronic prescribing systems in hospital settings: a scoping review of interventions and outcome measures\nSource: JAC Antimicrob Resist (2022)\nAbstract: Each of these four <m>studies</m> required <m>prior</m> approval, either <m>electronically</m> or by a second professional before treatment could continue.\n--------------------------------------------------------------------------------\nPMID: 36420559\nTitle: Appropriate inhaler use in children with asthma: barriers and opportunities through the lens of the socio-ecological model\nSource: J Asthma (2022)\nAbstract: Organizational Pharmacy accessNavigation of complex health systems to obtain care and medication Clinicians, community health workers, asthma educator limitations Pharmacy delivery to homes, schoolsPharmacies integrated into clinic sitesIncentives for guideline based <m>prescribing</m> practices Team-based care approach in health settings (for educating families, managing <m>prior</m> <m>authorizations</m> and other administrative burdens) Education programs for clinicians Use of information technology <m>alerts</m> based in guidelines and appropriately tailored to individuals with clinician input 4.\n--------------------------------------------------------------------------------\nPMID: 32931378\nTitle: Digital Health in Physicians' and Pharmacists' Office: A Comparative Study of e-Prescription Systems' Architecture and Digital Security in Eight Countries\nSource: OMICS (2021)\nAbstract: ...<m>Electronic</m> <m>prior</m> <m>authorization</m>\n--------------------------------------------------------------------------------\nPMID: 37663091\nTitle: The Penn Medicine COVID-19 Therapeutics Committee:Reflections on a Model for Rapid Evidence Review and Dynamic Practice Recommendations During a Public Health Emergency\nSource: Open Forum Infect Dis (2023)\nAbstract: Practical considerations were also included, such as procurement, supply, storage, and hospital <m>formulary</m> status. Reviewers created <m>alerts</m> through academic search engines to be notified continually of new publications and preprints.\n--------------------------------------------------------------------------------\nPMID: 35274083\nTitle: Health informatics interventions to minimize out-of-pocket medication costs for patients: what providers want\nSource: JAMIA Open (2022)\nAbstract: ...<m>Study</m> results aligned with <m>prior</m> findings concerning <m>prescribing</m> providers' strategies for addressing affordability, such as <m>prescribing</m> comparably effective, less costly medications.\n--------------------------------------------------------------------------------\nPMID: 39431829\nTitle: Approaches to developing and implementing a molecular diagnostics stewardship program for infectious diseases: an ASM Laboratory Practices Subcommittee report\nSource: J Clin Microbiol (2024)\nAbstract: Another consideration is the practice of <m>prior</m> <m>authorization</m> for laboratory testing. While already common for certain genetic tests, <m>prior</m> <m>authorization</m> is being applied by insurance providers to an increasing number of other high-cost molecular tests in an effort to manage healthcare costs.\n--------------------------------------------------------------------------------\nPMID: 39580747\nTitle: Pharmaceutical Supply Chains: A Structural Determinant of Health for Children With ADHD\nSource: J Pediatr Health Care (2024)\nAbstract: Choice of medication may be further constrained by insurance coverage and <m>formulary</m> restrictions, which can be especially limiting if supply issues are affecting the availability of one medication but the provider cannot <m>prescribe</m> an alternative without <m>prior</m> <m>authorization</m>.\n--------------------------------------------------------------------------------\nPMID: 34740338\nTitle: Barriers and facilitators to the uptake of new medicines into clinical practice: a systematic review\nSource: BMC Health Serv Res (2021)\nAbstract: Also, medium to high quality <m>studies</m> suggested financial incentives to reduce <m>prescribing</m> costs had limited to no impact on the uptake of new medicines already included in <m>formularies</m>.\n--------------------------------------------------------------------------------\nPMID: 37771732\nTitle: Situational analysis of antimicrobial stewardship program (ASP) among public and private sector tertiary care hospitals in Karachi, Pakistan: A qualitative case study\nSource: Antimicrob Steward Healthc Epidemiol (2023)\nAbstract: At H1, the interventions are classified as core and supplemental interventions. In core interventions, <m>formulary</m> restrictions and <m>prior</m> <m>authorization</m>, prospective audit and feedback and antimicrobial clinical guidelines whereas in supplemental interventions pharmacy-driven strategies are structured.\n--------------------------------------------------------------------------------\nPMID: 41492136\nTitle: Integration of electronic health records with automated compounding for parenteral nutrition: A narrative review Integration of electronic health records with automated compounding for parenteral nutrition: a narrative review\nSource: JPEN J Parenter Enteral Nutr (2026)\nAbstract: ...<m>PRIOR</m> @DISEASE_Meningioma @DISEASE_MESH:D008579 @@@TRANSITION@@@ TO THE <m>ELECTRONIC</m> HEALTH RECORD EPIC SYSTEM\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_wwN9zusQcJNYZcCzJTnjtyJf",
+    "parent_tool_call_id": "call_RUWj3lFIzg3QV3TdB3Usibis",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "RESULTS|CONCLUSIONS|delay|abandonment|adherence|prior authorization|cost sharing|equity",
+      "pmid": "37121255"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('37121255')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|CONCLUSIONS|delay|abandonment|adherence|prior authorization|cost sharing|equity')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (6):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|CONCLUSIONS|delay|abandonment|adherence|prior authorization|cost sharing|equity\n      \u001b[90mpmid:\u001b[0m 37121255\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|pain points|administrative burden|time|workflow|recommendations|electronic\n      \u001b[90mpmid:\u001b[0m 30279130\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|racial|insurance|delay|prior authorization|odds|disparity\n      \u001b[90mpmid:\u001b[0m 36942280\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|prior authorization|not receiving|fill|abandonment|adherence|race\n      \u001b[90mpmid:\u001b[0m 36227596\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|real-time prescription benefits|alert|cost|alternative|prescribing|implementation\n      \u001b[90mpmid:\u001b[0m 38713809\n\n  \u001b[1m\u001b[93m[6] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|treatment delays|treatment abandonment|adverse event|physicians|prior authorization\n      \u001b[90mpmid:\u001b[0m 37725308\n\n=== PMID: 37121255 ===\n\nTitle: The association between cost sharing, prior authorization, and specialty drug utilization: A systematic review.\n\nJournal/Date: Journal of managed care & specialty pharmacy (2023)\n\nMeSH Keywords: Humans, Prior Authorization, Cost Sharing, Drug Utilization, Antineoplastic Agents, Substance-Related Disorders\n\n\n--- ABSTRACT ---\nBACKGROUND: Specialty drugs are identified by high monthly costs and complexity of administration. Payers use utilization management strategies, including prior authorization and separate tiers with higher cost sharing, to control spending. These strategies can negatively impact patients' health outcomes through treatment initiation delays, medication abandonment, and nonadherence. OBJECTIVE: To examine the effect of patient cost sharing on specialty drug utilization and the effect of prior authorization on treatment delay and specialty drug utilization. METHODS: We conducted a literature search in the period between February 2021 and April 2022 using PubMed for articles published in English without restriction on date of publication. We included research papers with prior authorization and cost sharing for specialty drugs as exposure variables and specialty drug utilization as the outcome variable. Studies were reviewed by 2 independent reviewers and relevant information from eligible studies was extracted using a standardized form and approved by 2 reviewers. Review papers, opinion pieces, and projects without data were excluded. RESULTS: Forty-four studies were included in this review after screening and exclusions, 9 on prior authorization and 35 on cost sharing. Patients with lower cost sharing via patient support programs experienced higher adherence, fewer days to fill prescriptions, and lower discontinuation rates. Similar outcomes were noted for patients on low-income subsidy programs. Increasing cost sharing above $100 was associated with up to 75% abandonment rate for certain specialty drugs. This increased level of cost sharing was also associated with higher discontinuation rates and odds. At the same time, decreasing out-of-pocket costs increased initiation of specialty drugs. However, inconsistent results on impact of cost sharing on medication possession ratio (MPR) and proportion of days covered (PDC) were reported. Some studies reported a negative association between higher costs and MPR and PDC; however, MPR and PDC of cancer specialty drugs did not decrease with higher costs. Significant delays in prescription initiation were reported when prior authorization was needed. CONCLUSIONS: Higher levels of patient cost sharing reduce specialty drug use by increasing medication abandonment while generally decreasing initiation and persistence. Similarly, programs that reduce patient cost sharing increase initiation and persistence. In contrast, cost sharing had an inconsistent and bidirectional effect on MPR and PDC. Prior authorization caused treatment delays, but its effects on specialty drug use varied. More research is needed to examine the effect of cost sharing and prior authorization on long-term health outcomes.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_R3GP0nlxi4gQmKNyMk679dyB",
+    "parent_tool_call_id": "call_RUWj3lFIzg3QV3TdB3Usibis",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "RESULTS|pain points|administrative burden|time|workflow|recommendations|electronic",
+      "pmid": "30279130"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('30279130')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|pain points|administrative burden|time|workflow|recommendations|electronic')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 30279130 ===\n\nTitle: Medication prior authorization from the providers perspective: A prospective observational study.\n\nJournal/Date: Research in social & administrative pharmacy : RSAP (2019)\n\nMeSH Keywords: Arizona, Attitude of Health Personnel, Drug Therapy, Family Practice, Humans, Internal Medicine, Nurse Practitioners, Physician Assistants\n\n\n--- ABSTRACT ---\n[BACKGROUND]: The prior authorization (PA) process for medications used by community providers requires modernization. Therefore, a deeper understanding of current state of PA from the community provider perspective is imperative to inform and modernize this managed care tool.\n[OBJECTIVES]: Objectives of this study were to identify, analyze and categorize the issues associated with the medication PA process from provider practice perspective.\n[METHODS]: A prospective non-experimental, cross sectional, observational study was performed using semi-structured interviews and direct observation at a convenience sample of eight primary care and medicine subspecialty group practices in Tucson, Arizona, USA. Participating practices were required to have an established medication PA process. The participant feedback from each site was analyzed using the Richards qualitative coding technique that includes descriptive coding, topic coding, and analytical coding.\n[RESULTS]: Data were obtained from eight unique community provider offices (8 sites) at which 29 prescribers practice. The pain points identified represented five main categories: 1) information transfer gaps; 2) format disparities; 3) outdated technologies; 4) care consequences; and 5) workarounds. Prescribers and their staff suggested improvements that included real time eligibility and formulary alerts regarding PA during the e-prescribing process, accurate, up-to-date formulary data with easy-to-access alternatives, and embedded PA that is integrated with electronic medical record data. Three sites used medication PA portals such as CoverMyMeds® for information gathering, but at the time of data collection, no sites used these PA portals for prospective electronic prior authorization (ePA) or the electronic process of requesting authorization from health plan payers for coverage.\n[CONCLUSION]: The PA process for medication used by community providers is in urgent need of modernization. Pain points identified in this study could be alleviated by implementing medication ePA solutions. However, providers and their staff are largely unaware that ePA exists. Additional research in this area is needed.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_ru6vwLLgwxxHN270d4uKTCh0",
+    "parent_tool_call_id": "call_RUWj3lFIzg3QV3TdB3Usibis",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "RESULTS|racial|insurance|delay|prior authorization|odds|disparity",
+      "pmid": "36942280"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('36942280')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|racial|insurance|delay|prior authorization|odds|disparity')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 36942280 ===\n\nTitle: Insurance and racial disparities in prior authorization in gynecologic oncology.\n\nJournal/Date: Gynecologic oncology reports (2023)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nWhile prior authorization aims to reduce unnecessary care, it may limit or delay medically necessary care. Delays in cancer care can impact survival and are more common in historically-marginalized populations. Our objective was to examine to what extent disparities occurred in prior authorizations for gynecologic oncology. Using electronic medical records, we performed a retrospective review of prior authorization occurrence during gynecologic oncology care and analyzed the association with patient race and insurance in a multivariate regression model. In this cohort of 1,406 patients treated at an academic gynecologic oncology practice, patients with Medicare Advantage and patients of Asian descent were more likely to experience prior authorization. Addressing insurance-mediate disparities, such as in the occurrence of prior authorization, may help reduce disparities in gynecologic cancer care.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nThere were 2,112 clinic visits of 1,406 patients from January to March 2021. 23% (95%CI 20.7–25.1) of patients experienced prior authorization during their gynecologic oncology care, and 4.4% (95%CI 3.3–5.5) experienced more than one prior authorization. 56.2% (95%CI 53.5–58.8) of patients were privately-insured, 20.9% (95%CI 18.8–23.0) Medicare fee-for-service, 11.5% (95%CI 9.8–13.1) Medicare Advantage, and 11.3% (95%CI 9.7–13.0) Medicaid. Private insurance was the most common among patients of Asian descent and white patients, while Medicare Advantage was more common among Black patients (Supplemental Table* 2).\n\nAs shown in Table 1, 31.7% (95%CI 24.9–39.3) of patients with Medicare Advantage experienced prior authorization, compared to 17.7% (95%CI 13.8–22.6) of patients with M...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_NYOv1qA88OxC3ghQPgzxmMNI",
+    "parent_tool_call_id": "call_RUWj3lFIzg3QV3TdB3Usibis",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "RESULTS|real-time prescription benefits|alert|cost|alternative|prescribing|implementation",
+      "pmid": "38713809"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('38713809')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|real-time prescription benefits|alert|cost|alternative|prescribing|implementation')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 38713809 ===\n\nTitle: Price transparency at the point of prescribing with real-time prescription benefits.\n\nJournal/Date: American journal of health-system pharmacy : AJHP : official journal of the American Society of Health-System Pharmacists (2024)\n\nMeSH Keywords: Price Transparency, Prescription Fees, Prior Authorization, Health Expenditures, Prescription Drugs, Patient Satisfaction, Cost Savings, Drug Substitution\n\n\n--- ABSTRACT ---\n[PURPOSE]: Real-time prescription benefits (RTPB) shows prescribers patient-, medication-, and pharmacy-specific information on medication pricing, prior authorization requirements, and lower-cost alternatives. RTPB is intended to improve patient satisfaction and prescription fill rates by decreasing out-of-pocket costs for prescriptions. Therefore, we evaluated how RTPB affects prescribing patterns by examining acceptance and subsequent fill rates for RTPB alternative suggestions.\n[METHODS]: RTPB was implemented in February 2022 using external vendor interfaces. Prescribing data from March 2022 to March 2023 were analyzed. RTPB displayed alerts for medications requiring prior authorization or when alternative medications would result in cost savings. Patients were included if their prescription received an RTPB response and they had a subsequent encounter with pharmacy fill data. Primary outcomes were alert acceptance rates and prescription fill rates across RTPB alert groups, with a secondary outcome of monthly copay savings for accepted alerts.\n[RESULTS]: RTPB requests received a response for 88% of prescriptions, with price estimates provided for 77.9% of them. Lower-cost alternatives accounted for 67.2% of alerts, while prior authorization requirements represented 15% of alerts. Prescribers selected a lower-cost alternative 32% of the time. For those with an RTPB alert, patients filled prescriptions 68% of the time when an alternative was chosen, compared to 59% of the time when the original prescription was retained (odds ratio, 1.5; 95% confidence interval, 1.5-1.6; P < 0.001). Patients saved an average of $27.77 per month on copay costs when alternatives were selected.\n[CONCLUSION]: Implementation of RTPB was found to result in significant improvements in prescription fill rates and decrease patient copay costs, despite low alert acceptance rates.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nA total of 446,064 patients received 2,117,785 prescriptions during the study period. Patient demographics are included in Table 1, with 263,723 (59.1%) patients being female. Responses to RTPB queries were received for 1,867,282 (88.2%) prescriptions, with price estimates provided for 1,454,952 (77.9%) of these. RTPB alternative alerts were shown for 87,925 (4.7%) processed prescriptions. Lower-cost alternatives were included in 59,092 (67.2%) alerts, and PA requirements represented 13,230 (15.0%) alerts. A total of 371,065 (83.2%) patients received at least one RTPB response to their prescriptions. Patients saved an average of $27.77 per month, with a median (interquartile range) of $8.02 ($0-$30), on copay costs when an alternative was selected.\n\nPrescribing patterns\n\nPrescribe...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_b4FUTMnDAjQ6AFKnGqMTdklw",
+    "parent_tool_call_id": "call_RUWj3lFIzg3QV3TdB3Usibis",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "RESULTS|treatment delays|treatment abandonment|adverse event|physicians|prior authorization",
+      "pmid": "37725308"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('37725308')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|treatment delays|treatment abandonment|adverse event|physicians|prior authorization')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 37725308 ===\n\nTitle: Patient and Clinician Challenges with Anticholinergic Step Therapy in the Treatment of Overactive Bladder: A Narrative Review.\n\nJournal/Date: Advances in therapy (2023)\n\nMeSH Keywords: Humans, Urinary Bladder, Overactive, Cholinergic Antagonists, Adrenergic beta-3 Receptor Agonists\n\n\n--- ABSTRACT ---\nAnticholinergics have been used in the treatment of overactive bladder (OAB), but their use is limited by poor tolerability and anticholinergic-related side effects. Increasingly, providers are discontinuing anticholinergic prescribing because of growing evidence of the association of anticholinergic use with increased risk of cognitive decline and other adverse effects. Newer medications for OAB, the β3-adrenergic receptor agonists mirabegron and vibegron, do not have anticholinergic properties and are typically well tolerated; however, many insurance plans have limited patient access to these newer OAB medications by requiring step therapy, meaning less expensive anticholinergic medications must be trialed and/or failed before a β3-agonist will be covered and dispensed. Thus, many patients are unable to easily access these medications. Step therapy and other drug utilization strategies (e.g., prior authorization) are often used to manage the growing costs of pharmaceuticals, but these policies do not always follow treatment guidelines and may harm patients as a result of treatment delays, discontinuations, or related increases in adverse events. Medical professionals have called for reform of drug utilization strategies through partnerships that include clinicians and policymakers. This narrative review discusses prescribing patterns for OAB treatment and the effect of switching between drugs, as well as the costs of step therapy and prior authorization on patients and prescribers.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[DISCUSS]\nDrug Utilization Management of OAB Therapies\n\nThere are no clinical data to suggest that step therapy is beneficial to patient care, yet anticholinergics are generally preferred agents and/or required by insurance payers as initial treatment for the management of OAB. Utilization protocols for OAB drugs vary across US private health plans (Table 1) and Medicare prescription plans (managed through healthcare insurers that create treatment formularies; Table 2). In many formularies, exceptions to step therapy protocols may be made for patients with documented difficulties in swallowing, allowing for the prescribing of granules or other formulations that are not otherwise preferred products. β3-adrenergic receptor agonists (mirabegron and vibegron) have been given preferred status in older ad...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 15,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_y2W7loI2r7AwyB8exJLTAd70",
+    "parent_tool_call_id": "call_b4FUTMnDAjQ6AFKnGqMTdklw",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "A 2023 systematic review of 44 studies found that prior authorization was associated with significant delays in specialty-drug initiation; higher cost sharing was associated with medication abandonment (up to 75% for some specialty drugs), reduced initiation and persistence, and higher discontinuation, although effects on adherence measures such as MPR/PDC were inconsistent. The review explicitly noted that long-term clinical-outcome evidence remained limited.",
+          "source_tools": [
+            {
+              "relevance": "Systematic review with pooled evidence on delays, abandonment, adherence, and evidence limitations",
+              "tool_call_id": "call_wwN9zusQcJNYZcCzJTnjtyJf"
+            }
+          ]
+        },
+        {
+          "finding": "Patient-harm pathways are documented for step therapy and prior authorization: a narrative review of overactive-bladder care reported that payer-mandated step therapy can force trials of poorly tolerated or clinically unsuitable drugs, with treatment delays, discontinuations, and related increases in adverse events; it also noted that protocols may not follow treatment guidelines. This supports plausible and documented direct harm, but the cited review is narrative rather than a causal comparative trial.",
+          "source_tools": [
+            {
+              "relevance": "Direct discussion of step-therapy mechanisms, treatment delays, discontinuation, and adverse events",
+              "tool_call_id": "call_b4FUTMnDAjQ6AFKnGqMTdklw"
+            }
+          ]
+        },
+        {
+          "finding": "Equity concerns are documented: in a retrospective gynecologic-oncology cohort of 1,406 patients, 23% experienced prior authorization and occurrence differed by insurance and race/ethnicity; Medicare Advantage patients and patients of Asian descent had higher odds of prior authorization. The study establishes differential exposure, not definitive differential clinical harm.",
+          "source_tools": [
+            {
+              "relevance": "Peer-reviewed cohort study documenting insurance/racial disparities in PA exposure",
+              "tool_call_id": "call_ru6vwLLgwxxHN270d4uKTCh0"
+            }
+          ]
+        },
+        {
+          "finding": "Failure to receive therapy is measurable in oncology: a prospective cohort of 1,197 new oral anticancer prescriptions found 13% were not received within 3 months. Financial access accounted for 13% of nonreceipt cases, while most were attributed to clinical or patient decision-making; therefore, nonreceipt cannot be equated entirely with payer-caused abandonment, but payer/financial barriers are one documented component.",
+          "source_tools": [
+            {
+              "relevance": "Prospective cohort quantifying nonreceipt and separating financial from other causes",
+              "tool_call_id": "call_8EjUkSV0oKCiXhvjtBtZGyCy"
+            }
+          ]
+        },
+        {
+          "finding": "Clinician administrative burden is clearly documented and is distinct from direct patient harm: an observational study across eight community practices identified information-transfer gaps, incompatible formats, outdated technology, care consequences, and workarounds as PA pain points. Proposed mitigations were real-time eligibility/formulary alerts, accurate current formulary data with accessible alternatives, and embedded electronic prior authorization integrated with the EHR.",
+          "source_tools": [
+            {
+              "relevance": "Provider-perspective observational study with workflow problems and proposed interventions",
+              "tool_call_id": "call_R3GP0nlxi4gQmKNyMk679dyB"
+            }
+          ]
+        },
+        {
+          "finding": "A workflow intervention using real-time prescription benefits (RTPB) displayed prior-authorization and lower-cost-alternative alerts. In a large 2022–2023 implementation evaluation, selecting an alternative was associated with a higher fill rate than retaining the original prescription (68% vs 59%) and average monthly copay savings of $27.77. This supports alert redesign/transparency as a mitigation for access and cost barriers, but does not prove reduction in adverse clinical events.",
+          "source_tools": [
+            {
+              "relevance": "Policy/workflow evaluation of point-of-prescribing formulary/PA alerts",
+              "tool_call_id": "call_NYOv1qA88OxC3ghQPgzxmMNI"
+            }
+          ]
+        },
+        {
+          "finding": "Survey-based evidence cited in a peer-reviewed OAB review reported that 93% of respondents had seen treatment delays, 82% of physicians believed PA could contribute to treatment abandonment, and 34% said PA contributed to a serious adverse event. These are clinician perceptions rather than independently adjudicated patient outcomes and should be interpreted as signal of potential harm, not causal incidence estimates.",
+          "source_tools": [
+            {
+              "relevance": "Clinician-reported delay, abandonment, and adverse-event signal",
+              "tool_call_id": "call_b4FUTMnDAjQ6AFKnGqMTdklw"
+            },
+            {
+              "relevance": "Initial search result containing the survey percentages and adverse-event wording",
+              "tool_call_id": "call_uETWctWiwVMC96i1vTCX3fm"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: payer-imposed medication-management mechanisms are documented causes of access failures and treatment disruption, with the strongest evidence for initiation delays, nonreceipt/abandonment, reduced persistence, and financial burden; evidence for actual adverse events, hospitalization, mortality, or other hard clinical outcomes is thinner and often indirect. Formulary alerts themselves are less often studied as harms than the underlying payer rules they communicate or enforce.",
+          "source_tools": [
+            {
+              "relevance": "Systematic-review conclusion and evidence limitation",
+              "tool_call_id": "call_wwN9zusQcJNYZcCzJTnjtyJf"
+            },
+            {
+              "relevance": "Alert/workflow evidence showing alerts as mitigation rather than established harm mechanism",
+              "tool_call_id": "call_NYOv1qA88OxC3ghQPgzxmMNI"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_MeFUBUAE769wJe0vpDacbx5q",
+    "parent_tool_call_id": "call_pxCqnd0fadoTVZekpSnXGlrM",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "FINDING",
+          "name": "PA delays specialty therapy",
+          "observations": [
+            "A 2023 systematic review of 44 studies found prior authorization associated with significant delays in specialty-drug initiation; long-term clinical-outcome evidence remained limited."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Systematic-review evidence for treatment delay and limited hard-outcome evidence.",
+              "tool_call_id": "call_wwN9zusQcJNYZcCzJTnjtyJf"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Cost sharing abandonment",
+          "observations": [
+            "Higher cost sharing was associated with medication abandonment, reduced initiation and persistence, and higher discontinuation; abandonment reached 75% for some specialty drugs, while MPR/PDC findings were inconsistent."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Systematic-review evidence for access failure and treatment disruption.",
+              "tool_call_id": "call_wwN9zusQcJNYZcCzJTnjtyJf"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Step therapy harm pathway",
+          "observations": [
+            "A narrative review reported that payer-mandated step therapy can require poorly tolerated or clinically unsuitable drugs, causing treatment delays, discontinuations, and possible adverse events; protocols may not follow guidelines."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Mechanistic and narrative evidence for direct patient-harm pathways.",
+              "tool_call_id": "call_b4FUTMnDAjQ6AFKnGqMTdklw"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Unequal PA exposure",
+          "observations": [
+            "In a retrospective gynecologic-oncology cohort of 1,406 patients, 23% experienced prior authorization; occurrence differed by insurance and race/ethnicity, establishing differential exposure but not definitive differential clinical harm."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Evidence for inequitable exposure to payer barriers.",
+              "tool_call_id": "call_ru6vwLLgwxxHN270d4uKTCh0"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "RTPB mitigation",
+          "observations": [
+            "A real-time prescription-benefit intervention showed higher fill rates when patients selected an alternative than when retaining the original prescription (68% vs 59%) and produced average monthly copay savings of $27.77; clinical adverse-event reduction was not shown."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Evidence that redesigned formulary alerts can mitigate access and cost barriers.",
+              "tool_call_id": "call_NYOv1qA88OxC3ghQPgzxmMNI"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "PA workflow burden",
+          "observations": [
+            "An observational study across eight community practices identified information-transfer gaps, incompatible formats, outdated technology, workarounds, and care consequences; proposed mitigations included real-time formulary data, alternatives, and EHR-integrated electronic prior authorization."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Evidence distinguishing administrative burden from patient harm and identifying workflow changes.",
+              "tool_call_id": "call_R3GP0nlxi4gQmKNyMk679dyB"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PA delays specialty therapy",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Payer formulary mechanisms cause access harm"
+        },
+        {
+          "from_entity": "Cost sharing abandonment",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Payer formulary mechanisms cause access harm"
+        },
+        {
+          "from_entity": "Step therapy harm pathway",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Payer formulary mechanisms cause access harm"
+        },
+        {
+          "from_entity": "Unequal PA exposure",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Payer formulary mechanisms cause access harm"
+        },
+        {
+          "from_entity": "RTPB mitigation",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Formulary alert redesign mitigates access barriers"
+        },
+        {
+          "from_entity": "PA workflow burden",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Formulary alert redesign mitigates access barriers"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 6, \"entities\": [{\"name\": \"PA delays specialty therapy\", \"entityType\": \"FINDING\", \"observations\": [\"A 2023 systematic review of 44 studies found prior authorization associated with significant delays in specialty-drug initiation; long-term clinical-outcome evidence remained limited.\"]}, {\"name\": \"Cost sharing abandonment\", \"entityType\": \"FINDING\", \"observations\": [\"Higher cost sharing was associated with medication abandonment, reduced initiation and persistence, and higher discontinuation; abandonment reached 75% for some specialty drugs, while MPR/PDC findings were inconsistent.\"]}, {\"name\": \"Step therapy harm pathway\", \"entityType\": \"FINDING\", \"observations\": [\"A narrative review reported that payer-mandated step therapy can require poorly tolerated or clinically unsuitable drugs, causing treatment delays, discontinuations, and possible adverse events; protocols may not follow guidelines.\"]}, {\"name\": \"Unequal PA exposure\", \"entityType\": \"FINDING\", \"observations\": [\"In a retrospective gynecologic-oncology cohort of 1,406 patients, 23% experienced prior authorization; occurrence differed by insurance and race/ethnicity, establishing differential exposure but not definitive differential clinical harm.\"]}, {\"name\": \"RTPB mitigation\", \"entityType\": \"FINDING\", \"observations\": [\"A real-time prescription-benefit intervention showed higher fill rates when patients selected an alternative than when retaining the original prescription (68% vs 59%) and produced average monthly copay savings of $27.77; clinical adverse-event reduction was not shown.\"]}, {\"name\": \"PA workflow burden\", \"entityType\": \"FINDING\", \"observations\": [\"An observational study across eight community practices identified information-transfer gaps, incompatible formats, outdated technology, workarounds, and care consequences; proposed mitigations included real-time formulary data, alternatives, and EHR-integrated electronic prior authorization.\"]}]}, \"relations_created\": {\"count\": 6, \"relations\": [{\"from\": \"PA delays specialty therapy\", \"to\": \"Payer formulary mechanisms cause access harm\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Cost sharing abandonment\", \"to\": \"Payer formulary mechanisms cause access harm\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Step therapy harm pathway\", \"to\": \"Payer formulary mechanisms cause access harm\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Unequal PA exposure\", \"to\": \"Payer formulary mechanisms cause access harm\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"RTPB mitigation\", \"to\": \"Formulary alert redesign mitigates access barriers\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PA workflow burden\", \"to\": \"Formulary alert redesign mitigates access barriers\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_MeFUBUAE769wJe0vpDacbx5q\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_pxCqnd0fadoTVZekpSnXGlrM\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

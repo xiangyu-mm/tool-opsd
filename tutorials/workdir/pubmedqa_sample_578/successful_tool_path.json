@@ -1,0 +1,413 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_F4XbrluXM5suUI7fJzjJ4Flt",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "drug",
+        "disease"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether Aurora kinase A (AURKA) inhibitors enhance the effects of BRAF inhibitors and/or MEK inhibitors in melanoma. Identify direct studies using AURKA inhibitors such as alisertib/MLN8237 or other selective AURKA inhibitors with vemurafenib, dabrafenib, encorafenib, trametinib, cobimetinib, or binimetinib; report synergy/additivity, effects on tumor growth or resistance, melanoma models, and any clinical evidence. Distinguish AURKA from pan-Aurora inhibition and distinguish direct combination evidence from mechanistic rationale."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_ZYN20lCSzoxLz0BxJAlCO4uy",
+    "parent_tool_call_id": "call_F4XbrluXM5suUI7fJzjJ4Flt",
+    "round": 1,
+    "tool_input": {
+      "task_name": "Aurora melanoma resistance",
+      "boolean_query_text": "Aurora kinase A melanoma BRAF inhibitor resistance",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='Aurora kinase A melanoma BRAF inhibitor resistance',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='Aurora kinase A melanoma BRAF inhibitor resistance',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/Aurora_melanoma_resistance.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/Aurora_melanoma_resistance.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/Aurora_melanoma_resistance.csv'\nTotal results found: 57\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 26962685\nTitle: Overcoming MITF-conferred drug resistance through dual AURKA/MAPK targeting in human melanoma cells.\nSource: Cell death & disease (2016)\nAbstract: MITF (microphthalmia-associated transcription factor) is a frequently amplified lineage-specific oncogene in human melanoma, whose role in intrinsic drug resistance has not been systematically investigated. Utilizing chemical inhibitors for major signaling pathways/cellular processes, we witness MITF as an elicitor of intrinsic drug resistance. To search kinase(s) targets able to bypass MITF-conferred drug resistance, we employed a multi-kinase inhibitor-directed chemical proteomics-based differential affinity screen in human melanocytes carrying ectopic MITF overexpression. A subsequent methodical interrogation informed mitotic Ser/Thr kinase Aurora Kinase A (AURKA) as a crucial regulator of melanoma cell proliferation and migration, independent of the underlying molecular alterations, including TP53 functional status and MITF levels. Crucially, assessing the efficacy of investigational AURKA inhibitor MLN8237, we pre-emptively witness the procurement of a molecular program consistent with acquired drug resistance. This involved induction of multiple MAPK (mitogen-activated protein kinase) signaling pathway components and their downstream proliferation effectors (Cyclin D1 and c-J ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 25886620\nTitle: Next generation sequencing of exceptional responders with BRAF-mutant melanoma: implications for sensitivity and resistance.\nSource: BMC cancer (2015)\nAbstract: BACKGROUND: Patients with BRAF mutation-positive advanced melanoma respond well to matched therapy with BRAF or MEK inhibitors, but often quickly develop resistance. METHODS: Tumor tissue from ten patients with advanced BRAF mutation-positive melanoma who achieved partial response (PR) or complete response (CR) on BRAF and/or MEK inhibitors was analyzed using next generation sequencing (NGS) assay. Genomic libraries were captured for 3230 exons in 182 cancer-related genes plus 37 introns from 14 genes often rearranged in cancer and sequenced to average median depth of 734X with 99% of bases covered >100X. RESULTS: Three of the ten patients (median number of prior therapies = 2) attained prolonged CR (duration = 23.6+ to 28.7+ months); seven patients achieved either a PR or a short-lived CR. One patient who achieved CR ongoing at 28.7+ months and had tissue available close to the time of initiating BRAF inhibitor therapy had only a BRAF mutation. Abnormalities in addition to BRAF mutation found in other patients included: mutations in NRAS, APC and NF1; amplifications in BRAF, aurora kinase A, MYC, MITF and MET; deletions in CDKN2A/B and PAX5; and, alterations in RB1 and ATM. Hetero ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 34673281\nTitle: Proteogenomics Reveals Perturbed Signaling Networks in Malignant Melanoma Cells Resistant to BRAF Inhibition.\nSource: Molecular & cellular proteomics : MCP (2021)\nAbstract: Analysis of nucleotide variants is a cornerstone of cancer medicine. Although only 2% of the genomic sequence is protein coding, mutations occurring in these regions have the potential to influence protein structure or modification status and may have severe impact on disease aetiology. Proteogenomics enables the analysis of sample-specific nonsynonymous nucleotide variants with regard to their effect at the proteome and phosphoproteome levels. Here, we developed a proof-of-concept proteogenomics workflow and applied it to the malignant melanoma cell line A375. Initially, we studied the resistance to serine/threonine-protein kinase B-raf (BRAF) inhibitor (BRAFi) vemurafenib in A375 cells. This allowed identification of several oncogenic nonsynonymous nucleotide variants, including a gain-of-function variant on aurora kinase A (AURKA) at F31I. We also detected significant changes in abundance among (phospho)proteins, which led to reactivation of the MAPK signaling pathway in BRAFi-resistant A375 cells. Upon reconstruction of the multiomic integrated signaling networks, we predicted drug therapies with the potential to disrupt BRAFi resistance mechanism in A375 cells. Notably, we sho ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 25444926\nTitle: Ran signaling in melanoma: implications for the development of alternative therapeutic strategies.\nSource: Cancer letters (2015)\nAbstract: We performed a comparative study between two human metastatic melanoma cell lines (A375 and 526), and melanocytes (FOM78) by gene expression profiling and pathway analysis, using Gene Set Enrichment Analysis (GSEA) and Ingenuity Pathway Analysis (IPA) software. Genes involved in Ran signaling were significantly over-represented (p ≤ 0.001) and up-regulated in melanoma cells. A melanoma-associated molecular pathway was identified, where Ran, Aurora Kinase A (AurkA) and TERT were up-regulated, while c-myc and PTEN were down-regulated. A consistent high Ran and AurkA gene expression was detected in about 48% and 53%, respectively, of 113 tissue samples from metastatic melanoma patients. AurkA down-regulation was observed in melanoma cells, by Ran knockdown, suggesting AurkA protein is a Ran downstream target. Furthermore, AurkA inhibition, by exposure of melanoma cells to MLN8054, a specific AurKA inhibitor, induced apoptosis in both melanoma cell lines and molecular alterations in the IPA-identified molecular pathway. These alterations differed between cell lines, with an up-regulation of c-myc protein level observed in 526 cells and a slight reduction seen in A375 cells. Moreover, R ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 37003468\nTitle: Actionable Genetic Screens Unveil Targeting of AURKA, MEK, and Fatty Acid Metabolism as an Alternative Therapeutic Approach for Advanced Melanoma.\nSource: The Journal of investigative dermatology (2023)\nAbstract: Despite the remarkable improvements achieved in the management of metastatic melanoma, there are still unmet clinical needs. A considerable fraction of patients does not respond to immune and/or targeted therapies owing to primary and acquired resistance, high-grade immune-related adverse events, and a lack of alternative treatment options. To design effective combination therapies, we set up a functional ex vivo preclinical assay on the basis of a drop-out genetic screen in metastatic melanoma patient-derived xenografts. We showed that this approach can be used to isolate actionable vulnerabilities predictive of drug efficacy. In particular, we highlighted that the dual targeting of AURKA and MAPK/extracellular signal-regulated kinase kinase employing the combination of alisertib and trametinib is highly effective in a cohort of metastatic melanoma patient-derived xenografts, both ex vivo and in vivo. Alisertib and trametinib combination therapy outperforms standard-of-care therapy in both BRAF-mutant patient-derived xenografts and targeted therapy-resistant models. Furthermore, alisertib and trametinib treatment modulates several critical cancer pathways, including an early metab ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 28188776\nTitle: AURKA Overexpression Is Driven by FOXM1 and MAPK/ERK Activation in Melanoma Cells Harboring BRAF or NRAS Mutations: Impact on Melanoma Prognosis and Therapy.\nSource: The Journal of investigative dermatology (2017)\nAbstract: The cell cycle-related genes AURKA and FOXM1 are overexpressed in melanoma. We show here that AURKA overexpression is associated with poor prognosis in three independent cohorts of melanoma patients and correlates with the presence of genomic amplification of AURKA locus and BRAFV600E mutation. AURKA overexpression may also be driven by increased promoter activation through elements such as ETS and FOXM1 found within the 5' proximal promoter region. Activated MAPK/ERK signaling pathway mediates robust AURKA promoter activation, thereby knockdown of BRAFV600E and ERK inhibition results in reduced AURKA transcription and expression. We show a positive correlation between FOXM1 and AURKA expression in three independent cohorts of melanoma patients. FOXM1 silencing decreases expression of AURKA and late cell cycle genes in melanoma cells. We further found that FOXM1 expression levels are significantly higher in tumors carrying the BRAFV600E mutation compared with the wild-type BRAF (BRAFwt). Accordingly, the knockdown of BRAFV600E also reduces the expression of FOXM1 in BRAFV600E cells. Moreover, Aurora kinase A and FOXM1 inhibition by either genetic knockdown or pharmacologic inhibito ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 25074438\nTitle: AurkA inhibitors enhance the effects of B-RAF and MEK inhibitors in melanoma treatment.\nSource: Journal of translational medicine (2014)\nAbstract: BACKGROUND: Aurora kinase A (AurkA) is over-expressed in melanoma and its inhibition has been observed to limit tumor growth, suggesting a potential role in melanoma treatment. METHODS: A human melanoma cell line with the B-RAF (V600E) mutation (A375mel) was exposed to B-RAF inhibitor (GSK2118436), MEK inhibitor (GSK1120212) and AurkA inhibitor (MLN8054) as single agents or in various combinations (BRAF plus AurkA inhibitor, MEK plus AurkA inhibitor or triple combination BRAF plus MEK plus AurkA inhibitor). Cell proliferation was assessed using xCELLigence technology. Total protein extracts were examined for p53 and c-Myc protein expression by Western blot analysis. Drug anti-tumor effects were further assessed using a 3D-human melanoma skin reconstruction model, in which tissues were incubated with serum-free medium containing control, B-RAF plus MEK inhibitor, MEK plus AurkA inhibitor or the triple combination. RESULTS: AurkA inhibitor plus B-RAF inhibitor, AurkA inhibitor plus MEK inhibitor or triple combination had a markedly greater anti-proliferative effect on A375 (BRAFV600E) melanoma cells than single agents. In the 3D human skin model, the triple combination had a greater  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 34135599\nTitle: Current Perspectives and Novel Strategies of NRAS-Mutant Melanoma\nSource: Onco Targets Ther (2021)\nAbstract: @GENE_NRAS @GENE_4893 @@@NRAS@@@-mutant @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>melanoma</m>@@@ is refractory to <m>BRAF</m> <m>inhibitors</m>. <m>BRAF</m> <m>inhibitors</m> induce paradoxical activation of the MAPK pathway due to @GENE_RAF1 @GENE_5894 @@@CRAF@@@-mediated @GENE_MAPK1 @GENE_5594 @@@ERK@@@ phosphorylation.\n--------------------------------------------------------------------------------\nPMID: 35444937\nTitle: BRAF Inhibitor Resistance Confers Increased Sensitivity to Mitotic Inhibitors\nSource: Front Oncol (2022)\nAbstract: @GENE_BRAF @GENE_673 @@@<m>BRAF</m>@@@ <m>Inhibitor</m> <m>Resistance</m> Confers Increased Sensitivity to Mitotic <m>Inhibitors</m>\n--------------------------------------------------------------------------------\nPMID: 37003468\nTitle: Actionable genetic screens unveil targeting of AURKA, MEK and fatty acid metabolism as an alternative therapeutic approach for advanced melanoma.\nSource: J Invest Dermatol (2023)\nAbstract: In particular, we highlighted that the dual targeting of @GENE_AURKA @GENE_6790 @@@<m>Aurora</m> <m>kinase</m> A@@@ and @GENE_MAP2K7 @GENE_5609 @@@MEK@@@ employing the combination of @CHEMICAL_MLN_8237 @CHEMICAL_MESH:C550258 @@@alisertib@@@ and @CHEMICAL_trametinib @CHEMICAL_MESH:C560077 @@@trametinib@@@ (AT) is highly effective in a cohort of @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@metastatic <m>melanoma</m>@@@ PDXs both ex vivo and in vivo.\n--------------------------------------------------------------------------------\nPMID: 34673281\nTitle: Proteogenomics Reveals Perturbed Signaling Networks in Malignant Melanoma Cells Resistant to BRAF Inhibition\nSource: Mol Cell Proteomics (2021)\nAbstract: Initially, we studied the <m>resistance</m> to @GENE_BRAF @GENE_673 @@@serine/threonine-protein <m>kinase</m> B-raf@@@ (@GENE_BRAF @GENE_673 @@@<m>BRAF</m>@@@) <m>inhibitor</m> (BRAFi) @CHEMICAL_Vemurafenib @CHEMICAL_MESH:D000077484 @@@vemurafenib@@@ in @VARIANT_tmVar:c|Allele|A|375;VariantGroup:3;CorrespondingGene:861;CorrespondingSpecies:9606 @@@A375@@@ cells.\n--------------------------------------------------------------------------------\nPMID: 33972681\nTitle: The role of the p90 ribosomal S6 kinase family in prostate cancer progression and therapy resistance\nSource: Oncogene (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39510293\nTitle: Lessons learned from 20 years of preclinical testing in pediatric cancers\nSource: Pharmacol Ther (2024)\nAbstract: ...The <m>aurora</m> A <m>kinase</m> <m>inhibitor</m> @CHEMICAL_MLN_8237 @CHEMICAL_MESH:C550258 @@@alisertib@@@ (@CHEMICAL_MLN_8237 @CHEMICAL_MESH:C550258 @@@MLN8237@@@)\n--------------------------------------------------------------------------------\nPMID: 34063141\nTitle: Many Distinct Ways Lead to Drug Resistance in BRAF- and NRAS-Mutated Melanomas\nSource: Life (Basel) (2021)\nAbstract: ...3. <m>Resistance</m> to <m>Inhibitors</m> of Mutated @GENE_BRAF @GENE_673 @@@<m>BRAF</m>@@@ in @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>Melanoma</m>@@@\n--------------------------------------------------------------------------------\nPMID: 38521968\nTitle: The effects of Aurora Kinase inhibition on thyroid cancer growth and sensitivity to MAPK-directed therapies\nSource: Cancer Biol Ther (2024)\nAbstract: ...MEK1/2 <m>inhibitor</m>-sensitive and -resistant cell lines differentially regulate <m>Aurora</m> <m>Kinases</m> in response to MEKi\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_bjtbc0HNh51N9DY7bXuueRjc",
+    "parent_tool_call_id": "call_ZYN20lCSzoxLz0BxJAlCO4uy",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "MLN8054|GSK2118436|GSK1120212|combination|synerg|additive|A375|3D|tumor",
+      "pmid": "25074438"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25074438')\noutput = format_paper_content_output(result, filter_keywords='MLN8054|GSK2118436|GSK1120212|combination|synerg|additive|A375|3D|tumor')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (5):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m MLN8054|GSK2118436|GSK1120212|combination|synerg|additive|A375|3D|tumor\n      \u001b[90mpmid:\u001b[0m 25074438\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m alisertib|trametinib|synerg|combination|PDX|BRAF|resistan|tumor growth|in vivo\n      \u001b[90mpmid:\u001b[0m 37003468\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m MLN8237|BRAF|MEK|vemurafenib|resistan|combination|MITF|synerg\n      \u001b[90mpmid:\u001b[0m 26962685\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m MLN8054|apoptosis|A375|526|melanoma|specific AURKA\n      \u001b[90mpmid:\u001b[0m 25444926\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m AURKA|vemurafenib|resistan|F31I|inhibitor|combination\n      \u001b[90mpmid:\u001b[0m 34673281\n\n=== PMID: 25074438 ===\n\nTitle: AurkA inhibitors enhance the effects of B-RAF and MEK inhibitors in melanoma treatment.\n\nJournal/Date: Journal of translational medicine (2014)\n\nMeSH Keywords: Aurora Kinase A, Cell Line, Tumor, Cell Proliferation, Humans, Immunohistochemistry, Ki-67 Antigen, Melanoma, Mitogen-Activated Protein Kinase Kinases\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Aurora kinase A (AurkA) is over-expressed in melanoma and its inhibition has been observed to limit tumor growth, suggesting a potential role in melanoma treatment.\n[METHODS]: A human melanoma cell line with the B-RAF (V600E) mutation (A375mel) was exposed to B-RAF inhibitor (GSK2118436), MEK inhibitor (GSK1120212) and AurkA inhibitor (MLN8054) as single agents or in various combinations (BRAF plus AurkA inhibitor, MEK plus AurkA inhibitor or triple combination BRAF plus MEK plus AurkA inhibitor). Cell proliferation was assessed using xCELLigence technology. Total protein extracts were examined for p53 and c-Myc protein expression by Western blot analysis. Drug anti-tumor effects were further assessed using a 3D-human melanoma skin reconstruction model, in which tissues were incubated with serum-free medium containing control, B-RAF plus MEK inhibitor, MEK plus AurkA inhibitor or the triple combination.\n[RESULTS]: AurkA inhibitor plus B-RAF inhibitor, AurkA inhibitor plus MEK inhibitor or triple combination had a markedly greater anti-proliferative effect on A375 (BRAFV600E) melanoma cells than single agents. In the 3D human skin model, the triple combination had a greater anti-tumor effect at the epidermal/dermal junction than control or either double combination. However, S-100 and Ki-67 positively stained spindle-shaped cells were detected in the dermal stratum, suggesting the presence of alive and proliferating melanoma cells.\n[CONCLUSIONS]: These findings provide new prospects for melanoma research, including combined B-RAF/AurkA inhibition for B-RAF mutated melanomas and MEK/AurkA inhibitor combination for patients without B-RAF mutations. Moreover, for the first time, we have shown that a B-RAF, MEK and AurkA inhibitor triple drug combination offers increased efficacy against melanoma cell growth and might be considered as a potential treatment strategy for enhancing clinical response in melanoma. However, although this triple drug combination was more effective at the epidermal/dermal junction, the suggested presence of alive and proliferating melanoma cells in the dermal stratum could result in drug resistance and disease recurrence. Molecular characterization of these dermal cells may be critical for the development of novel therapeutic strategies.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults and discussion\n\nMelanoma cell exposure to B-RAF, MEK and AurkA inhibitors\n\nA375 (BRAFV600E) cell proliferation rates were assessed upon exposure to the different inhibitor drugs alone and in combination. As shown in Figure 1A, A375 cell proliferation rates were, as expected, reduced with B-RAF inhibitor alone and the combined B-RAF inhibitor plus MEK inhibitor. AurkA inhibitor in combination with B-RAF inhibitor and as a triple combination with B-RAF plus MEK inhibitors also reduced cell proliferation rate, although it was not very effective on cell proliferation rate, as single agent (Figure 1A). This suggests combined B-RAF/\n\n...[Remainder Truncated to Maintain LLM Context Budget]\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_25pooHDDpQgReopZ0aUbiyzE",
+    "parent_tool_call_id": "call_ZYN20lCSzoxLz0BxJAlCO4uy",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "alisertib|trametinib|synerg|combination|PDX|BRAF|resistan|tumor growth|in vivo",
+      "pmid": "37003468"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('37003468')\noutput = format_paper_content_output(result, filter_keywords='alisertib|trametinib|synerg|combination|PDX|BRAF|resistan|tumor growth|in vivo')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 37003468 ===\n\nTitle: Actionable Genetic Screens Unveil Targeting of AURKA, MEK, and Fatty Acid Metabolism as an Alternative Therapeutic Approach for Advanced Melanoma.\n\nJournal/Date: The Journal of investigative dermatology (2023)\n\nMeSH Keywords: Humans, Mice, Animals, Aurora Kinase A, Protein Kinase Inhibitors, Melanoma, Pyrimidinones, Mitogen-Activated Protein Kinase Kinases\n\n\n--- ABSTRACT ---\nDespite the remarkable improvements achieved in the management of metastatic melanoma, there are still unmet clinical needs. A considerable fraction of patients does not respond to immune and/or targeted therapies owing to primary and acquired resistance, high-grade immune-related adverse events, and a lack of alternative treatment options. To design effective combination therapies, we set up a functional ex vivo preclinical assay on the basis of a drop-out genetic screen in metastatic melanoma patient-derived xenografts. We showed that this approach can be used to isolate actionable vulnerabilities predictive of drug efficacy. In particular, we highlighted that the dual targeting of AURKA and MAPK/extracellular signal-regulated kinase kinase employing the combination of alisertib and trametinib is highly effective in a cohort of metastatic melanoma patient-derived xenografts, both ex vivo and in vivo. Alisertib and trametinib combination therapy outperforms standard-of-care therapy in both BRAF-mutant patient-derived xenografts and targeted therapy-resistant models. Furthermore, alisertib and trametinib treatment modulates several critical cancer pathways, including an early metabolic reprogramming that leads to the transcriptional upregulation of the fatty acid oxidation pathway. This acquired trait unveiled an additional point of intervention for pharmacological targeting, and indeed, the triple combination of alisertib and trametinib with the fatty acid oxidation inhibitor etomoxir proved to be further beneficial, inducing tumor regression and remarkably prolonging the overall survival of the mice.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_VgSmnHhsLXXlah7HDHdoZ6M7",
+    "parent_tool_call_id": "call_ZYN20lCSzoxLz0BxJAlCO4uy",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "MLN8237|BRAF|MEK|vemurafenib|resistan|combination|MITF|synerg",
+      "pmid": "26962685"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('26962685')\noutput = format_paper_content_output(result, filter_keywords='MLN8237|BRAF|MEK|vemurafenib|resistan|combination|MITF|synerg')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 26962685 ===\n\nTitle: Overcoming MITF-conferred drug resistance through dual AURKA/MAPK targeting in human melanoma cells.\n\nJournal/Date: Cell death & disease (2016)\n\nMeSH Keywords: Apoptosis, Aurora Kinase A, Azepines, Cell Line, Tumor, Drug Resistance, Neoplasm, GTP Phosphohydrolases, Humans, Melanoma\n\n\n--- ABSTRACT ---\nMITF (microphthalmia-associated transcription factor) is a frequently amplified lineage-specific oncogene in human melanoma, whose role in intrinsic drug resistance has not been systematically investigated. Utilizing chemical inhibitors for major signaling pathways/cellular processes, we witness MITF as an elicitor of intrinsic drug resistance. To search kinase(s) targets able to bypass MITF-conferred drug resistance, we employed a multi-kinase inhibitor-directed chemical proteomics-based differential affinity screen in human melanocytes carrying ectopic MITF overexpression. A subsequent methodical interrogation informed mitotic Ser/Thr kinase Aurora Kinase A (AURKA) as a crucial regulator of melanoma cell proliferation and migration, independent of the underlying molecular alterations, including TP53 functional status and MITF levels. Crucially, assessing the efficacy of investigational AURKA inhibitor MLN8237, we pre-emptively witness the procurement of a molecular program consistent with acquired drug resistance. This involved induction of multiple MAPK (mitogen-activated protein kinase) signaling pathway components and their downstream proliferation effectors (Cyclin D1 and c-JUN) and apoptotic regulators (MITF and Bcl-2). A concomitant AURKA/BRAF and AURKA/MEK targeting overcame MAPK signaling activation-associated resistance signature in BRAF- and NRAS-mutated melanomas, respectively, and elicited heightened anti-proliferative activity and apoptotic cell death. These findings reveal a previously unreported MAPK signaling-mediated mechanism of immediate resistance to AURKA inhibitors. These findings could bear significant implications for the application and the success of anti-AURKA approaches that have already entered phase-II clinical trials for human melanoma.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nMITF and intrinsic drug resistance\n\nTo explicitly understand the role of MITF in intrinsic drug resistance, we tested immortalized HMEL cells (Pmel/hTERT/CDK4(R24C)/p53DD), ectopically expressing BRAF(V600E) (referred to as HMEL-B) or BRAF(V600E)+MITF (referred to as HMEL-B/M) (Figure 1a) for their responsiveness to carefully selected targeted and general therapeutics (Supplementary Table S1). In line with the previous reports, introduction of constitutively active BRAF(V600E), while triggering an induction of c-JUN and Cyclin D1 expression, markedly downregulated the expression of endogenous MITF and its target Bcl-2. However, ectopic expression of MITF could restore MITF levels and partially rescue its target (Bcl-2) expression (Figure 1a). The choice of this model cellular syst...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_qmLOYkEaKaybhanCfVQvRflF",
+    "parent_tool_call_id": "call_ZYN20lCSzoxLz0BxJAlCO4uy",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "AURKA|vemurafenib|resistan|F31I|inhibitor|combination",
+      "pmid": "34673281"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('34673281')\noutput = format_paper_content_output(result, filter_keywords='AURKA|vemurafenib|resistan|F31I|inhibitor|combination')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 34673281 ===\n\nTitle: Proteogenomics Reveals Perturbed Signaling Networks in Malignant Melanoma Cells Resistant to BRAF Inhibition.\n\nJournal/Date: Molecular & cellular proteomics : MCP (2021)\n\nMeSH Keywords: Cell Line, Tumor, Core Binding Factor Alpha 2 Subunit, Drug Resistance, Neoplasm, Humans, Melanoma, Protein Kinase Inhibitors, Proteogenomics, Proto-Oncogene Proteins B-raf\n\n\n--- ABSTRACT ---\nAnalysis of nucleotide variants is a cornerstone of cancer medicine. Although only 2% of the genomic sequence is protein coding, mutations occurring in these regions have the potential to influence protein structure or modification status and may have severe impact on disease aetiology. Proteogenomics enables the analysis of sample-specific nonsynonymous nucleotide variants with regard to their effect at the proteome and phosphoproteome levels. Here, we developed a proof-of-concept proteogenomics workflow and applied it to the malignant melanoma cell line A375. Initially, we studied the resistance to serine/threonine-protein kinase B-raf (BRAF) inhibitor (BRAFi) vemurafenib in A375 cells. This allowed identification of several oncogenic nonsynonymous nucleotide variants, including a gain-of-function variant on aurora kinase A (AURKA) at F31I. We also detected significant changes in abundance among (phospho)proteins, which led to reactivation of the MAPK signaling pathway in BRAFi-resistant A375 cells. Upon reconstruction of the multiomic integrated signaling networks, we predicted drug therapies with the potential to disrupt BRAFi resistance mechanism in A375 cells. Notably, we showed that AURKA inhibition is effective and specific against BRAFi-resistant A375 cells. Subsequently, we investigated amino acid variants that interfere with protein posttranslational modification (PTM) status and potentially influence A375 cell signaling irrespective of BRAFi resistance. Mass spectrometry (MS) measurements confirmed variant-driven PTM changes in 12 proteins. Among them was the runt-related transcription factor 1 (RUNX1) displaying a variant on a known phosphorylation site S(Ph)276L. We confirmed the loss of phosphorylation site by MS and demonstrated the impact of this variant on RUNX1 interactome.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nTo study signal transduction networks using a proteogenomic approach, we selected the widely studied A375 melanoma cell line that harbors the BRAFV600E mutation. We generated two closely related A375 cell lines, drug-sensitive (A375 S) and drug-resistant against the BRAF inhibitor vemurafenib (A375 R), as described previously. The resulting cell lines were subjected to WES, as well as proteomics and phosphoproteomics evaluation (supplemental Fig. S1A). These multiomic measurements were then integrated (1) to reconstruct signaling networks that are disturbed in BRAFi-resistant A375 cells and (2) to investigate the impact of variants altering protein PTM status in A375 cells irrespective of BRAFi resistance.\n\nVariance in Protein Abundance Discriminates between BRAFi-sensitive and -r...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_XZb299DP1BYFO7mZK0UPDAf8",
+    "parent_tool_call_id": "call_qmLOYkEaKaybhanCfVQvRflF",
+    "round": 3,
+    "tool_input": {
+      "task_name": "alisertib melanoma trial",
+      "boolean_query_text": "alisertib melanoma clinical trial phase II",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='alisertib melanoma clinical trial phase II',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='alisertib melanoma clinical trial phase II',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/alisertib_melanoma_trial.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/alisertib_melanoma_trial.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (5):\u001b[0m\n  \u001b[1m\u001b[93m[1] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m alisertib melanoma trial\n      \u001b[90mboolean_query_text:\u001b[0m alisertib melanoma clinical trial phase II\n      \u001b[90mtop_k:\u001b[0m 30\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[2] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m Aurora BRAF combination\n      \u001b[90mboolean_query_text:\u001b[0m melanoma Aurora inhibitor vemurafenib dabrafenib alisertib MLN8054 MLN8237\n      \u001b[90mtop_k:\u001b[0m 50\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[3] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m pan Aurora melanoma\n      \u001b[90mboolean_query_text:\u001b[0m pan-Aurora inhibitor melanoma BRAF MEK inhibitor\n      \u001b[90mtop_k:\u001b[0m 50\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[4] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m AURKA dabrafenib\n      \u001b[90mboolean_query_text:\u001b[0m AURKA inhibitor dabrafenib melanoma\n      \u001b[90mtop_k:\u001b[0m 30\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[5] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m AURKA vemurafenib\n      \u001b[90mboolean_query_text:\u001b[0m AURKA inhibitor vemurafenib melanoma combination\n      \u001b[90mtop_k:\u001b[0m 30\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/alisertib_melanoma_trial.csv'\nTotal results found: 30\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 34371703\nTitle: Second-Generation Antimitotics in Cancer Clinical Trials\nSource: Pharmaceutics (2021)\nAbstract: Many of these inhibitors have entered <m>clinical</m> <m>trials</m>; however, they exhibited limited efficacy as monotherapy, and failed to go beyond <m>phase</m> <m>II</m> <m>trials</m>.\n--------------------------------------------------------------------------------\nPMID: 34050264\nTitle: Aurora kinase A, a synthetic lethal target for precision cancer medicine\nSource: Exp Mol Med (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38496700\nTitle: Clinical translation for targeting DNA damage repair in non-small cell lung cancer: a review\nSource: Transl Lung Cancer Res (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 41928334\nTitle: Preventive strategies against brain metastases: current state of the art and future directions\nSource: Neurol Res Pract (2026)\nAbstract: The key <m>clinical</m> <m>trials</m> leading to this approach were the <m>phase</m> <m>II</m> <m>trials</m> CheckMate 204 and @CHEMICAL_abacavir @CHEMICAL_MESH:C106538 @@@ABC@@@, demonstrating intracranial response rates of up to 60% in asymptomatic and up to 17% in symptomatic, @CHEMICAL_Steroids @CHEMICAL_MESH:D013256 @@@steroid@@@-dependent @SPECIES_9606 @@@patients@@@.\n--------------------------------------------------------------------------------\nPMID: 40098976\nTitle: Identification of biomarkers and target drugs for melanoma: a topological and deep learning approach\nSource: Front Genet (2025)\nAbstract: Drug Name Mechanism of action Drug disease Highest status reached ABT-510 Angiogenesis inhibitor; Thrombospondin 1 agonist, etc @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@Cancer@@@ <m>Phase</m> <m>II</m> <m>Clinical</m> <m>Trial</m> AEG-41174 Apoptosis stimulant; Bcr-Abl inhibitor; etc @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@Cancer@@@, leukaemia <m>Phase</m> I <m>Clinical</m> <m>Trial</m> AG-957 Apoptosis stimulant; Bcr-Abl inhibitor @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@Cancer@@@, unspecified Preclinical <m>alisertib</m> Aurora kinase inhibitor; Mitotic inhibitor; etc @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@Cancer@@@, leukaemia, lymphoma, myeloma, etc <m>Phase</m> <m>II</m> <m>Clinical</m> <m>Trial</m> aurora A kinase inhibitors Aurora kinase inhibitor @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@Cancer@@@, unspecified Preclinical BAY-1217389 @GENE_TTK @GENE_7272 @@@TTK@@@ kinase inhibitor @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@Cancer@@@, breast <m>Phase</m> I <m>Clinical</m> <m>Trial</m> ENMD-2076 Angiogenesis inhibitor; Aurora kinase inhibitor; etc @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@Cancer@@@, leukaemia, lymphoma, myeloma, etc <m>Phase</m> <m>II</m> < ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 37521867\nTitle: Emerging roles of Aurora-A kinase in cancer therapy resistance\nSource: Acta Pharm Sin B (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38606093\nTitle: Centrosomes and associated proteins in pathogenesis and treatment of breast cancer\nSource: Front Oncol (2024)\nAbstract: However, despite demonstrating strong antitumor activity in preclinical studies, <m>phase</m> <m>II</m> <m>clinical</m> <m>trials</m> with @CHEMICAL_alvocidib @CHEMICAL_MESH:C077990 @@@Flavopiridol@@@ alone failed to show efficacy against solid @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@carcinomas@@@.\n--------------------------------------------------------------------------------\nPMID: 33451333\nTitle: Targeting AURKA in Cancer: molecular mechanisms and opportunities for Cancer therapy\nSource: Mol Cancer (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33916592\nTitle: Developing New Agents for Treatment of Childhood Cancer: Challenges and Opportunities for Preclinical Testing\nSource: J Clin Med (2021)\nAbstract: Consequently, it is important to simulate <m>clinical</m> exposures for drugs in preclinical testing. Usually, testing in pediatric preclinical studies lags behind adult <m>clinical</m> <m>trials</m>, and for some drugs results of adult <m>phase</m> I pharmacokinetic studies are available to guide both dose and schedule of administration.\n--------------------------------------------------------------------------------\nPMID: 36009418\nTitle: Developing New Treatment Options for Castration-Resistant Prostate Cancer and Recurrent Disease\nSource: Biomedicines (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37835416\nTitle: Neuroblastoma in the Era of Precision Medicine: A Clinical Review\nSource: Cancers (Basel) (2023)\nAbstract: NCT03275402 is a currently open <m>phase</m> <m>II</m>/III <m>clinical</m> <m>trial</m> assessing the efficacy of @CHEMICAL_Iodine_131 @CHEMICAL_MESH:C000614965 @@@131I@@@-omburtamab in @DISEASE_Neuroblastoma @DISEASE_MESH:D009447 @@@HRNBL@@@ @SPECIES_9606 @@@patients@@@ with @DISEASE_Neoplasm_Metastasis @DISEASE_MESH:D009362 @@@CNS/leptomeningeal metastases@@@.\n--------------------------------------------------------------------------------\nPMID: 35559250\nTitle: Immune Checkpoint Inhibitors in Peripheral T-Cell Lymphoma\nSource: Front Pharmacol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34386358\nTitle: Current advances of targeting epigenetic modifications in neuroendocrine prostate cancer\nSource: Tzu Chi Med J (2021)\nAbstract: A <m>Phase</m> <m>II</m> <m>clinical</m> <m>trial</m> of @CHEMICAL_MLN_8237 @CHEMICAL_MESH:C550258 @@@MLN 8237@@@ (@CHEMICAL_MLN_8237 @CHEMICAL_MESH:C550258 @@@<m>alisertib</m>@@@) in @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@NEPC@@@ @SPECIES_9606 @@@patients@@@ showed a modest <m>clinical</m> benefit (NCT01799278).\n--------------------------------------------------------------------------------\nPMID: 35326717\nTitle: Interrogating the Genomic Landscape of Uterine Leiomyosarcoma: A Potential for Patient Benefit\nSource: Cancers (Basel) (2022)\nAbstract: Following encouraging preclinical evidence of sensitivity to @CHEMICAL_MLN_8237 @CHEMICAL_MESH:C550258 @@@MLN8237@@@ in the vulval @DISEASE_Lateral_meningocele_syndrome @DISEASE_MESH:C537878 @@@LMS@@@ cell line @CELLLINE_CVCL:0628 @@@SK-LMS-1@@@ both in vitro and in vivo, a <m>phase</m> <m>II</m> <m>clinical</m> <m>trial</m> of @CHEMICAL_MLN_8237 @CHEMICAL_MESH:C550258 @@@<m>Alisertib</m>@@@ as a monotherapy was conducted in recurrent @DISEASE_Leiomyosarcoma @DISEASE_MESH:D007890 @@@uLMS@@@ @SPECIES_9606 @@@patients@@@.\n--------------------------------------------------------------------------------\nPMID: 35326726\nTitle: Identification of New Vulnerabilities in Conjunctival Melanoma Using Image-Based High Content Drug Screening\nSource: Cancers (Basel) (2022)\nAbstract: <m>Clinical</m> <m>trials</m> using @CHEMICAL_dinaciclib @CHEMICAL_MESH:C553669 @@@Dinaciclib@@@ as a single agent in the treatment of advanced @DISEASE_Melanoma_Cutaneous_Malignant @DISEASE_MESH:C562393 @@@cutaneous <m>melanoma</m>@@@ are ongoing.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_njbP8NMzz2DoJRyhYeewgWz2",
+    "parent_tool_call_id": "call_qmLOYkEaKaybhanCfVQvRflF",
+    "round": 3,
+    "tool_input": {
+      "task_name": "AURKA vemurafenib",
+      "boolean_query_text": "AURKA inhibitor vemurafenib melanoma combination",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='AURKA inhibitor vemurafenib melanoma combination',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='AURKA inhibitor vemurafenib melanoma combination',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/AURKA_vemurafenib.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/AURKA_vemurafenib.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/AURKA_vemurafenib.csv'\nTotal results found: 30\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 34673281\nTitle: Proteogenomics Reveals Perturbed Signaling Networks in Malignant Melanoma Cells Resistant to BRAF Inhibition\nSource: Mol Cell Proteomics (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35969744\nTitle: Bromodomain inhibition overcomes treatment resistance in distinct molecular subtypes of melanoma\nSource: Proc Natl Acad Sci U S A (2022)\nAbstract: Collectively, these observations suggest the potential utility of a bromodomain <m>inhibitor</m>, alone or in <m>combination</m> with MAPK pathway inhibition, as a rational therapeutic strategy for @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>melanoma</m>@@@, which represents the focus of the current analysis.\n--------------------------------------------------------------------------------\nPMID: 34575429\nTitle: Combination Therapy of Navitoclax with Chemotherapeutic Agents in Solid Tumors and Blood Cancer: A Review of Current Evidence\nSource: Pharmaceutics (2021)\nAbstract: This <m>combination</m> significantly inhibited cell development and induced a higher apoptosis rate with a lower concentration of @CHEMICAL_navitoclax @CHEMICAL_MESH:C528561 @@@navitoclax@@@ and @CHEMICAL_Vemurafenib @CHEMICAL_MESH:D000077484 @@@<m>vemurafenib</m>@@@, in which 0.5 microM and 1 microM were required respectively to yield synergistic activity.\n--------------------------------------------------------------------------------\nPMID: 34071428\nTitle: Emerging Insights into Targeted Therapy-Tolerant Persister Cells in Cancer\nSource: Cancers (Basel) (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37174007\nTitle: 4-[(5-Methyl-1H-pyrazol-3-yl)amino]-2H-phenyl-1-phthalazinone Inhibits MCPyV T Antigen Expression in Merkel Cell Carcinoma Independent of Aurora Kinase A\nSource: Cancers (Basel) (2023)\nAbstract: Indeed, it is a well-known phenomenon that @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@tumors@@@ treated by small molecule <m>inhibitors</m> after an initial response can become resistant. For example, @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@tumors@@@ induced by xenotransplantation of a @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>melanoma</m>@@@ cell line first shrank upon treatment with the @GENE_BRAF @GENE_673 @@@BRAF@@@ <m>inhibitor</m> @CHEMICAL_Vemurafenib @CHEMICAL_MESH:D000077484 @@@<m>vemurafenib</m>@@@, but after only 10 days regained growth.\n--------------------------------------------------------------------------------\nPMID: 37259298\nTitle: Piperine-Chlorogenic Acid Hybrid Inhibits the Proliferation of the SK-MEL-147 Melanoma Cells by Modulating Mitotic Kinases\nSource: Pharmaceuticals (Basel) (2023)\nAbstract: In this way, pharmacological inhibition of @GENE_AURKA @GENE_6790 @@@<m>AURKA</m>@@@ by @CHEMICAL_MLN_8237 @CHEMICAL_MESH:C550258 @@@MLN8237@@@ (@CHEMICAL_MLN_8237 @CHEMICAL_MESH:C550258 @@@alisertib@@@) resulted in the reduction of @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>melanoma</m>@@@ cell proliferation and induced senescence and apoptosis in cells with @GENE_BRAF @GENE_673 @@@BRAF@@@ and @GENE_NRAS @GENE_4893 @@@NRAS@@@ mutation, and in @CHEMICAL_Vemurafenib @CHEMICAL_MESH:D000077484 @@@<m>vemurafenib</m>@@@ (@GENE_BRAF @GENE_673 @@@BRAF@@@ <m>inhibitor</m>) resistant cells.\n--------------------------------------------------------------------------------\nPMID: 40615439\nTitle: MelanoDB: A dataset of clinical and molecular features of patients with advanced melanoma treated with MAPK inhibitors\nSource: Sci Data (2025)\nAbstract: All @SPECIES_9606 @@@patients@@@ were treated with MAPKi: 252 (61%) with BRAFi alone (@CHEMICAL_Vemurafenib @CHEMICAL_MESH:D000077484 @@@<m>vemurafenib</m>@@@ or @CHEMICAL_dabrafenib @CHEMICAL_MESH:C561627 @@@dabrafenib@@@) and 163 (39%) with a <m>combination</m> of BRAFi and MEKi (@CHEMICAL_dabrafenib @CHEMICAL_MESH:C561627 @@@dabrafenib@@@ + trametininb or @CHEMICAL_Vemurafenib @CHEMICAL_MESH:D000077484 @@@<m>vemurafenib</m>@@@ + cobimetitnib) (Fig. 2b).\n--------------------------------------------------------------------------------\nPMID: 39790031\nTitle: Research progress of Chinese medicinal monomers in the process of melanoma occurrence\nSource: Pharm Biol (2025)\nAbstract: By <m>inhibiting</m> this pathway, toadflax endolipids may reverse drug resistance in @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>melanoma</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 36011043\nTitle: Targeting Histone Epigenetic Modifications and DNA Damage Responses in Synthetic Lethality Strategies in Cancer?\nSource: Cancers (Basel) (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35975971\nTitle: Molecular Mechanisms of Resistance to Kinase Inhibitors and Redifferentiation in Thyroid Cancers\nSource: Endocr Relat Cancer (2022)\nAbstract: Resistance to @CHEMICAL_Vemurafenib @CHEMICAL_MESH:D000077484 @@@<m>vemurafenib</m>@@@ in @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>melanoma</m>@@@ can also be caused by over-expression of @GENE_EPHA2 @GENE_1969 @@@EPHA2@@@, a member of the Ephrin receptor family of tyrosine kinases.\n--------------------------------------------------------------------------------\nPMID: 33915740\nTitle: Aurora Kinase B Inhibition: A Potential Therapeutic Strategy for Cancer\nSource: Molecules (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37325482\nTitle: lncRNAs-EZH2 interaction as promising therapeutic target in cutaneous melanoma\nSource: Front Mol Biosci (2023)\nAbstract: As mentioned previously, recently published research acknowledge @GENE_EZH2 @GENE_2146 @@@EZH2@@@ contribution to resistance to targeted therapy against BRAFV600 and MEK1/2 in @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>melanoma</m>@@@. Gebhardt and others have noticed that @GENE_MIR1295A @GENE_100302178 @@@miR-129-5p@@@ is among the most upregulated miRNAs during acute treatment with BRAFV600 <m>inhibitors</m> @CHEMICAL_Vemurafenib @CHEMICAL_MESH:D000077484 @@@<m>vemurafenib</m>@@@ and @CHEMICAL_dabrafenib @CHEMICAL_MESH:C561627 @@@dabrafenib@@@, however, in @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>melanoma</m>@@@ cell lines with acquired resistance to BRAFV600 <m>inhibitors</m> (BRAFi) its expression diminishes.\n--------------------------------------------------------------------------------\nPMID: 40514365\nTitle: The role and mechanism of fatty acid oxidation in cancer drug resistance\nSource: Cell Death Discov (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36601121\nTitle: The role of lncRNAs in the tumor microenvironment and immunotherapy of melanoma\nSource: Front Immunol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34202566\nTitle: Drug Tolerance to EGFR Tyrosine Kinase Inhibitors in Lung Cancers with EGFR Mutations\nSource: Cells (2021)\nAbstract: Another potential answer to the question of the origin of @DISEASE_Ototoxicity @DISEASE_MESH:D000081015 @@@DTCs@@@ is provided by a study of @GENE_BRAF @GENE_673 @@@BRAF@@@ @VARIANT_p.V600E_BRAF_human @VARIANT_tmVar:p|SUB|V|600|E;HGVS:p.V600E;VariantGroup:0;CorrespondingGene:673;RS#:113488022;CorrespondingSpecies:9606;CA#:123643 @@@V600E@@@-mutated @DISEASE_Melanoma @DISEASE_MESH:D008545 @@@<m>melanoma</m>@@@ cell line models treated with @CHEMICAL_Vemurafenib @CHEMICAL_MESH:D000077484 @@@<m>vemurafenib</m>@@@.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 15,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_PqhrufqW810A1yV80PhqBs9o",
+    "parent_tool_call_id": "call_njbP8NMzz2DoJRyhYeewgWz2",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Direct preclinical evidence supports AURKA plus MAPK inhibition in melanoma. In BRAFV600E A375 cells, the selective AURKA inhibitor MLN8054 combined with the BRAF inhibitor GSK2118436 (dabrafenib) or the MEK inhibitor GSK1120212 (trametinib) produced markedly greater antiproliferative effects than single agents; the triple combination was strongest in a 3D human melanoma skin-reconstruction model, although residual proliferating melanoma cells remained in the dermis. The paper did not report a formal synergy/additivity metric in the abstract/full-text passages retrieved.",
+          "source_tools": [
+            {
+              "relevance": "Direct MLN8054 + dabrafenib/trametinib melanoma combination study",
+              "tool_call_id": "call_bjtbc0HNh51N9DY7bXuueRjc"
+            }
+          ]
+        },
+        {
+          "finding": "A 2023 metastatic-melanoma patient-derived xenograft study directly tested selective AURKA inhibition with MEK inhibition: alisertib plus trametinib was highly effective ex vivo and in vivo, outperformed standard-of-care therapy in BRAF-mutant PDXs, and retained activity in targeted-therapy-resistant models. The retrieved abstract describes enhanced efficacy and tumor control but does not provide a formal synergy score.",
+          "source_tools": [
+            {
+              "relevance": "Direct alisertib + trametinib PDX and resistant-model evidence",
+              "tool_call_id": "call_25pooHDDpQgReopZ0aUbiyzE"
+            }
+          ]
+        },
+        {
+          "finding": "In BRAF- and NRAS-mutant melanoma cell models, MLN8237 (alisertib) induced a compensatory MAPK-resistance program; combined AURKA/BRAF targeting in BRAF-mutant cells and AURKA/MEK targeting in NRAS-mutant cells overcame that resistance signature and increased antiproliferative and apoptotic effects. This is direct combination evidence, but the abstract does not identify the specific BRAF/MEK drug names or report a formal synergy metric.",
+          "source_tools": [
+            {
+              "relevance": "Mechanistic/direct combination evidence with alisertib in melanoma models",
+              "tool_call_id": "call_VgSmnHhsLXXlah7HDHdoZ6M7"
+            }
+          ]
+        },
+        {
+          "finding": "AURKA inhibition is also active against BRAF-inhibitor-resistant melanoma: in A375 cells selected for vemurafenib resistance, an AURKA F31I variant was identified with MAPK reactivation, and AURKA inhibition was reported as effective and specific against the resistant cells. This supports a resistance rationale, but it is not a direct combination experiment with vemurafenib and does not establish combination synergy.",
+          "source_tools": [
+            {
+              "relevance": "Direct resistance model but not combination study",
+              "tool_call_id": "call_qmLOYkEaKaybhanCfVQvRflF"
+            }
+          ]
+        },
+        {
+          "finding": "Other selective-AURKA melanoma evidence is mechanistic rather than combination evidence: MLN8054 induced apoptosis in A375 and 526 metastatic melanoma cells, independently of BRAF mutational status; and AURKA expression is associated with MAPK/ERK activation and poor prognosis. These findings support rationale but do not demonstrate enhancement of a named BRAF/MEK inhibitor.",
+          "source_tools": [
+            {
+              "relevance": "Selective AURKA single-agent melanoma evidence",
+              "tool_call_id": "call_lCVv45P9yTuFYjy2Uf0bkAIy"
+            },
+            {
+              "relevance": "AURKA-MAPK biology and resistance rationale",
+              "tool_call_id": "call_ZYN20lCSzoxLz0BxJAlCO4uy"
+            }
+          ]
+        },
+        {
+          "finding": "No direct clinical evidence was identified for combining an AURKA-selective inhibitor (alisertib/MLN8237, MLN8054, or another selective AURKA inhibitor) with vemurafenib, dabrafenib, encorafenib, trametinib, cobimetinib, or binimetinib in melanoma. The clinical literature retrieved concerns AURKA inhibitors largely as monotherapy or in non-melanoma settings; therefore clinical benefit, safety, and translational feasibility of these combinations remain unestablished.",
+          "source_tools": [
+            {
+              "relevance": "Clinical-trial search did not identify a melanoma AURKA + BRAF/MEK combination trial",
+              "tool_call_id": "call_XZb299DP1BYFO7mZK0UPDAf8"
+            }
+          ]
+        },
+        {
+          "finding": "The evidence located is principally selective AURKA-specific, not pan-Aurora: MLN8054 and alisertib/MLN8237 are described as AURKA-directed agents in the direct melanoma studies. No convincing direct melanoma combination study using a pan-Aurora inhibitor with the requested BRAF/MEK inhibitors was identified; pan-Aurora or broader Aurora literature should not be substituted for these AURKA-specific results.",
+          "source_tools": [
+            {
+              "relevance": "Selective-AURKA designation in direct studies",
+              "tool_call_id": "call_bjtbc0HNh51N9DY7bXuueRjc"
+            },
+            {
+              "relevance": "Selective alisertib/AURKA designation in PDX study",
+              "tool_call_id": "call_25pooHDDpQgReopZ0aUbiyzE"
+            },
+            {
+              "relevance": "Search for pan-Aurora combinations did not yield a direct melanoma study",
+              "tool_call_id": "call_gks2bWUbTdmW8WO3g9f5aocj"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_wyyk4lN1ouRMdFgEEnfXWeXN",
+    "parent_tool_call_id": "call_F4XbrluXM5suUI7fJzjJ4Flt",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "CHEMICAL",
+          "name": "MLN8054",
+          "observations": [
+            "Selective AURKA inhibitor tested with dabrafenib and trametinib in BRAFV600E A375 melanoma cells and a 3D human melanoma skin model; combinations produced greater growth inhibition than single agents, with the triple regimen strongest, but no formal synergy metric was reported."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct AURKA–BRAF/MEK combination evidence",
+              "tool_call_id": "call_bjtbc0HNh51N9DY7bXuueRjc"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL",
+          "name": "Alisertib",
+          "observations": [
+            "Selective AURKA inhibitor combined with trametinib in melanoma patient-derived xenografts; the combination showed strong ex vivo and in vivo tumor control, including BRAF-mutant and targeted-therapy-resistant models, without a reported formal synergy score."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct AURKA–MEK combination evidence",
+              "tool_call_id": "call_25pooHDDpQgReopZ0aUbiyzE"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL",
+          "name": "Dabrafenib",
+          "observations": [
+            "Combined with MLN8054 in BRAFV600E A375 melanoma cells, producing greater antiproliferative effects than single agents."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct combination result",
+              "tool_call_id": "call_bjtbc0HNh51N9DY7bXuueRjc"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL",
+          "name": "Trametinib",
+          "observations": [
+            "Combined with MLN8054 in BRAFV600E A375 cells and with alisertib in melanoma PDX models; combinations enhanced antitumor effects and retained activity in resistant models."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct combination results",
+              "tool_call_id": "call_bjtbc0HNh51N9DY7bXuueRjc"
+            },
+            {
+              "relevance": "PDX combination result",
+              "tool_call_id": "call_25pooHDDpQgReopZ0aUbiyzE"
+            }
+          ]
+        },
+        {
+          "entity_type": "DISEASE",
+          "name": "Melanoma",
+          "observations": [
+            "Selective AURKA inhibition enhances BRAF/MEK pathway inhibitor activity in multiple preclinical melanoma models, but clinical benefit of these combinations remains unestablished."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Overall evidence synthesis",
+              "tool_call_id": "call_bjtbc0HNh51N9DY7bXuueRjc"
+            },
+            {
+              "relevance": "Clinical evidence assessment",
+              "tool_call_id": "call_XZb299DP1BYFO7mZK0UPDAf8"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "AURKA-MAPK enhancement",
+          "observations": [
+            "In melanoma models, AURKA inhibition combined with BRAF or MEK inhibition increased antiproliferative, apoptotic, or tumor-control effects compared with single agents; formal pharmacologic synergy was not consistently demonstrated."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct combination studies",
+              "tool_call_id": "call_bjtbc0HNh51N9DY7bXuueRjc"
+            },
+            {
+              "relevance": "Resistance and combination study",
+              "tool_call_id": "call_VgSmnHhsLXXlah7HDHdoZ6M7"
+            },
+            {
+              "relevance": "PDX study",
+              "tool_call_id": "call_25pooHDDpQgReopZ0aUbiyzE"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Clinical evidence gap",
+          "observations": [
+            "No direct clinical evidence was identified for combining selective AURKA inhibitors with approved melanoma BRAF or MEK inhibitors; clinical efficacy, safety, and translational feasibility remain unestablished."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Clinical literature assessment",
+              "tool_call_id": "call_XZb299DP1BYFO7mZK0UPDAf8"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "AURKA resistance vulnerability",
+          "observations": [
+            "AURKA inhibition overcame or targeted compensatory MAPK resistance programs in BRAF- and NRAS-mutant melanoma models and showed activity in vemurafenib-resistant melanoma, although the latter was not a direct combination experiment."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Combination resistance mechanisms",
+              "tool_call_id": "call_VgSmnHhsLXXlah7HDHdoZ6M7"
+            },
+            {
+              "relevance": "Vemurafenib-resistant model",
+              "tool_call_id": "call_qmLOYkEaKaybhanCfVQvRflF"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "MLN8054",
+          "relation_type": "INHIBITS",
+          "to_entity": "AURKA"
+        },
+        {
+          "from_entity": "Alisertib",
+          "relation_type": "INHIBITS",
+          "to_entity": "AURKA"
+        },
+        {
+          "from_entity": "MLN8054",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "AURKA-MAPK enhancement"
+        },
+        {
+          "from_entity": "Alisertib",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "AURKA-MAPK enhancement"
+        },
+        {
+          "from_entity": "AURKA-MAPK enhancement",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Melanoma"
+        },
+        {
+          "from_entity": "AURKA resistance vulnerability",
+          "relation_type": "SUPPORTS",
+          "to_entity": "AURKA-MAPK enhancement"
+        },
+        {
+          "from_entity": "Clinical evidence gap",
+          "relation_type": "INCONCLUSIVE_FOR",
+          "to_entity": "Melanoma"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 8, \"entities\": [{\"name\": \"MLN8054\", \"entityType\": \"CHEMICAL\", \"observations\": [\"Selective AURKA inhibitor tested with dabrafenib and trametinib in BRAFV600E A375 melanoma cells and a 3D human melanoma skin model; combinations produced greater growth inhibition than single agents, with the triple regimen strongest, but no formal synergy metric was reported.\"]}, {\"name\": \"Alisertib\", \"entityType\": \"CHEMICAL\", \"observations\": [\"Selective AURKA inhibitor combined with trametinib in melanoma patient-derived xenografts; the combination showed strong ex vivo and in vivo tumor control, including BRAF-mutant and targeted-therapy-resistant models, without a reported formal synergy score.\"]}, {\"name\": \"Dabrafenib\", \"entityType\": \"CHEMICAL\", \"observations\": [\"Combined with MLN8054 in BRAFV600E A375 melanoma cells, producing greater antiproliferative effects than single agents.\"]}, {\"name\": \"Trametinib\", \"entityType\": \"CHEMICAL\", \"observations\": [\"Combined with MLN8054 in BRAFV600E A375 cells and with alisertib in melanoma PDX models; combinations enhanced antitumor effects and retained activity in resistant models.\"]}, {\"name\": \"Melanoma\", \"entityType\": \"DISEASE\", \"observations\": [\"Selective AURKA inhibition enhances BRAF/MEK pathway inhibitor activity in multiple preclinical melanoma models, but clinical benefit of these combinations remains unestablished.\"]}, {\"name\": \"AURKA-MAPK enhancement\", \"entityType\": \"FINDING\", \"observations\": [\"In melanoma models, AURKA inhibition combined with BRAF or MEK inhibition increased antiproliferative, apoptotic, or tumor-control effects compared with single agents; formal pharmacologic synergy was not consistently demonstrated.\"]}, {\"name\": \"Clinical evidence gap\", \"entityType\": \"FINDING\", \"observations\": [\"No direct clinical evidence was identified for combining selective AURKA inhibitors with approved melanoma BRAF or MEK inhibitors; clinical efficacy, safety, and translational feasibility remain unestablished.\"]}, {\"name\": \"AURKA resistance vulnerability\", \"entityType\": \"FINDING\", \"observations\": [\"AURKA inhibition overcame or targeted compensatory MAPK resistance programs in BRAF- and NRAS-mutant melanoma models and showed activity in vemurafenib-resistant melanoma, although the latter was not a direct combination experiment.\"]}]}, \"relations_created\": {\"count\": 7, \"relations\": [{\"from\": \"MLN8054\", \"to\": \"AURKA\", \"relationType\": \"INHIBITS\"}, {\"from\": \"Alisertib\", \"to\": \"AURKA\", \"relationType\": \"INHIBITS\"}, {\"from\": \"MLN8054\", \"to\": \"AURKA-MAPK enhancement\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Alisertib\", \"to\": \"AURKA-MAPK enhancement\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"AURKA-MAPK enhancement\", \"to\": \"Melanoma\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"AURKA resistance vulnerability\", \"to\": \"AURKA-MAPK enhancement\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Clinical evidence gap\", \"to\": \"Melanoma\", \"relationType\": \"INCONCLUSIVE_FOR\"}]}}, \"provenance\": {\"tool_call_id\": \"call_wyyk4lN1ouRMdFgEEnfXWeXN\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_F4XbrluXM5suUI7fJzjJ4Flt\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

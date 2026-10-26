@@ -1,0 +1,206 @@
+[
+  {
+    "step": 8,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_XqXoO4WAGt7a6YF68MdkmAg1",
+    "parent_tool_call_id": null,
+    "round": 2,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 4,
+      "search_target": "Determine whether decreased daytime sleeping or daytime napping after hospital discharge is associated with improved cognition in older adults (aged 65+). Search specifically for longitudinal cohorts, post-acute care, hospital-to-home recovery, delirium follow-up, sleep-wake activity, actigraphy, daytime sleep, daytime sleepiness, naps, and cognitive tests. Report exact studies and results, and state if direct evidence is absent; do not substitute general associations unless clearly labeled."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_SRGjpMDDbP9LG0iWkCuTIkSE",
+    "parent_tool_call_id": "call_XqXoO4WAGt7a6YF68MdkmAg1",
+    "round": 1,
+    "tool_input": {
+      "task_name": "daytime sleepiness cognition",
+      "boolean_query_text": "older adults hospital-to-home daytime sleepiness naps cognitive recovery cohort",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='older adults hospital-to-home daytime sleepiness naps cognitive recovery cohort',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='older adults hospital-to-home daytime sleepiness naps cognitive recovery cohort',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/daytime_sleepiness_cognition.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/daytime_sleepiness_cognition.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/daytime_sleepiness_cognition.csv'\nTotal results found: 20\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 34484437\nTitle: Joint consensus statement of the Saudi Public Health Authority on the recommended amount of physical activity, sedentary behavior, and sleep duration for healthy Saudis: Background, methodology, and discussion\nSource: Ann Thorac Med (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39559891\nTitle: Daytime Sleepiness, Apnea, Neuroimaging Correlates and Cortisol Dysregulation in a Memory Clinic Cohort\nSource: J Prev Alzheimers Dis (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35804185\nTitle: Sleep habits are associated with cognition decline in physically robust, but not in frail participants: a longitudinal observational study\nSource: Sci Rep (2022)\nAbstract: The Healthy Ageing Longitudinal Study in Taiwan (HALST), a prospective follow-up <m>cohort</m> study of community-dwelling <m>older</m> <m>adults</m>, provides an opportunity to observe physical and <m>cognitive</m> changes in later life.\n--------------------------------------------------------------------------------\nPMID: 38643014\nTitle: Sleep and circadian biomarkers of postoperative delirium (SLEEP-POD): protocol for a prospective and observational cohort study\nSource: BMJ Open (2024)\nAbstract: It is associated with @DISEASE_Cognition_Disorders @DISEASE_MESH:D003072 @@@<m>cognitive</m> dysfunction@@@ and @DISEASE_Alzheimer_Disease @DISEASE_MESH:D000544 @@@Alzheimer's disease@@@ (@DISEASE_Alzheimer_Disease @DISEASE_MESH:D000544 @@@AD@@@) and related @DISEASE_Dementia @DISEASE_MESH:D003704 @@@dementias@@@ (@DISEASE_Dementia @DISEASE_MESH:D003704 @@@ADRD@@@) but can present in otherwise <m>cognitively</m> intact <m>older</m> <m>adults</m>.\n--------------------------------------------------------------------------------\nPMID: 35756155\nTitle: Sleep Pattern Changes and the Level of Fatigue Reported in a Community Sample of Adults During COVID-19 Pandemic\nSource: Sleep Vigil (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37754349\nTitle: 34th Annual Meeting of the Society for Light Treatment and Biological Rhythms (SLTBR), 30 May-1 June, Lausanne, Switzerland\nSource: Clocks Sleep (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33921870\nTitle: Sleep-Based Interventions in Alzheimer's Disease: Promising Approaches from Prevention to Treatment along the Disease Trajectory\nSource: Pharmaceuticals (Basel) (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37190572\nTitle: Gender and Nightshift Work: A Cross Sectional Study on Sleep Quality and Daytime Somnolence\nSource: Brain Sci (2023)\nAbstract: Poor alertness during the night shift and @DISEASE_Sleep_Wake_Disorders @DISEASE_MESH:D012893 @@@<m>daytime</m> <m>sleepiness</m>@@@ may impair @DISEASE_Cognition_Disorders @DISEASE_MESH:D003072 @@@<m>cognitive</m>@@@ performance, increasing the risk of @DISEASE_Occupational_Stress @DISEASE_MESH:D000073397 @@@workplace injuries@@@ and errors at work and @DISEASE_Car_Factor_Deficiency @DISEASE_MESH:C566176 @@@car accidents@@@ while commuting back <m>home</m> after the night shift.\n--------------------------------------------------------------------------------\nPMID: 40394026\nTitle: Sleep regularity index as a novel indicator of sleep disturbance in stroke survivors: a secondary data analysis\nSource: Sci Rep (2025)\nAbstract: Lunsford-Avery and colleagues used the SRI in <m>older</m> <m>adults</m>, finding that less regular sleep was linked to increased cardiometabolic risk, delayed sleep timing, increased @DISEASE_Sleep_Wake_Disorders @DISEASE_MESH:D012893 @@@<m>daytime</m> sleep and <m>sleepiness</m>@@@, and reduced light exposure, however the SRI was independent of sleep duration.\n--------------------------------------------------------------------------------\nPMID: 36388217\nTitle: Relationship between sleep disorders and the prognosis of neurological function after stroke\nSource: Front Neurol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38925698\nTitle: Digital cognitive-behavioural therapy application compared with zolpidem for the treatment of insomnia: protocol for an exploratory randomised controlled trial\nSource: BMJ Open (2024)\nAbstract: Based on a Clinical Practice Guideline from the American College of Physicians (ACP), ACP recommends that all <m>adult</m> @SPECIES_9606 @@@patients@@@ receive <m>cognitive</m>-behavioural therapy for @DISEASE_Sleep_Initiation_and_Maintenance_Disorders @DISEASE_MESH:D007319 @@@insomnia@@@ (CBT-@CHEMICAL_Iodine @CHEMICAL_MESH:D007455 @@@I@@@) as the initial treatment for chronic @DISEASE_Sleep_Initiation_and_Maintenance_Disorders @DISEASE_MESH:D007319 @@@insomnia disorder@@@.\n--------------------------------------------------------------------------------\nPMID: 34190939\nTitle: Duration of night sleep and cognitive performance of community older adults* \nSource: Rev Lat Am Enfermagem (2021)\nAbstract: In addition, they obtained gains in sleep quality and a reduction in terms of @DISEASE_Disorders_of_Excessive_Somnolence @DISEASE_MESH:D006970 @@@excessive <m>daytime</m> <m>sleepiness</m>@@@. Thus, they concluded that <m>cognitive</m> training and sleep interventions were successful strategies for improving <m>cognitive</m> performance, as well as for the quality of sleep in the <m>older</m> <m>adults</m>.\n--------------------------------------------------------------------------------\nPMID: 41239401\nTitle: A [11C]PBR28 PET study on the associations between sleep health and microglial density\nSource: J Neuroinflammation (2025)\nAbstract: Sleep duration and @DISEASE_Fatigue @DISEASE_MESH:D005221 @@@<m>daytime</m> fatigue@@@ are often intertwined, as short sleep duration can contribute to @DISEASE_Fatigue @DISEASE_MESH:D005221 @@@<m>daytime</m> fatigue@@@ and @DISEASE_Sleepiness @DISEASE_MESH:D000077260 @@@<m>sleepiness</m>@@@ (for a review see).\n--------------------------------------------------------------------------------\nPMID: 41562649\nTitle: Thirty-Sixth Annual Meeting of the Society for Light, Rhythms, and Circadian Health (SLRCH), 14-16 June, Boston, MA, USA\nSource: Clocks Sleep (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34911720\nTitle: Prevalence and incidence of Parkinson's disease and other forms of parkinsonism in a cohort of elderly individuals in Southern Brazil: protocol for a population-based study\nSource: BMJ Open (2021)\nAbstract: Scores>10 points indicate a great possibility of @DISEASE_Disorders_of_Excessive_Somnolence @DISEASE_MESH:D006970 @@@Excessive <m>Daytime</m> <m>Sleepiness</m>@@@ and scores>16 are indicative of severe @DISEASE_Sleepiness @DISEASE_MESH:D000077260 @@@<m>sleepiness</m>@@@.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 18,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_9AY4urxzIZ8ksFTZLohlxpiB",
+    "parent_tool_call_id": "call_SRGjpMDDbP9LG0iWkCuTIkSE",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Abstract|Methods|Results|daytime|nap|sleep|cognitive|hospital|discharge",
+      "pmid": "33414142"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('33414142')\noutput = format_paper_content_output(result, filter_keywords='Abstract|Methods|Results|daytime|nap|sleep|cognitive|hospital|discharge')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 33414142 ===\n\nTitle: Octogenarian patients' sleep and delirium experiences in hospital and four years after aortic valve replacement: a qualitative interview study.\n\nJournal/Date: BMJ open (2021)\n\nMeSH Keywords: Aged, 80 and over, Aortic Valve, Aortic Valve Stenosis, Delirium, Female, Heart Valve Prosthesis Implantation, Hospitals, Humans\n\n\n--- ABSTRACT ---\n[OBJECTIVES]: Sleep disturbances and delirium are frequently observed complications after surgical aortic valve replacement (SAVR) and transcutaneous aortic valve implantation (TAVI), especially in octogenarian patients. However, a knowledge gap exists on patient experiences of sleep and delirium. In particular, patients' long-term sleep and delirium experiences are unknown. This article explores and describes how octogenarian patients suffering from delirium after aortic valve replacement experience their sleep and delirium situation.\n[DESIGN]: An explorative and descriptive design with a longitudinal qualitative approach was applied. Qualitative content analysis following the recommended steps of Graneheim and Lundman was performed.\n[SETTING]: Patients were included at a tertiary university hospital with 1400 beds. Delirium and insomnia screening was performed at baseline and five postoperative days after aortic valve treatment. For qualitative data, 10 patients were interviewed 6-12 months after treatment with focus on delirium. Five of these patients were reinterviewed 4 years after treatment, with focus on their sleep situation.\n[PARTICIPANTS]: Inclusion criteria; age 80+, treated with SAVR or TAVI and had experienced delirium after treatment.\n[RESULTS]: For the initial interview, we included five men and five women, four following TAVI and six following SAVR, mean age 83. One overarching theme revealed from the content analyses; Hours in bed represented emotional chaos. Whereas three subthemes described the patients' experiences with sleep and delirium, a cascade of distressful experiences disturbing sleep, the struggle between sleep and activity and elements influencing sleep. Four years after the treatment, sleep disturbances persisted, and patients still remembered strongly the delirium incidences.\n[CONCLUSIONS]: For octogenarian patients, sleep disturbances and delirium are long-term burdens and need a greater attention in order to improve patient care.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nFindings\n\nSleep experiences of octogenarian patients were characterised by an overarching theme: Hours in bed represented emotional chaos. Findings are presented below by three subthemes with two categories each (table 2, figure 2). Quotations are presented to illustrate the themes.\n\nA cascade of distressful experiences disturbing sleep\n\nIn hospital, nightmares dominated the patients’ sleep, an unpleasant experience they readily recalled in a long-term perspective. Physical and psychological discomforts were also prominent features of their sleep disturbances, some of which persisted 4 years post surgery.\n\nDisruptions from nightmares\n\nPatients’ nightmares led to poor quality of sleep. Patients alternated between dreaming and reality most of the time in hospital. Surrounding objects and peo...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 19,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_vLq3feXneIHJYH0vTBPiLsbh",
+    "parent_tool_call_id": "call_9AY4urxzIZ8ksFTZLohlxpiB",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "Abstract|Methods|Results|daytime sleep|daytime sleeping|MMSE|β|follow-up|discharge|actigraphy|nighttime",
+      "pmid": "25093233"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25093233')\noutput = format_paper_content_output(result, filter_keywords='Abstract|Methods|Results|daytime sleep|daytime sleeping|MMSE|β|follow-up|discharge|actigraphy|nighttime')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Abstract|Methods|Results|daytime sleep|daytim ... SE|β|follow-up|discharge|actigraphy|nighttime\n      \u001b[90mpmid:\u001b[0m 25093233\n\n  \u001b[1m\u001b[93m[2] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m daytime nap cognition\n      \u001b[90mboolean_query_text:\u001b[0m \"decrease in daytime sleeping\" cognition older adults\n      \u001b[90mtop_k:\u001b[0m 10\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[3] get_paper_references\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 20\n      \u001b[90mmax_workers:\u001b[0m 2\n      \u001b[90mmini_batch_size:\u001b[0m 10\n      \u001b[90mpmids:\u001b[0m ['25093233']\n      \u001b[90mrate_limit:\u001b[0m 3\n      \u001b[90mtask_name:\u001b[0m related evidence\n\n=== PMID: 25093233 ===\n\nTitle: Decrease in daytime sleeping is associated with improvement in cognition after hospital discharge in older adults.\n\nJournal/Date: Journal of the American Geriatrics Society (2014)\n\nMeSH Keywords: Actigraphy, Activities of Daily Living, Aged, Chronic Disease, Circadian Rhythm, Cognition, Depression, Female\n\n\n--- ABSTRACT ---\n[OBJECTIVES]: To examine the relationship between changes in objectively assessed sleep and global cognitive functioning from inpatient postacute rehabilitation to 6-month follow-up.\n[DESIGN]: Secondary analysis of two prospective, longitudinal studies.\n[SETTING]: Inpatient rehabilitation units at a Veterans Affairs Medical Center.\n[PARTICIPANTS]: Older adults (mean age 73.8 ± 9.4) undergoing inpatient rehabilitation (n = 192).\n[MEASUREMENTS]: All participants completed 7 nights and days of ambulatory sleep monitoring using wrist actigraphy (yielding an estimate of nighttime wakefulness and daytime sleep) and the Mini-Mental State Examination (MMSE) during a postacute inpatient rehabilitation stay and 6 months after discharge. The 5-item Geriatric Depression Scale, Geriatric Pain Measure, and Cumulative Illness Rating Scale for Geriatrics were completed during inpatient rehabilitation.\n[RESULTS]: Growth curve modeling (controlling for baseline age, education, sex, body mass index, depression, pain, and comorbidity burden) revealed that individuals whose amount of daytime sleep decreased from inpatient postacute rehabilitation to 6-month follow-up also experienced improvements in MMSE score (β = -0.01, t(80 = -3.22, P = .002)). Change in nighttime wakefulness was not a significant predictor of change in MMSE score.\n[CONCLUSION]: Older adults whose daytime sleeping decreased after hospital discharge also experienced improvements in cognitive functioning at 6 month follow-up. As such, daytime sleep may represent a promising candidate for targeted interventions aimed at promoting cognitive recovery after hospital discharge.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nRESULTS\n\nSample Characteristics\n\nA total of 192 participants provided baseline data. Rates of follow-up were: 78% provided at least partial follow-up data, 6% were deceased, and 16% either refused follow-up, relocated out of the area and thus were unable to participate, or were unable to be contacted. The participants had a mean age of 73.8 ± 9.7 years, were 97% male, had an average level of education of 13.8 ± 3.0 years, and had an average BMI of 27.3 ± 7.0. Table 1 provides means and standard deviations for variables of interest for the study participants, along with comparisons between the groups of participants in Study 1 (n=85) and Study 2 stratified by intervention allocation (n=107).\n\nGrowth Curve Model\n\nPrior to estimating the growth curve model, we plotted the raw MMSE scores obta...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 21,
+    "agent": "search",
+    "tool_name": "get_paper_references",
+    "tool_call_id": "call_llkKYeleEE79JOrDp2Hn7SfK",
+    "parent_tool_call_id": "call_9AY4urxzIZ8ksFTZLohlxpiB",
+    "round": 3,
+    "tool_input": {
+      "batch_size": 20,
+      "max_workers": 2,
+      "mini_batch_size": 10,
+      "pmids": [
+        "25093233"
+      ],
+      "rate_limit": 3,
+      "task_name": "related evidence"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_get_paper_references\nimport pandas as pd\n\nsearch_results = pubmed_api_get_paper_references(\n    pmids=['25093233'], batch_size=20, mini_batch_size=10,\n    max_workers=2, rate_limit=3\n)\n\nsearch_results_df = pd.DataFrame(search_results)\nsearch_results_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/related_evidence.csv', index=False)\nprint(\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/related_evidence.csv'\")\nprint(search_results_df.head().to_markdown())\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/related_evidence.csv'\n|    |   source_pmid |   target_pmid | relation_type   | target_title                                                                                                                 |   target_year |\n|---:|--------------:|--------------:|:----------------|:-----------------------------------------------------------------------------------------------------------------------------|--------------:|\n|  0 |      25093233 |      23980920 | cites           | Exercise and sleep in community-dwelling older adults: evidence for a reciprocal relationship.                               |          2014 |\n|  1 |      25093233 |      23128048 | cites           | Cognitive decline one year after hospitalization in older adults without dementia.                                           |          2012 |\n|  2 |      25093233 |      22855682 | cites           | Age-related changes in sleep and circadian rhythms: impact on cognitive performance and underlying neuroanatomical networks. |          2012 |\n|  3 |      25093233 |      22442434 | cites           | Cognitive decline after hospitalization in a community population of older persons.                                          |          2012 |\n|  4 |      25093233 |      22323897 | cites           | Tackling sleeplessness: psychological treatment options for insomnia in older adults.                                        |          2010 |\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 22,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_4DTa0SVFhriX94ff8Nf4RlAM",
+    "parent_tool_call_id": "call_llkKYeleEE79JOrDp2Hn7SfK",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Direct evidence is present but appears limited to one clearly matching longitudinal cohort: McCrae et al., “Decrease in daytime sleeping is associated with improvement in cognition after hospital discharge in older adults” (J Am Geriatr Soc, 2014; PMID 25093233). This secondary analysis of two prospective longitudinal studies included 192 older adults (mean age 73.8) in VA inpatient post-acute rehabilitation; wrist actigraphy measured daytime sleep over 7 days during rehabilitation and again at 6 months after discharge, with MMSE at both time points. After adjustment for age, education, sex, BMI, depression, pain, and comorbidity, decreased daytime sleep was associated with MMSE improvement (β = −0.01, t(80) = −3.22, P = .002); change in nighttime wakefulness was not a significant predictor. This is an association, not proof that reducing naps causes cognitive improvement.",
+          "source_tools": [
+            {
+              "relevance": "Full abstract and results for the directly matching post-acute, post-discharge actigraphy/MMSE longitudinal cohort",
+              "tool_call_id": "call_vLq3feXneIHJYH0vTBPiLsbh"
+            }
+          ]
+        },
+        {
+          "finding": "The direct study does not establish an intervention effect or specifically test intentional nap reduction: daytime sleep was observed longitudinally, and the analysis related within-person change to cognitive change. The evidence therefore supports an association between reduced daytime sleeping and better cognitive trajectory after discharge, with possible residual confounding and incomplete follow-up (78% provided at least partial follow-up).",
+          "source_tools": [
+            {
+              "relevance": "Study design, observational/secondary-analysis nature, follow-up completeness, and adjusted growth-curve result",
+              "tool_call_id": "call_vLq3feXneIHJYH0vTBPiLsbh"
+            }
+          ]
+        },
+        {
+          "finding": "No additional clearly matching study was identified in the searched post-acute, hospital-to-home, delirium-follow-up, actigraphy, and daytime-nap domains. A small post-discharge cohort (N=23; mean age 74) found that changes in subjective sleep quality, daytime dysfunction, and fatigue predicted physical/functional recovery at 4 weeks, but it did not measure cognition or daytime sleeping/naps by actigraphy; it is not direct evidence for the question.",
+          "source_tools": [
+            {
+              "relevance": "Post-discharge older-adult cohort with sleep and recovery outcomes, showing functional rather than cognitive endpoints",
+              "tool_call_id": "call_KYCcPuVl9kCdPj3KViNGoZdH"
+            }
+          ]
+        },
+        {
+          "finding": "Related longitudinal community evidence should not be substituted for post-discharge evidence: in a 5.5-year cohort of adults aged 55+, excessive daytime sleepiness was associated with later MMSE decline among physically robust participants (OR 1.49, 95% CI 1.04–2.13), but this was not a hospital-discharge or post-acute-care cohort and did not test decreased naps/daytime sleep as a recovery exposure.",
+          "source_tools": [
+            {
+              "relevance": "Clearly labeled indirect community longitudinal cohort with daytime sleepiness and cognitive outcome",
+              "tool_call_id": "call_o5cjb5OocpIM8lIJQhsHibXw"
+            }
+          ]
+        },
+        {
+          "finding": "Qualitative delirium follow-up evidence in 10 octogenarians after aortic valve replacement reported persistent sleep disturbance up to 4 years and patient-described struggles between sleep and activity, but it did not quantify daytime naps or test cognition longitudinally; it cannot answer whether decreased daytime sleeping improves cognition.",
+          "source_tools": [
+            {
+              "relevance": "Delirium-related longitudinal qualitative follow-up, explicitly lacking quantitative cognition/napping association",
+              "tool_call_id": "call_9AY4urxzIZ8ksFTZLohlxpiB"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 23,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_e9tAv4adtqgUAZvGeA8xXQft",
+    "parent_tool_call_id": "call_XqXoO4WAGt7a6YF68MdkmAg1",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25093233",
+          "observations": [
+            "McCrae et al. (2014) analyzed older adults in VA inpatient post-acute rehabilitation with actigraphy and MMSE during rehabilitation and 6 months after discharge."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct longitudinal evidence for post-discharge daytime sleep and cognition",
+              "tool_call_id": "call_vLq3feXneIHJYH0vTBPiLsbh"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Reduced daytime sleep and cognition",
+          "observations": [
+            "Among 192 older adults (mean age 73.8), decrease in actigraphy-measured daytime sleep over follow-up was associated with MMSE improvement in adjusted models (β=-0.01, t(80)=-3.22, P=.002); observational association does not establish that nap reduction causes improvement.",
+            "Daytime sleep was observed, not experimentally reduced; residual confounding and incomplete follow-up limit causal interpretation."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct result and interpretation limits",
+              "tool_call_id": "call_vLq3feXneIHJYH0vTBPiLsbh"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:25093233",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Reduced daytime sleep and cognition"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 2, \"entities\": [{\"name\": \"PMID:25093233\", \"entityType\": \"PAPER\", \"observations\": [\"McCrae et al. (2014) analyzed older adults in VA inpatient post-acute rehabilitation with actigraphy and MMSE during rehabilitation and 6 months after discharge.\"]}, {\"name\": \"Reduced daytime sleep and cognition\", \"entityType\": \"FINDING\", \"observations\": [\"Among 192 older adults (mean age 73.8), decrease in actigraphy-measured daytime sleep over follow-up was associated with MMSE improvement in adjusted models (\\u03b2=-0.01, t(80)=-3.22, P=.002); observational association does not establish that nap reduction causes improvement.\", \"Daytime sleep was observed, not experimentally reduced; residual confounding and incomplete follow-up limit causal interpretation.\"]}]}, \"relations_created\": {\"count\": 1, \"relations\": [{\"from\": \"PMID:25093233\", \"to\": \"Reduced daytime sleep and cognition\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_e9tAv4adtqgUAZvGeA8xXQft\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_XqXoO4WAGt7a6YF68MdkmAg1\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

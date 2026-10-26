@@ -1,0 +1,351 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_u7istKBGOM6cqA4c51fNw2DO",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "drug"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether ibulocydine (including spelling variants and synonyms) sensitizes human cancer cells or tumors to radiotherapy, and whether the radiosensitization mechanism is induction of mitochondria-mediated/intrinsic apoptosis. Find primary studies, cancer types, experimental models, radiation interaction results, apoptosis markers (e.g., mitochondrial membrane potential, cytochrome c, caspases, BCL-2 family), and report identifiers and limitations."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_SvregGCZ7wKZMsHx5ZnwpY1b",
+    "parent_tool_call_id": "call_u7istKBGOM6cqA4c51fNw2DO",
+    "round": 1,
+    "tool_input": {
+      "task_name": "ibulocydine radiosensitization",
+      "boolean_query_text": "ibulocydine radiotherapy radiosensitization cancer apoptosis",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='ibulocydine radiotherapy radiosensitization cancer apoptosis',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='ibulocydine radiotherapy radiosensitization cancer apoptosis',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_radiosensitization.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_radiosensitization.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nUnexpected error (attempt 1/3): \"['pmcid'] not in index\"\nRetry attempt 2 after 0.3333333333333333 seconds...\nUnexpected error (attempt 2/3): \"['pmcid'] not in index\"\nRetry attempt 3 after 0.6666666666666666 seconds...\nUnexpected error (attempt 3/3): \"['pmcid'] not in index\"\nUnexpected error after 3 attempts\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_radiosensitization.csv'\nTotal results found: 1\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 25082098\nTitle: Ibulocydine sensitizes human cancers to radiotherapy by induction of mitochondria-mediated apoptosis.\nSource: Radiotherapy and oncology : journal of the European Society for Therapeutic Radiology and Oncology (2014)\nAbstract: BACKGROUND AND PURPOSE: Ibulocydine (IB), a novel prodrug of CDK inhibitor, has been reported to have anti-cancer effect in human hepatoma cells. In order to address its feasibility as a radiosensitizer to improve radiotherapeutic efficacy for human cancers, this study was designed. MATERIAL AND METHODS: Human cancer cells of lung and colon were treated with IB and/or radiotherapy (RT). The cellular effects were assessed by CCK-8, clonogenic, flow cytometric, and western blotting assays. In vivo radiotherapeutic efficacy was evaluated using the xenograft mouse model. RESULTS: Combined treatment of IB and RT significantly reduced viability and survival fraction of the cells. Apoptotic cell death accompanied with activation of caspases, decrease in Bcl-2/Bax expression, loss of mitochondrial membrane potential (MMP) leading to release of cytochrome c into cytosol was observed. Recovery of Bcl-2 expression level by introducing Bcl-2 expressing plasmid DNA compromised the loss of MMP and apoptosis induced by IB and RT. In vivo therapeutic efficacy of combined treatment was verified in the xenograft mouse model, in which tumor growth was markedly delayed by RT with IB. CONCLUSIONS: IB d ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_aHodhmVu0FW90z0RSwbgdGbt",
+    "parent_tool_call_id": "call_u7istKBGOM6cqA4c51fNw2DO",
+    "round": 1,
+    "tool_input": {
+      "task_name": "ibulocydine synonyms",
+      "boolean_query_text": "ibulocydine OR ibulocydine hydrochloride OR ibulocydine HCl cancer radiation",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='ibulocydine OR ibulocydine hydrochloride OR ibulocydine HCl cancer radiation',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='ibulocydine OR ibulocydine hydrochloride OR ibulocydine HCl cancer radiation',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_synonyms.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_synonyms.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_synonyms.csv'\nTotal results found: 54\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38892310\nTitle: Ibulocydine Inhibits Migration and Invasion of TNBC Cells via MMP-9 Regulation.\nSource: International journal of molecular sciences (2024)\nAbstract: Triple-negative breast cancer (TNBC) accounts for approximately 15-20% of all breast cancer types, indicating a poor survival prognosis with a more aggressive biology of metastasis to the lung and a short response duration to available therapies. Ibulocydine (IB) is a novel (cyclin-dependent kinase) CDK7/9 inhibitor prodrug displaying potent anti-cancer effects against various cancer cell types. We performed in vitro and in vivo experiments to determine whether IB inhibits metastasis and eventually overcomes the poor drug response in TNBC. The result showed that IB inhibited the growth of TNBC cells by inducing caspase-mediated apoptosis and blocking metastasis by reducing MMP-9 expression in vitro. Concurrently, in vivo experiments using the metastasis model showed that IB inhibited metastasis of MDA-MB-231-Luc cells to the lung. Collectively, these results demonstrate that IB inhibited the growth of TNBC cells and blocked metastasis by regulating MMP-9 expression, suggesting a novel therapeutic agent for metastatic TNBC.\n--------------------------------------------------------------------------------\nPMID: 25082098\nTitle: Ibulocydine sensitizes human cancers to radiotherapy by induction of mitochondria-mediated apoptosis.\nSource: Radiotherapy and oncology : journal of the European Society for Therapeutic Radiology and Oncology (2014)\nAbstract: BACKGROUND AND PURPOSE: Ibulocydine (IB), a novel prodrug of CDK inhibitor, has been reported to have anti-cancer effect in human hepatoma cells. In order to address its feasibility as a radiosensitizer to improve radiotherapeutic efficacy for human cancers, this study was designed. MATERIAL AND METHODS: Human cancer cells of lung and colon were treated with IB and/or radiotherapy (RT). The cellular effects were assessed by CCK-8, clonogenic, flow cytometric, and western blotting assays. In vivo radiotherapeutic efficacy was evaluated using the xenograft mouse model. RESULTS: Combined treatment of IB and RT significantly reduced viability and survival fraction of the cells. Apoptotic cell death accompanied with activation of caspases, decrease in Bcl-2/Bax expression, loss of mitochondrial membrane potential (MMP) leading to release of cytochrome c into cytosol was observed. Recovery of Bcl-2 expression level by introducing Bcl-2 expressing plasmid DNA compromised the loss of MMP and apoptosis induced by IB and RT. In vivo therapeutic efficacy of combined treatment was verified in the xenograft mouse model, in which tumor growth was markedly delayed by RT with IB. CONCLUSIONS: IB d ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 27923747\nTitle: Ibulocydine sensitizes human hepatocellular carcinoma cells to TRAIL-induced apoptosis via calpain-mediated Bax cleavage.\nSource: The international journal of biochemistry & cell biology (2017)\nAbstract: Tumor necrosis factor-related apoptosis-induced ligand (TRAIL) induces apoptosis selectively in cancer cells without affecting the majority of normal human cells. However, hepatocellular carcinoma (HCC) cells often display resistance to TRAIL-induced apoptosis. Ibulocydine (IB) is an isobutyrate ester pro-drug of a novel synthetic Cdk inhibitor that targets Cdk7 and Cdk9. In this study, we show that treatment with subtoxic doses of IB in combination with TRAIL displays potent cytotoxicity in TRAIL-resistant human HCC cells. Combination of IB and TRAIL was found to synergistically induce apoptosis through activation of caspases, which was blocked by a pan-caspase inhibitor (zVAD). Although the expression of Mcl-1 and survivin were reduced by IB plus TRAIL, overexpression of Mcl-1 and survivin did not block the cell death induced by co-treatment. Moreover, overexpression of Bcl-xL did not significantly interfere with the cell death induced by co-treatment of IB and TRAIL. Interestingly, the combination treatment induced cleavage of Bax, which was translocated to mitochondria upon induction of apoptosis. Furthermore, down-regulation of Bax by small interfering RNA effectively reduced  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 21478145\nTitle: Ibulocydine is a novel prodrug Cdk inhibitor that effectively induces apoptosis in hepatocellular carcinoma cells.\nSource: The Journal of biological chemistry (2011)\nAbstract: Hepatocellular carcinoma (HCC) is frequently associated with abnormalities in cell cycle regulation, leading to increased activity of cyclin-dependent kinases (Cdks) due to the loss, or low expression of, Cdk inhibitors. In this study, we showed that ibulocydine (an isobutyrate prodrug of the specific Cdk inhibitor, BMK-Y101) is a candidate anti-cancer drug for HCC. Ibulocydine has high activity against Cdk7/cyclin H/Mat1 and Cdk9/cyclin T. Ibulocydine inhibited the growth of HCC cells more effectively than other Cdk inhibitors, including olomoucine and roscovitine, whereas ibulocydine as well as the other Cdk inhibitors and BMK-Y101 minimally influenced the growth of normal hepatocyte cells. Ibulocydine induced apoptosis in HCC cells, most likely by inhibiting Cdk7 and Cdk9. In vitro treatment of HCC cells with ibulocydine rapidly blocked phosphorylation of the carboxyl-terminal domain (CTD) of the large subunit of RNA polymerase II, a process mediated by Cdk7/9. Anti-apoptotic gene products such as Mcl-1, survivin, and X-linked IAP (XIAP) are crucial for the survival of many cell types, including HCC. Following the inhibition of RNA polymerase II phosphorylation, ibulocydine caus ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 35161188\nTitle: Compatibility of Drotaverine Hydrochloride with Ibuprofen and Ketoprofen Nonsteroidal Anti-Inflammatory Drugs Mixtures\nSource: Materials (Basel) (2022)\nAbstract: @CHEMICAL_drotaverin @CHEMICAL_MESH:C005317 @@@Drotaverine <m>hydrochloride</m>@@@ (@CHEMICAL_drotaverin @CHEMICAL_MESH:C005317 @@@D-<m>HCl</m>@@@) is commonly used for its antispasmodic action.\n--------------------------------------------------------------------------------\nPMID: 36236096\nTitle: Ultrasensitive Functionalized Polymeric-Nanometal Oxide Sensors for Potentiometric Determination of Ranitidine Hydrochloride\nSource: Polymers (Basel) (2022)\nAbstract: The medication form of RNT <m>HCl</m>, Ranimax tablets (150 mg @CHEMICAL_Ranitidine @CHEMICAL_MESH:D011899 @@@ranitidine <m>hydrochloride</m>@@@/tablet) were obtained from Jazeera Pharmaceutical Industries (Riyadh, Saudi Arabia).\n--------------------------------------------------------------------------------\nPMID: 35022335\nTitle: [Successful surgical resection of rectal cancer in a patient with relapsed hairy cell leukemia under interferon-alpha treatment].\nSource: Rinsho Ketsueki (2021)\nAbstract: Surgical resection of the @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ was presumed unfeasible; therefore, <m>radiation</m> was performed.\n--------------------------------------------------------------------------------\nPMID: 36969830\nTitle: Evaluation on the inclusion behavior of beta-cyclodextrins with lycorine and its hydrochloride\nSource: J Mol Liq (2023)\nAbstract: Combining antiviral capability of sulfonated linkers, SBE-beta-CD will be promising anti-viral and anti-@DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ DDS for Lyc/Lyc <m>HCl</m>.\n--------------------------------------------------------------------------------\nPMID: 35372569\nTitle: Design and Characterization of Agarose/HPMC Buccal Films Bearing Ondansetron HCl In Vitro and In Vivo: Enhancement Using Iontophoretic and Chemical Approaches\nSource: Biomed Res Int (2022)\nAbstract: The antagonism at central and peripheral serotonin 5-HT3 receptors by @CHEMICAL_Ondansetron @CHEMICAL_MESH:D017294 @@@ondansetron <m>HCl</m>@@@ provides a potent relief in @DISEASE_Postoperative_Nausea_and_Vomiting @DISEASE_MESH:D020250 @@@nausea and vomiting@@@ and improves the quality of life in @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ @SPECIES_9606 @@@patients@@@.\n--------------------------------------------------------------------------------\nPMID: 39559733\nTitle: Novel N-phenyl-2-(aniline) benzamide hydrochloride salt development for colon cancer therapy\nSource: Front Pharmacol (2024)\nAbstract: Novel N-phenyl-2-(aniline) benzamide <m>hydrochloride</m> salt development for @DISEASE_Colorectal_Neoplasms @DISEASE_MESH:D015179 @@@colon <m>cancer</m>@@@ therapy\n--------------------------------------------------------------------------------\nPMID: 36853422\nTitle: Engineering a modular 44Ti/44Sc generator: eluate evaluation in preclinical models and estimation of human radiation dosimetry\nSource: EJNMMI Res (2023)\nAbstract: Estimation of @SPECIES_9606 @@@human@@@ <m>radiation</m> dose\n--------------------------------------------------------------------------------\nPMID: 41181593\nTitle: Clinically approved immunotoxins targeting hematological cancers: \"the best of both worlds\".\nSource: Front Pharmacol (2025)\nAbstract: Although cornerstone interventions such as <m>radiation</m> and chemotherapy are efficiently used to treat some malignant @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@blood <m>neoplasms</m>@@@, these treatments are often limited by resistance, relapse, lack of enduring disease-free survival/complete remission, and systemic @DISEASE_Drug_Related_Side_Effects_and_Adverse_Reactions @DISEASE_MESH:D064420 @@@toxicity@@@.\n--------------------------------------------------------------------------------\nPMID: 36844433\nTitle: Combinatorial Polydopamine-Liposome Nanoformulation as an Effective Anti-Breast Cancer Therapy\nSource: Int J Nanomedicine (2023)\nAbstract: @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>Tumor</m>@@@ Models\n--------------------------------------------------------------------------------\nPMID: 34906274\nTitle: A Multimodal Theranostic System Prepared from High-Density Lipoprotein Carrier of Doxorubicin and 177Lu.\nSource: J Biomed Nanotechnol (2021)\nAbstract: @CHEMICAL_Hydrochloric_Acid @CHEMICAL_MESH:D006851 @@@<m>HCl</m>@@@), a chemotherapeutic agent, could be photoactivated by Cerenkov <m>radiation</m> (CR).\n--------------------------------------------------------------------------------\nPMID: 35309430\nTitle: Determination and Correlation of Solubility of Metformin Hydrochloride in Aqueous Binary Solvents from 283.15 to 323.15 K\nSource: ACS Omega (2022)\nAbstract: @CHEMICAL_Metformin @CHEMICAL_MESH:D008687 @@@Metformin <m>hydrochloride</m>@@@ (@GENE_SLTM @GENE_79811 @@@MET@@@ <m>HCl</m>) is one of the most widely used oral hypoglycemic drugs in the world.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "find_entities",
+    "tool_call_id": "call_P72bmkt72TjqCGExLIAzYQWj",
+    "parent_tool_call_id": "call_u7istKBGOM6cqA4c51fNw2DO",
+    "round": 1,
+    "tool_input": {
+      "concept_type": "CHEMICAL",
+      "limit": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "query_text": "ibulocydine"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_find_entities\nimport pandas as pd\nresults = pubtator_api_find_entities(\n    query_text='ibulocydine', concept_type='CHEMICAL',\n    limit=20, max_retries=3, max_requests_per_second=3\n)\nif len(results) == 0:\n    print(\"No entities found. Please try again with different query.\")\nelse:\n    if isinstance(results, pd.DataFrame): print(results.to_markdown())\n    else: print(\"No entities found. Please try again with different query.\")\n\n```\n\n### Output:\n```\nSuccessfully retrieved 1 entity suggestions\n|    | PubTator3_EntityID                                                                                                              | Name                                                                                                                  | Type     | SourceDB   | ID_in_SourceDB   |\n|---:|:--------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------------------------------------------------------------|:---------|:-----------|:-----------------|\n|  0 | @CHEMICAL_(5_(4_amino_6_bromo_5_carbamoyl_1H_pyrrolo(2_3_d)pyrimidin_1_yl)_3_4_dihydroxytetrahydrofuran_2_yl)methyl_isobutyrate | (5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate | chemical | ncbi_mesh  | C559897          |\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_1AICN8ZVPsAukIO4KNuXBUfn",
+    "parent_tool_call_id": "call_u7istKBGOM6cqA4c51fNw2DO",
+    "round": 1,
+    "tool_input": {
+      "task_name": "ibulocydine apoptosis",
+      "boolean_query_text": "ibulocydine mitochondria apoptosis cancer",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='ibulocydine mitochondria apoptosis cancer',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='ibulocydine mitochondria apoptosis cancer',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_apoptosis.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_apoptosis.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_apoptosis.csv'\nTotal results found: 8\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 25082098\nTitle: Ibulocydine sensitizes human cancers to radiotherapy by induction of mitochondria-mediated apoptosis.\nSource: Radiotherapy and oncology : journal of the European Society for Therapeutic Radiology and Oncology (2014)\nAbstract: BACKGROUND AND PURPOSE: Ibulocydine (IB), a novel prodrug of CDK inhibitor, has been reported to have anti-cancer effect in human hepatoma cells. In order to address its feasibility as a radiosensitizer to improve radiotherapeutic efficacy for human cancers, this study was designed. MATERIAL AND METHODS: Human cancer cells of lung and colon were treated with IB and/or radiotherapy (RT). The cellular effects were assessed by CCK-8, clonogenic, flow cytometric, and western blotting assays. In vivo radiotherapeutic efficacy was evaluated using the xenograft mouse model. RESULTS: Combined treatment of IB and RT significantly reduced viability and survival fraction of the cells. Apoptotic cell death accompanied with activation of caspases, decrease in Bcl-2/Bax expression, loss of mitochondrial membrane potential (MMP) leading to release of cytochrome c into cytosol was observed. Recovery of Bcl-2 expression level by introducing Bcl-2 expressing plasmid DNA compromised the loss of MMP and apoptosis induced by IB and RT. In vivo therapeutic efficacy of combined treatment was verified in the xenograft mouse model, in which tumor growth was markedly delayed by RT with IB. CONCLUSIONS: IB d ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 27923747\nTitle: Ibulocydine sensitizes human hepatocellular carcinoma cells to TRAIL-induced apoptosis via calpain-mediated Bax cleavage.\nSource: The international journal of biochemistry & cell biology (2017)\nAbstract: Tumor necrosis factor-related apoptosis-induced ligand (TRAIL) induces apoptosis selectively in cancer cells without affecting the majority of normal human cells. However, hepatocellular carcinoma (HCC) cells often display resistance to TRAIL-induced apoptosis. Ibulocydine (IB) is an isobutyrate ester pro-drug of a novel synthetic Cdk inhibitor that targets Cdk7 and Cdk9. In this study, we show that treatment with subtoxic doses of IB in combination with TRAIL displays potent cytotoxicity in TRAIL-resistant human HCC cells. Combination of IB and TRAIL was found to synergistically induce apoptosis through activation of caspases, which was blocked by a pan-caspase inhibitor (zVAD). Although the expression of Mcl-1 and survivin were reduced by IB plus TRAIL, overexpression of Mcl-1 and survivin did not block the cell death induced by co-treatment. Moreover, overexpression of Bcl-xL did not significantly interfere with the cell death induced by co-treatment of IB and TRAIL. Interestingly, the combination treatment induced cleavage of Bax, which was translocated to mitochondria upon induction of apoptosis. Furthermore, down-regulation of Bax by small interfering RNA effectively reduced  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 25082098\nTitle: Ibulocydine sensitizes human cancers to radiotherapy by induction of mitochondria-mediated apoptosis.\nSource: Radiother Oncol (2014)\nAbstract: @CHEMICAL_(5_(4_amino_6_bromo_5_carbamoyl_1H_pyrrolo(2_3_d)pyrimidin_1_yl)_3_4_dihydroxytetrahydrofuran_2_yl)methyl_isobutyrate @CHEMICAL_MESH:C559897 @@@<m>Ibulocydine</m>@@@ sensitizes @SPECIES_9606 @@@human@@@ @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancers</m>@@@ to radiotherapy by induction of <m>mitochondria</m>-mediated <m>apoptosis</m>.\n--------------------------------------------------------------------------------\nPMID: 27923747\nTitle: Ibulocydine sensitizes human hepatocellular carcinoma cells to TRAIL-induced apoptosis via calpain-mediated Bax cleavage.\nSource: Int J Biochem Cell Biol (2017)\nAbstract: ...<m>Tumor</m> necrosis factor-related <m>apoptosis</m>-induced ligand (@GENE_TNFSF10 @GENE_8743 @@@TRAIL@@@) induces <m>apoptosis</m> selectively in @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ cells without affecting the majority of normal @SPECIES_9606 @@@human@@@ cells.\n--------------------------------------------------------------------------------\nPMID: 24576043\nTitle: The basal transcription machinery as a target for cancer therapy\nSource: Cancer Cell Int (2014)\nAbstract: For example, @CHEMICAL_CX_5461 @CHEMICAL_MESH:C557717 @@@CX5461@@@-treated solid @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m> <m>cancer</m>@@@ cell lines display autophagy and senescence, not <m>apoptosis</m>.\n--------------------------------------------------------------------------------\nPMID: 31685811\nTitle: Activation of Piezo1 sensitizes cells to TRAIL-mediated apoptosis through mitochondrial outer membrane permeability\nSource: Cell Death Dis (2019)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 28536639\nTitle: Survivin, a molecular target for therapeutic interventions in squamous cell carcinoma\nSource: Cell Mol Biol Lett (2017)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 28834581\nTitle: Pyrrolo[2,3-d]pyrimidine (7-deazapurine) as a privileged scaffold in design of antitumor and antiviral nucleosides\nSource: Med Res Rev (2017)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_A8EBrElqOzhWaqgKIr6H8RyV",
+    "parent_tool_call_id": "call_1AICN8ZVPsAukIO4KNuXBUfn",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "cell lines|radiation|irradiation|clonogenic|xenograft|dose|Gy|apoptosis|mitochondrial membrane potential|cytochrome c|caspase|Bcl-2|Bax|lung|colon",
+      "pmid": "25082098"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25082098')\noutput = format_paper_content_output(result, filter_keywords='cell lines|radiation|irradiation|clonogenic|xenograft|dose|Gy|apoptosis|mitochondrial membrane potential|cytochrome c|caspase|Bcl-2|Bax|lung|colon')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (4):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m cell lines|radiation|irradiation|clonogenic|x ... ial|cytochrome c|caspase|Bcl-2|Bax|lung|colon\n      \u001b[90mpmid:\u001b[0m 25082098\n\n  \u001b[1m\u001b[93m[2] fetch_paper_annotations\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 50\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mpmids:\u001b[0m ['25082098', '21478145', '27923747', '38892310']\n\n  \u001b[1m\u001b[93m[3] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m ibulocydine radiation variants\n      \u001b[90mboolean_query_text:\u001b[0m \"BMK-Y101\" radiation cancer OR \"isobutyrate\" Cdk inhibitor radiotherapy\n      \u001b[90mtop_k:\u001b[0m 50\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[4] get_paper_references\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 20\n      \u001b[90mmax_workers:\u001b[0m 2\n      \u001b[90mmini_batch_size:\u001b[0m 10\n      \u001b[90mpmids:\u001b[0m ['25082098']\n      \u001b[90mrate_limit:\u001b[0m 3\n      \u001b[90mtask_name:\u001b[0m ibulocydine references\n\n=== PMID: 25082098 ===\n\nTitle: Ibulocydine sensitizes human cancers to radiotherapy by induction of mitochondria-mediated apoptosis.\n\nJournal/Date: Radiotherapy and oncology : journal of the European Society for Therapeutic Radiology and Oncology (2014)\n\nMeSH Keywords: Animals, Apoptosis, Caspases, Cell Line, Tumor, Colonic Neoplasms, Cytochromes c, Flow Cytometry, Humans\n\n\n--- ABSTRACT ---\n[BACKGROUND AND PURPOSE]: Ibulocydine (IB), a novel prodrug of CDK inhibitor, has been reported to have anti-cancer effect in human hepatoma cells. In order to address its feasibility as a radiosensitizer to improve radiotherapeutic efficacy for human cancers, this study was designed.\n[MATERIAL AND METHODS]: Human cancer cells of lung and colon were treated with IB and/or radiotherapy (RT). The cellular effects were assessed by CCK-8, clonogenic, flow cytometric, and western blotting assays. In vivo radiotherapeutic efficacy was evaluated using the xenograft mouse model.\n[RESULTS]: Combined treatment of IB and RT significantly reduced viability and survival fraction of the cells. Apoptotic cell death accompanied with activation of caspases, decrease in Bcl-2/Bax expression, loss of mitochondrial membrane potential (MMP) leading to release of cytochrome c into cytosol was observed. Recovery of Bcl-2 expression level by introducing Bcl-2 expressing plasmid DNA compromised the loss of MMP and apoptosis induced by IB and RT. In vivo therapeutic efficacy of combined treatment was verified in the xenograft mouse model, in which tumor growth was markedly delayed by RT with IB.\n[CONCLUSIONS]: IB demonstrated the property of sensitizing human cancer cells to RT by induction of mitochondria-mediated apoptosis, suggesting that IB deserves to be applied for chemoradiotherapy.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_annotations",
+    "tool_call_id": "call_D7sW88y6PFGowetsn5nAk9l3",
+    "parent_tool_call_id": "call_1AICN8ZVPsAukIO4KNuXBUfn",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "pmids": [
+        "25082098",
+        "21478145",
+        "27923747",
+        "38892310"
+      ]
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_fetch_paper_annotations\nimport json\nsearch_results = pubtator_api_fetch_paper_annotations(\n    pmids=['25082098', '21478145', '27923747', '38892310'], batch_size=50, max_retries=3, max_requests_per_second=3\n)\nprint(json.dumps(search_results, indent=4))\n\n```\n\n### Output:\n```\nSuccessfully processed 4 publications from chunk\nTotal results: 4\n[\n    {\n        \"Chemical\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate\"\n        ],\n        \"Disease\": [\n            \"Carcinoma Hepatocellular\"\n        ],\n        \"Relevant_Disease\": [\n            \"Carcinoma Hepatocellular\",\n            \"Neoplasms\"\n        ],\n        \"Relevant_Chemical\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate\",\n            \"4-amino-6-bromo-1-(3 4-dihydroxy-5-(hydroxymethyl)tetrahydrofuran-2-yl)-1H-pyrrolo(2 3-d)pyrimidine-5-carboxamide\",\n            \"Isobutyrates\",\n            \"Roscovitine\",\n            \"olomoucine\"\n        ],\n        \"Relevant_Gene\": [\n            \"CCNH\",\n            \"CDK7\",\n            \"CDK9\",\n            \"MCL1\",\n            \"MNAT1\",\n            \"XIAP\"\n        ],\n        \"Relation_Mentions\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:CCNH\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:CDK7\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:CDK9\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:Carcinoma Hepatocellular\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:MCL1\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:MNAT1\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:Neoplasms\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:XIAP\"\n        ],\n        \"PMID\": 21478145\n    },\n    {\n        \"Chemical\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate\"\n        ],\n        \"Species\": [\n            \"9606\"\n        ],\n        \"Disease\": [\n            \"Neoplasms\"\n        ],\n        \"Relevant_Chemical\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate\",\n            \"Sincalide\"\n        ],\n        \"Relevant_Disease\": [\n            \"Carcinoma Hepatocellular\",\n            \"Colorectal Neoplasms\",\n            \"Neoplasms\"\n        ],\n        \"Relevant_Species\": [\n            \"10090\",\n            \"9606\"\n        ],\n        \"Relevant_Gene\": [\n            \"BAX\",\n            \"BCL2\",\n            \"CYCS\"\n        ],\n        \"Relation_Mentions\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:BCL2\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:Carcinoma Hepatocellular\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:Colorectal Neoplasms\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:Neoplasms\"\n        ],\n        \"PMID\": 25082098\n    },\n    {\n        \"Chemical\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate\"\n        ],\n        \"Species\": [\n            \"9606\"\n        ],\n        \"Disease\": [\n            \"Carcinoma Hepatocellular\"\n        ],\n        \"Gene\": [\n            \"BAX\",\n            \"TNFSF10\"\n        ],\n        \"Relevant_Gene\": [\n            \"BAX\",\n            \"BCL2L1\",\n            \"CDK7\",\n            \"CDK9\",\n            \"TNFSF10\"\n        ],\n        \"Relevant_Disease\": [\n            \"Carcinoma Hepatocellular\",\n            \"Neoplasms\"\n        ],\n        \"Relevant_Species\": [\n            \"9606\"\n        ],\n        \"Relevant_Chemical\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate\"\n        ],\n        \"Relation_Mentions\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:CDK7\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:CDK9\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:Carcinoma Hepatocellular\",\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:TNFSF10\"\n        ],\n        \"PMID\": 27923747\n    },\n    {\n        \"Chemical\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate\"\n        ],\n        \"Gene\": [\n            \"MMP9\"\n        ],\n        \"Relevant_Chemical\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate\"\n        ],\n        \"Relevant_Gene\": [\n            \"MMP9\"\n        ],\n        \"Relation_Mentions\": [\n            \"(5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo(2 3-d)pyrimidin-1-yl)-3 4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate:negative_correlation:MMP9\"\n        ],\n        \"PMID\": 38892310\n    }\n]\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_Lvx9sK6pi3kMo5hSIVYfkrvK",
+    "parent_tool_call_id": "call_1AICN8ZVPsAukIO4KNuXBUfn",
+    "round": 2,
+    "tool_input": {
+      "task_name": "ibulocydine radiation variants",
+      "boolean_query_text": "\"BMK-Y101\" radiation cancer OR \"isobutyrate\" Cdk inhibitor radiotherapy",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='\"BMK-Y101\" radiation cancer OR \"isobutyrate\" Cdk inhibitor radiotherapy',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='\"BMK-Y101\" radiation cancer OR \"isobutyrate\" Cdk inhibitor radiotherapy',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_radiation_variants.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_radiation_variants.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_radiation_variants.csv'\nTotal results found: 1\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 28536639\nTitle: Survivin, a molecular target for therapeutic interventions in squamous cell carcinoma\nSource: Cell Mol Biol Lett (2017)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "get_paper_references",
+    "tool_call_id": "call_xEhrfCPM59aZgewHrAN4lYzL",
+    "parent_tool_call_id": "call_1AICN8ZVPsAukIO4KNuXBUfn",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 20,
+      "max_workers": 2,
+      "mini_batch_size": 10,
+      "pmids": [
+        "25082098"
+      ],
+      "rate_limit": 3,
+      "task_name": "ibulocydine references"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_get_paper_references\nimport pandas as pd\n\nsearch_results = pubmed_api_get_paper_references(\n    pmids=['25082098'], batch_size=20, mini_batch_size=10,\n    max_workers=2, rate_limit=3\n)\n\nsearch_results_df = pd.DataFrame(search_results)\nsearch_results_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_references.csv', index=False)\nprint(\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_references.csv'\")\nprint(search_results_df.head().to_markdown())\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ibulocydine_references.csv'\n\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_s8LSRf5p9pHmxEZ6GJsbT8Kf",
+    "parent_tool_call_id": "call_xEhrfCPM59aZgewHrAN4lYzL",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "A primary study supports ibulocydine (IB; systematic chemical name in PubTator: (5-(4-amino-6-bromo-5-carbamoyl-1H-pyrrolo[2,3-d]pyrimidin-1-yl)-3,4-dihydroxytetrahydrofuran-2-yl)methyl isobutyrate; described elsewhere as an isobutyrate ester/prodrug of the CDK inhibitor BMK-Y101) as a radiosensitizer: in human lung and colon cancer cells, IB plus radiotherapy reduced viability and clonogenic survival more than either treatment alone, and in a xenograft mouse model the combination markedly delayed tumor growth. PMID 25082098; title: 'Ibulocydine sensitizes human cancers to radiotherapy by induction of mitochondria-mediated apoptosis' (Radiother Oncol, 2014).",
+          "source_tools": [
+            {
+              "relevance": "Primary PubMed abstract with study design and radiation interaction results",
+              "tool_call_id": "call_A8EBrElqOzhWaqgKIr6H8RyV"
+            },
+            {
+              "relevance": "Independent search result identifying the primary study and abstract",
+              "tool_call_id": "call_SvregGCZ7wKZMsHx5ZnwpY1b"
+            },
+            {
+              "relevance": "Chemical identity and cancer annotations for PMID 25082098",
+              "tool_call_id": "call_D7sW88y6PFGowetsn5nAk9l3"
+            }
+          ]
+        },
+        {
+          "finding": "The reported radiosensitization mechanism is consistent with intrinsic/mitochondria-mediated apoptosis: combination treatment activated caspases, decreased the Bcl-2/Bax expression ratio, caused loss of mitochondrial membrane potential, and released cytochrome c into the cytosol. Functional support came from Bcl-2 plasmid rescue, which compromised the IB+RT-induced mitochondrial membrane-potential loss and apoptosis. PubTator annotations specifically identify BCL2, BAX, and CYCS in the radiation study (PMID 25082098).",
+          "source_tools": [
+            {
+              "relevance": "Primary abstract explicitly reports caspases, Bcl-2/Bax, MMP, cytochrome c, and Bcl-2 rescue",
+              "tool_call_id": "call_A8EBrElqOzhWaqgKIr6H8RyV"
+            },
+            {
+              "relevance": "Entity annotations identify BCL2, BAX, and CYCS for PMID 25082098",
+              "tool_call_id": "call_D7sW88y6PFGowetsn5nAk9l3"
+            }
+          ]
+        },
+        {
+          "finding": "The evidence base for radiotherapy is narrow: searches using ibulocydine, spelling/chemical variants, BMK-Y101, and isobutyrate/CDK-inhibitor terms retrieved one directly relevant primary radiosensitization paper (PMID 25082098). The other identified primary ibulocydine studies concern apoptosis in hepatocellular carcinoma or TRAIL sensitization, not radiotherapy, so they provide mechanistic context but do not independently establish radiosensitization.",
+          "source_tools": [
+            {
+              "relevance": "Variant/synonym search returned PMID 25082098 as the sole directly relevant radiation paper",
+              "tool_call_id": "call_aHodhmVu0FW90z0RSwbgdGbt"
+            },
+            {
+              "relevance": "Focused apoptosis search identified the radiation paper plus non-radiation HCC/TRAIL studies",
+              "tool_call_id": "call_1AICN8ZVPsAukIO4KNuXBUfn"
+            },
+            {
+              "relevance": "BMK-Y101/isobutyrate radiation search did not identify an additional primary radiation study",
+              "tool_call_id": "call_Lvx9sK6pi3kMo5hSIVYfkrvK"
+            }
+          ]
+        },
+        {
+          "finding": "Important limitations: the available record is an abstract-only evidence assessment because no open full text was available through the retrieval tool; therefore exact cell-line names, IB and radiation doses/schedules, timing, effect sizes, synergy/statistical analysis, radiation type, xenograft host/site, and detailed caspase/BCL-2-family results cannot be verified here. The study is preclinical, with no human tumor or clinical radiotherapy evidence identified.",
+          "source_tools": [
+            {
+              "relevance": "Retrieval output explicitly states full text unavailable and limits analysis to the abstract",
+              "tool_call_id": "call_A8EBrElqOzhWaqgKIr6H8RyV"
+            },
+            {
+              "relevance": "Search results characterize the work as cell assays plus mouse xenograft, with no clinical study retrieved",
+              "tool_call_id": "call_SvregGCZ7wKZMsHx5ZnwpY1b"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_TVSVkRdNLoZDrPseu6W3Ztwi",
+    "parent_tool_call_id": "call_u7istKBGOM6cqA4c51fNw2DO",
+    "round": 2,
+    "tool_input": {
+      "entity_names": null,
+      "get_full_map": false,
+      "max_entities": null,
+      "max_observations_per_entity": 5,
+      "query": "ibulocydine radiosensitization radiotherapy PMID 25082098 mitochondrial apoptosis BCL2 BAX cytochrome c",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"search_query\": \"ibulocydine radiosensitization radiotherapy PMID 25082098 mitochondrial apoptosis BCL2 BAX cytochrome c\", \"results\": {\"entities\": [], \"relations\": []}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_JR552KCjus0q7hvmi28n7qSi",
+    "parent_tool_call_id": "call_TVSVkRdNLoZDrPseu6W3Ztwi",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "CHEMICAL / DRUG",
+          "name": "Ibulocydine",
+          "observations": [
+            "Reported preclinical radiosensitizer in human lung and colon cancer cells; evidence derives from one primary study, PMID:25082098."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Drug identity and reported radiosensitization evidence",
+              "tool_call_id": "call_A8EBrElqOzhWaqgKIr6H8RyV"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25082098",
+          "observations": [
+            "2014 preclinical study reports ibulocydine plus radiotherapy reduced viability and clonogenic survival in human lung/colon cancer cells and delayed xenograft growth.",
+            "Combination-associated mitochondrial apoptosis evidence included loss of mitochondrial membrane potential, cytosolic cytochrome-c release, caspase activation, lower Bcl-2/Bax ratio, and BCL2 rescue effects."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary radiosensitization and mechanism evidence",
+              "tool_call_id": "call_A8EBrElqOzhWaqgKIr6H8RyV"
+            },
+            {
+              "relevance": "Search synthesis and evidence limitations",
+              "tool_call_id": "call_D7sW88y6PFGowetsn5nAk9l3"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Ibulocydine radiosensitization",
+          "observations": [
+            "A single preclinical study supports ibulocydine radiosensitization through mitochondria-mediated apoptosis; available evidence is abstract-only and no clinical validation was identified."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Summary of primary evidence and limitations",
+              "tool_call_id": "call_A8EBrElqOzhWaqgKIr6H8RyV"
+            },
+            {
+              "relevance": "Search scope and mechanism details",
+              "tool_call_id": "call_D7sW88y6PFGowetsn5nAk9l3"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Ibulocydine",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Ibulocydine radiosensitization"
+        },
+        {
+          "from_entity": "PMID:25082098",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Ibulocydine radiosensitization"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"Ibulocydine\", \"entityType\": \"CHEMICAL / DRUG\", \"observations\": [\"Reported preclinical radiosensitizer in human lung and colon cancer cells; evidence derives from one primary study, PMID:25082098.\"]}, {\"name\": \"PMID:25082098\", \"entityType\": \"PAPER\", \"observations\": [\"2014 preclinical study reports ibulocydine plus radiotherapy reduced viability and clonogenic survival in human lung/colon cancer cells and delayed xenograft growth.\", \"Combination-associated mitochondrial apoptosis evidence included loss of mitochondrial membrane potential, cytosolic cytochrome-c release, caspase activation, lower Bcl-2/Bax ratio, and BCL2 rescue effects.\"]}, {\"name\": \"Ibulocydine radiosensitization\", \"entityType\": \"FINDING\", \"observations\": [\"A single preclinical study supports ibulocydine radiosensitization through mitochondria-mediated apoptosis; available evidence is abstract-only and no clinical validation was identified.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"Ibulocydine\", \"to\": \"Ibulocydine radiosensitization\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:25082098\", \"to\": \"Ibulocydine radiosensitization\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_JR552KCjus0q7hvmi28n7qSi\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_TVSVkRdNLoZDrPseu6W3Ztwi\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

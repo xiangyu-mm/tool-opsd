@@ -1,0 +1,362 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_yKq3AzUzXY2b7GW27CyTOrll",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether PET-CT, especially 18F-FDG PET/CT, is used and clinically useful for assessing treatment response or treatment results in patients with sarcoidosis. Identify human studies, systematic reviews, and guidelines describing pre/post-treatment PET/CT changes, correlation with clinical outcomes, and limitations. Focus on sarcoidosis (including pulmonary and extrapulmonary disease) and distinguish treatment monitoring from diagnosis or staging."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_JhfWoI3Bp8vi3qpsn1DFshWK",
+    "parent_tool_call_id": "call_yKq3AzUzXY2b7GW27CyTOrll",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "sarcoidosis FDG PET systematic review guideline treatment response",
+      "relation_query": null,
+      "task_name": "PET reviews guidelines",
+      "top_k": 30
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='sarcoidosis FDG PET systematic review guideline treatment response',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='sarcoidosis FDG PET systematic review guideline treatment response',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/PET_reviews_guidelines.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/PET_reviews_guidelines.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/PET_reviews_guidelines.csv'\nTotal results found: 30\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 39915121\nTitle: Summary: EANM/SNMMI Release Joint Guideline/Procedure Standard for [18F]FDG Hybrid PET Use in Infection and Inflammation in Adults, Version 2.0\nSource: J Nucl Med (2025)\nAbstract: The authors' search included all pertinent <m>systematic</m> <m>reviews</m> and metaanalyses, focusing on <m>PET</m>/CT rather than standalone <m>PET</m>.\n--------------------------------------------------------------------------------\nPMID: 38940716\nTitle: The role of infliximab in treating refractory cardiac sarcoidosis. Case series and systematic review of literature\nSource: Sarcoidosis Vasc Diffuse Lung Dis (2024)\nAbstract: The role of @CHEMICAL_Infliximab @CHEMICAL_MESH:D000069285 @@@infliximab@@@ in treating refractory @DISEASE_Sarcoidosis @DISEASE_MESH:D012507 @@@cardiac <m>sarcoidosis</m>@@@. Case series and <m>systematic</m> <m>review</m> of literature\n--------------------------------------------------------------------------------\nPMID: 39387894\nTitle: EANM/SNMMI guideline/procedure standard for [18F]FDG hybrid PET use in infection and inflammation in adults v2.0\nSource: Eur J Nucl Med Mol Imaging (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39439667\nTitle: Cardiac sarcoidosis: diagnosis and management\nSource: Front Cardiovasc Med (2024)\nAbstract: This is in contrast to many institutes that perform routine @CHEMICAL_Fluorodeoxyglucose_F18 @CHEMICAL_MESH:D019788 @@@<m>FDG</m>@@@-<m>PET</m> to monitor disease activity and <m>treatment</m> <m>response</m>.\n--------------------------------------------------------------------------------\nPMID: 38541919\nTitle: Cardiac Sarcoidosis:Diagnostic and Therapeutic Challenges\nSource: J Clin Med (2024)\nAbstract: @CHEMICAL_Fluorodeoxyglucose_F18 @CHEMICAL_MESH:D019788 @@@<m>FDG</m>@@@-<m>PET</m> also plays a key role in guiding immunomodulatory <m>therapy</m>.\n--------------------------------------------------------------------------------\nPMID: 38312203\nTitle: Sarcoid heart disease and imaging\nSource: Heart Rhythm O2 (2023)\nAbstract: The @CHEMICAL_Fluorodeoxyglucose_F18 @CHEMICAL_MESH:D019788 @@@<m>FDG</m>@@@-<m>PET</m> scan can be used to monitor <m>treatment</m> <m>response</m> and relapse after immunosuppression <m>therapy</m>.\n--------------------------------------------------------------------------------\nPMID: 36043423\nTitle: Adalimumab for the treatment of cardiac sarcoidosis with multiple arrhythmias\nSource: ESC Heart Fail (2022)\nAbstract: ... 18F-<m>FDG</m> <m>PET</m>-CT images. The maximum intensity projection <m>PET</m> image revealed high @CHEMICAL_Fluorodeoxyglucose_F18 @CHEMICAL_MESH:D019788 @@@<m>FDG</m>@@@ uptake in interventricular septum, right ventricular wall, left atrium, and papillary muscles of the left ventricle before <m>treatment</m> (A).\n--------------------------------------------------------------------------------\nPMID: 37496784\nTitle: Incidence of Atrial Fibrillation as the Initial Manifestation of Cardiac Sarcoidosis: Insights From a Catheter Ablation Registry\nSource: CJC Open (2023)\nAbstract: CMR, cardiac magnetic resonance; CR, chest radiograph; @DISEASE_Sarcoidosis @DISEASE_MESH:D012507 @@@CS@@@, @DISEASE_Sarcoidosis @DISEASE_MESH:D012507 @@@cardiac <m>sarcoidosis</m>@@@; CT, computed tomography; @CHEMICAL_Fluorodeoxyglucose_F18 @CHEMICAL_MESH:D019788 @@@<m>FDG</m>@@@-<m>PET</m>, @CHEMICAL_Fluorodeoxyglucose_F18 @CHEMICAL_MESH:D019788 @@@fluorodeoxyglucose@@@ positron emission tomography.\n--------------------------------------------------------------------------------\nPMID: 34277510\nTitle: State of the art of 18F-FDG PET/CT application in inflammation and infection: a guide for image acquisition and interpretation\nSource: Clin Transl Imaging (2021)\nAbstract: Finally, [18F]<m>FDG</m> <m>PET</m>/CT should be performed for the evaluation of <m>treatment</m> <m>response</m> having preferably acquired a basal scan before the start of <m>treatment</m>.\n--------------------------------------------------------------------------------\nPMID: 35022844\nTitle: Joint EANM/SNMMI/ESTRO practice recommendations for the use of 2-[18F]FDG PET/CT external beam radiation treatment planning in lung cancer V1.0\nSource: Eur J Nucl Med Mol Imaging (2022)\nAbstract: Other studies have also shown that post-<m>treatment</m> <m>response</m> assessment with 2-[18F]<m>FDG</m> <m>PET</m>/CT can predict survival.\n--------------------------------------------------------------------------------\nPMID: 35869744\nTitle: Hit-hard and early versus step-up treatment in severe sarcoidosis\nSource: Curr Opin Pulm Med (2022)\nAbstract: However, these guidelines do provide consistency of direction for physicians treating @DISEASE_Sarcoidosis @DISEASE_MESH:D012507 @@@<m>sarcoidosis</m>@@@ @SPECIES_9606 @@@patients@@@. A step-up approach with initial corticosteroid monotherapy is favored by the ERS/BTS <m>guideline</m>, although some other <m>reviews</m> or expert opinions leave room for initiation of upfront second-line <m>treatment</m> (e.g.\n--------------------------------------------------------------------------------\nPMID: 38740576\nTitle: Joint EANM-SNMMI guideline on the role of 2-[18F]FDG PET/CT in no special type breast cancer\nSource: Eur J Nucl Med Mol Imaging (2024)\nAbstract: ...A <m>systematic</m> <m>review</m> and meta-analysis from 2021 analyzed the impact of 2-[18F]<m>FDG</m> <m>PET</m> (3 studies), <m>PET</m>/CT (25 studies), and <m>PET</m>/MRI (1 study) and found a pooled 25% change in staging that resulted in an 18% change in management.\n--------------------------------------------------------------------------------\nPMID: 35376991\nTitle: Joint EANM/SNMMI/ANZSNM practice guidelines/procedure standards on recommended use of [18F]FDG PET/CT imaging during immunomodulatory treatments in patients with solid tumors version 1.0\nSource: Eur J Nucl Med Mol Imaging (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33669531\nTitle: Quantitative FDG PET Assessment for Oncology Therapy\nSource: Cancers (Basel) (2021)\nAbstract: ...Assessment of <m>treatment</m> <m>response</m> with @CHEMICAL_Fluorodeoxyglucose_F18 @CHEMICAL_MESH:D019788 @@@<m>FDG</m>@@@ <m>PET</m>-CT plays an important role for optimizing next <m>treatment</m> strategy and predicting @SPECIES_9606 @@@patient@@@ outcome.\n--------------------------------------------------------------------------------\nPMID: 36959810\nTitle: The role of artificial intelligence based on PET/CT radiomics in NSCLC: Disease management, opportunities, and challenges\nSource: Front Oncol (2023)\nAbstract: <m>PET</m> <m>Response</m> Criteria in @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@Solid Tumors@@@ (PERCIST 1.0) provides a <m>systematic</m> and structured method for assessing <m>response</m> to <m>therapy</m> in @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@cancer@@@ @SPECIES_9606 @@@patients@@@ with @CHEMICAL_Fluorodeoxyglucose_F18 @CHEMICAL_MESH:D019788 @@@18F-<m>FDG</m>@@@ <m>PET</m>.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_O7qvz3vwLToFg2Me7iATgc2A",
+    "parent_tool_call_id": "call_JhfWoI3Bp8vi3qpsn1DFshWK",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "response|follow-up|clinical|SUV|max|limitation|treatment",
+      "pmid": "23486337"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('23486337')\noutput = format_paper_content_output(result, filter_keywords='response|follow-up|clinical|SUV|max|limitation|treatment')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (9):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m response|follow-up|clinical|SUV|max|limitation|treatment\n      \u001b[90mpmid:\u001b[0m 23486337\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m response|relapse|SUV|max|clinical outcome|follow-up\n      \u001b[90mpmid:\u001b[0m 28079849\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m treatment response|prognosis|SUV|max|clinical response|follow-up\n      \u001b[90mpmid:\u001b[0m 29686996\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m immunosuppression|response|SUV|max|quantitative|rebound|limitation\n      \u001b[90mpmid:\u001b[0m 27457527\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m follow-up|treatment response|PET|SUV|max|clinical\n      \u001b[90mpmid:\u001b[0m 38077350\n\n  \u001b[1m\u001b[93m[6] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m treatment response|limitations|clinical management|evidence\n      \u001b[90mpmid:\u001b[0m 24703482\n\n  \u001b[1m\u001b[93m[7] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m therapeutic follow-up|corticosteroid|response|limitation\n      \u001b[90mpmid:\u001b[0m 18418595\n\n  \u001b[1m\u001b[93m[8] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m sarcoidosis|treatment response|monitor|limitation|recommend\n      \u001b[90mpmid:\u001b[0m 39387894\n\n  \u001b[1m\u001b[93m[9] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m routine|monitor|treatment response|PET|sarcoidosis|limitation\n      \u001b[90mpmid:\u001b[0m 39439667\n\n=== PMID: 23486337 ===\n\nTitle: Responsiveness of FDG PET/CT to treatment of patients with active chronic sarcoidosis.\n\nJournal/Date: Clinical nuclear medicine (2013)\n\nMeSH Keywords: Chronic Disease, Female, Fluorodeoxyglucose F18, Follow-Up Studies, Humans, Inflammation, Male, Middle Aged\n\n\n--- ABSTRACT ---\n[PURPOSE]: This study aimed to compare baseline to follow-up 18F-FDG PET/CT findings after treatment for active chronic sarcoidosis and to correlate changes on 18F-FDG PET/CT with changes in clinical status.\n[PATIENTS AND METHODS]: The sample included 66 patients with chronic sarcoidosis and evidence of active inflammation on baseline F-FDG PET/CT for which they received therapy. Of these 66 patients, 30 returned for the follow-up 18F-FDG PET/CT after 12 (5) months to evaluate response to treatment. They were also asked to indicate changes in clinical status. Baseline characteristics of patients who did and did not return for the follow-up were compared to assess selection bias.\n[RESULTS]: SUVmax was significantly decreased at the follow-up compared with baseline 18F-FDG PET/CT (8.46 [3.52] vs 4.90 [0.96]; P = 0.006), primarily in the mediastinum. Inflammatory activity appeared absent in 9 patients, decreased in 12 patients, and increased in 9 patients, with the corresponding changes in SUVmax of -80%, -41%, and +54%, respectively. The changes on 18F-FDG PET/CT were in agreement with self-perceived changes in clinical symptoms (P = 0.019). The angiotensin-converting enzyme at the follow-up was not significantly different from baseline (49.80 [19.25] vs 46.35 [25.58], P = 0.522). There was no difference in baseline characteristics of patients who did and did not return for the follow-up.\n[CONCLUSIONS]: 18F-FDG PET/CT is able to detect clinically meaningful changes in magnitude and extent of inflammatory activity in patients receiving treatment for active chronic sarcoidosis. Thus, 18F-FDG PET/CT is a valuable adjunct to clinical evaluation for monitoring the response to treatment in these patients.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_fjOSQNksNY37YLqF3XQ9lO1u",
+    "parent_tool_call_id": "call_JhfWoI3Bp8vi3qpsn1DFshWK",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "response|relapse|SUV|max|clinical outcome|follow-up",
+      "pmid": "28079849"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('28079849')\noutput = format_paper_content_output(result, filter_keywords='response|relapse|SUV|max|clinical outcome|follow-up')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 28079849 ===\n\nTitle: Role of serial F-18 FDG PET/CT scans in assessing treatment response and predicting relapses in patients with symptomatic sarcoidosis.\n\nJournal/Date: Sarcoidosis, vasculitis, and diffuse lung diseases : official journal of WASOG (2016)\n\nMeSH Keywords: Adrenal Cortex Hormones, Adult, Disease-Free Survival, Female, Fluorodeoxyglucose F18, Humans, Kaplan-Meier Estimate, Lung\n\n\n--- ABSTRACT ---\n[UNLABELLED]: ackground: Monitoring disease activity in sarcoidosis remains a clinical challenge as there is no gold standard. Positron emission tomography (PET) imaging is a novel tool to assess the metabolic activity. There is limited data on the role of serial PET scans in monitoring the disease activity.\n[METHODS]: This is a prospective study of 27 sarcoidosis patients treated with systemic corticosteroids. Patients underwent two serial PET/CT scans: one before initiating therapy and the follow up scan at end of therapy. The metabolic response on PET scan was classified as: (a) complete metabolic response (CMR); (b) partial metabolic response (PMR); (c) stable metabolic disease (SMD); and, (d) progressive metabolic disease (PMD). Patients with either CMR or PMR were classified as PET responders while those with SMD or PMD were considered as PET non-responders. All patients were followed at 3, 6 and 12 months after completion of therapy. Relapse rates and relapse-free survival was compared between the various groups.\n[RESULTS]: There was significant decline in the median SUVmax of the mediastinal lymph nodes, peripheral lymph nodes and the lung parenchyma in the follow up PET scan. Eight patients achieved CMR, 6 patients achieved PMR while 13 patients were PET non-responders. There was no difference in the clinical remission rates between the responders and non-responders. However, the relapse rate was significantly higher in non-responders vs. responders (61.5% vs. 14.2%, p=0.018). None of the patients who achieved a CMR relapsed during the study period.\n[CONCLUSIONS]: Patients with metabolic response on PET scan have significantly fewer relapses as compared to those with no response on PET scan.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_xCcGZqcD3HTN8sWNT8cYFGDn",
+    "parent_tool_call_id": "call_JhfWoI3Bp8vi3qpsn1DFshWK",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "immunosuppression|response|SUV|max|quantitative|rebound|limitation",
+      "pmid": "27457527"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27457527')\noutput = format_paper_content_output(result, filter_keywords='immunosuppression|response|SUV|max|quantitative|rebound|limitation')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 27457527 ===\n\nTitle: The response of FDG uptake to immunosuppressive treatment on FDG PET/CT imaging for cardiac sarcoidosis.\n\nJournal/Date: Journal of nuclear cardiology : official publication of the American Society of Nuclear Cardiology (2017)\n\nMeSH Keywords: Cardiomyopathies, Female, Fluorodeoxyglucose F18, Humans, Immunosuppressive Agents, Male, Metabolic Clearance Rate, Middle Aged\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Immunosuppression is used to treat cardiac sarcoidosis, despite limited data. FDG PET/CT is used for detecting cardiac inflammation in patients with CS, yet there is variability in interpretation of FDG PET/CT. Our aim was to compare quantitative and qualitative interpretation of FDG PET/CT for CS in defining the FDG response to immunosuppression.\n[METHODS AND RESULTS]: Patients with CS (N = 43 total studies from 17 patients) had serial FDG PET/CT studies before/after immunosuppression. FDG uptake was analyzed qualitatively (visually; FDG-positive segments) and quantitatively (SUVmax; cardiac metabolic volume and activity (CMV, CMA); volume above SUV thresholds 2.7 and 4.1 g/mL). Complete resolution of FDG uptake was common using CMA (10/17), CMV (10/17), but a 2.7 g/mL SUV threshold (13/17) and SUVmax (14/17) were more likely to define partial responses. In six patients imaged after a reduction in immunosuppression, 4/6 had a rebound quantitative FDG uptake.\n[CONCLUSIONS]: Quantitative interpretation of FDG PET/CT in CS can detect changes in FDG uptake in response to immunosuppression. Further studies are needed to see if quantitative changes in FDG uptake are associated with improved outcomes.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_TH7c5t5cDdiztXdlydbL9sJq",
+    "parent_tool_call_id": "call_JhfWoI3Bp8vi3qpsn1DFshWK",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "treatment response|limitations|clinical management|evidence",
+      "pmid": "24703482"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('24703482')\noutput = format_paper_content_output(result, filter_keywords='treatment response|limitations|clinical management|evidence')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 24703482 ===\n\nTitle: The role of 18F-FDG-PET and PET/CT in patients with sarcoidosis: an updated evidence-based review.\n\nJournal/Date: Academic radiology (2014)\n\nMeSH Keywords: Evidence-Based Medicine, Fluorodeoxyglucose F18, Humans, Image Enhancement, Multimodal Imaging, Positron-Emission Tomography, Radiopharmaceuticals, Reproducibility of Results\n\n\n--- ABSTRACT ---\n[RATIONALE AND OBJECTIVES]: To provide an updated evidence-based review of the literature on the role of fluorine-18-fluorodeoxyglucose positron emission tomography (FDG-PET) or PET/computed tomography (PET/CT) in patients with sarcoidosis.\n[MATERIALS AND METHODS]: A comprehensive literature search of PubMed/MEDLINE, Scopus, and Embase databases was conducted to find relevant published articles on FDG-PET or PET/CT in patients with sarcoidosis. Only those studies that satisfied all the following criteria were included: (1) FDG-PET or PET/CT performed in patients with histologically confirmed sarcoidosis, (2) sample size of at least 10 patients, and (3) whole-body PET studies performed. Information was collected concerning basic study, patient characteristics, and technical aspects. The main findings of the articles included have been described.\n[RESULTS]: Reviewing titles and abstracts, 21 articles were selected. The role of FDG-PET or PET/CT was analyzed in assessing disease extent and activity and in treatment response evaluation. Comparison with other tracers had also been investigated. Recent studies evaluated the influence of these methods in the clinical management and their role as predictive tools in patients with sarcoidosis.\n[CONCLUSIONS]: FDG-PET and PET/CT seem to be useful in staging, evaluating disease activity, and monitoring treatment response in patients with sarcoidosis. PET appears to have higher diagnostic accuracy compared to Gallium-67-citrate scintigraphy. Conversely, there is not enough evidence about the use of other PET tracers in patients with sarcoidosis. FDG-PET and PET/CT seem to have a role as predictive tools and may influence the clinical management in patients with sarcoidosis, but more studies are needed in this regard.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_oNQNg7ERCCSXyS5Zs3EW7Vtt",
+    "parent_tool_call_id": "call_JhfWoI3Bp8vi3qpsn1DFshWK",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "sarcoidosis|treatment response|monitor|limitation|recommend",
+      "pmid": "39387894"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('39387894')\noutput = format_paper_content_output(result, filter_keywords='sarcoidosis|treatment response|monitor|limitation|recommend')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 39387894 ===\n\nTitle: EANM/SNMMI guideline/procedure standard for [18F]FDG hybrid PET use in infection and inflammation in adults v2.0.\n\nJournal/Date: European journal of nuclear medicine and molecular imaging (2025)\n\nMeSH Keywords: Humans, Fluorodeoxyglucose F18, Inflammation, Positron-Emission Tomography, Adult, Infections, Nuclear Medicine, Radiopharmaceuticals\n\n\n--- ABSTRACT ---\n[INTRODUCTION]: Hybrid [18F]FDG PET imaging is currently the method of choice for a wide variety of infectious and inflammatory disorders and was recently adopted in several clinical guidelines. A large amount of evidence-based articles, guidelines and appropriate use criteria have been published since the first version of this guideline in 2013.\n[PURPOSE]: To provide updated evidence-based information to assist physicians in recommending, performing and interpreting hybrid [18F]FDG PET examinations for infectious and inflammatory disorders in the adult population.\n[METHODS]: A systematic literature search of evidence-based articles using whole-body [18F]FDG hybrid imaging on the indications covered within this guideline was performed. All systematic reviews and meta-analyses published within the last 10 years until January 2023 were identified in PubMed/Medline or Cochrane. For each indication covered in this manuscript, diagnostic performance was provided based on meta-analyses or systematic reviews. If not available, results from prospective or retrospective studies were considered based on predefined selection criteria. RESULTS AND CONCLUSIONS: Hybrid [18F]FDG PET is extremely useful in the work-up and management of adults with infectious and inflammatory diseases, as supported by extensive and rapidly growing evidence-based literature and adoption in clinical guidelines. Practical recommendations are provided describing evidence-based indications as well as interpretation criteria and pitfalls. Monitoring treatment response is the most challenging but insufficiently studied potential application in infection and inflammation imaging.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[DISCUSS]\nAreas of future research and perspectives\n\nAssess the potential role for late imaging (90-180 minutes post [18F]FDG injection) in selected indications such as osteomyelitis, vascular and cardiac imaging aiming at improving image quality through higher target to background ratios.\n\nAssess the role of ECG-synchronized cardiac gated acquisition in suspected endocarditis.\n\nAssess the added value and potential improvement of diagnostic yield using IV contrast with [18F]FDG PET/CT in selected indications.\n\nDefine the role and threshold(s) for SUV or lesion-to-background ratios to diagnose and differentiate an infection from a sterile inflammation or a malignant process.\n\nDetermine whether the diagnostic accuracy is further improved with new digital or large FOV hybrid PET systems, particularly i...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_hmNbPfvDWPM15kkzjhSdkZZr",
+    "parent_tool_call_id": "call_JhfWoI3Bp8vi3qpsn1DFshWK",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "routine|monitor|treatment response|PET|sarcoidosis|limitation",
+      "pmid": "39439667"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('39439667')\noutput = format_paper_content_output(result, filter_keywords='routine|monitor|treatment response|PET|sarcoidosis|limitation')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 39439667 ===\n\nTitle: Cardiac sarcoidosis: diagnosis and management.\n\nJournal/Date: Frontiers in cardiovascular medicine (2024)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nNon-caseating granulomatous infiltration of the myocardium is the hallmark of cardiac sarcoidosis (CS). CS manifests clinically as conduction disturbance, ventricular arrhythmia, sudden cardiac death and/or heart failure with reduced ejection fraction. Other than confirmation through endomyocardial biopsy, a diagnosis of probable CS can be established by histological evidence of systemic sarcoidosis in addition to characteristic clinical or advanced imaging findings. Cardiac Magnetic Resonance imaging (CMR) and 18F-flurodeoxyglycose positron emission tomography (FDG-PET) are imaging modalities indispensable in the diagnosis and monitoring of CS. FDG-PET is the method of choice for identifying the active inflammatory phase of CS and in the monitoring and modifying of immunosuppressive treatment. CMR is better suited for assessing cardiac morphology and function. Both modalities are more effective in detecting CS when used in combination than either is alone. Management of CS is primarily based upon observational data of low quality due to a paucity of randomized controlled trials. Corticosteroid therapy and/or tiered-immunosuppression are the mainstays of treatment in reducing myocardial inflammation. Steroid-sparing agents aim to limit the unfavorable side-effects of a significant steroid burden. Antiarrhythmics and guideline-directed medical therapies are utilized for control of ventricular arrhythmia and left ventricular dysfunction respectively. CS necessitates multidisciplinary care in specialized centers to most effectively diagnose and manage the disease. Additional randomized trials are warranted to further our understanding of medical optimization in CS.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_oo61clfWZm4sT79uZSO2SvqT",
+    "parent_tool_call_id": "call_hmNbPfvDWPM15kkzjhSdkZZr",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "18F-FDG PET/CT is used for treatment monitoring in sarcoidosis, including multisystem/pulmonary disease. In a 30-patient follow-up cohort with active chronic sarcoidosis, median SUVmax fell from 8.46 to 4.90 after approximately 12 months of therapy; PET changes (absent, decreased, or increased inflammation) agreed with patient-reported clinical status, whereas ACE did not significantly change. This supports PET/CT as an adjunct—not a standalone replacement—for clinical assessment.",
+          "source_tools": [
+            {
+              "relevance": "Human pre/post-treatment study correlating PET change with symptoms",
+              "tool_call_id": "call_O7qvz3vwLToFg2Me7iATgc2A"
+            }
+          ]
+        },
+        {
+          "finding": "Serial PET/CT changes may have prognostic value. In a prospective 27-patient corticosteroid study, mediastinal/peripheral nodal and pulmonary SUVmax declined; PET responders had substantially fewer relapses than nonresponders (14.2% vs 61.5%, p=0.018), and no complete metabolic responders relapsed during follow-up. However, clinical remission rates did not differ, indicating that metabolic response and clinical remission are not interchangeable.",
+          "source_tools": [
+            {
+              "relevance": "Prospective serial PET study with relapse follow-up",
+              "tool_call_id": "call_fjOSQNksNY37YLqF3XQ9lO1u"
+            }
+          ]
+        },
+        {
+          "finding": "A retrospective 23-patient glucocorticoid study found that follow-up PET/CT within 3 months generally showed reduced SUVmax, and greater metabolic response was associated with higher clinical remission and lower recurrence; the authors concluded PET/CT was useful for early therapeutic response and long-term prognosis. The evidence is small, retrospective, and heterogeneous.",
+          "source_tools": [
+            {
+              "relevance": "Human pre/post-glucocorticoid PET study",
+              "tool_call_id": "call_jJRxs95zatX2HjMHFNd9CeZ9"
+            }
+          ]
+        },
+        {
+          "finding": "PET/CT is particularly established for monitoring active cardiac sarcoidosis during immunosuppression. In 17 patients with 43 serial studies, quantitative measures (SUVmax, cardiac metabolic volume/activity, threshold volumes) detected response and rebound uptake after immunosuppression reduction, but the investigators explicitly noted that outcome associations remained unproven. In a larger retrospective cohort, 45 cardiac sarcoidosis patients with follow-up PET/CT showed treatment-regimen differences in myocardial FDG suppression and TNF-inhibitor therapy was associated with improved LVEF; this remains observational and confounded by treatment selection.",
+          "source_tools": [
+            {
+              "relevance": "Serial quantitative cardiac PET response/rebound study",
+              "tool_call_id": "call_xCcGZqcD3HTN8sWNT8cYFGDn"
+            },
+            {
+              "relevance": "Larger retrospective cardiac treatment-monitoring cohort",
+              "tool_call_id": "call_eG0pEsuzsICVu5Bl3RJbhM2r"
+            }
+          ]
+        },
+        {
+          "finding": "Early multisystem evidence also supports pre/post-treatment use: in a 20-case review/series, five patients had repeat PET/CT after corticosteroids; two had complete disappearance of uptake permitting steroid withdrawal, two had incomplete improvement, and one progressed during steroid taper. The study specifically highlights value in atypical, complex, and multisystem sarcoidosis, including extrapulmonary sites, but is too small for reliable outcome estimates.",
+          "source_tools": [
+            {
+              "relevance": "Human thoracic and extrapulmonary pre/post-corticosteroid series",
+              "tool_call_id": "call_xXcrbE0CLcB4jgmGp8ZbpYXZ"
+            }
+          ]
+        },
+        {
+          "finding": "Systematic/evidence-based review evidence is supportive but not definitive: a 2014 review of 21 qualifying whole-body studies concluded FDG-PET/PET/CT can assess activity and monitor treatment response and may influence management, while emphasizing that more studies are needed. The 2025 EANM/SNMMI inflammation guideline states that treatment-response monitoring is the most challenging and insufficiently studied application of FDG PET in infection/inflammation imaging, despite practical recommendations and recognized utility in inflammatory disease.",
+          "source_tools": [
+            {
+              "relevance": "Sarcoidosis-specific evidence-based review",
+              "tool_call_id": "call_TH7c5t5cDdiztXdlydbL9sJq"
+            },
+            {
+              "relevance": "Current hybrid FDG PET guideline with explicit limitation",
+              "tool_call_id": "call_oNQNg7ERCCSXyS5Zs3EW7Vtt"
+            }
+          ]
+        },
+        {
+          "finding": "Important limitations are lack of a sarcoidosis treatment-response gold standard, small mostly retrospective/nonrandomized cohorts, incomplete follow-up and potential selection bias, variable PET interpretation/quantification, and imperfect correspondence between metabolic, clinical, and functional outcomes. Cardiac studies additionally require rigorous dietary myocardial glucose suppression; residual physiologic uptake can mimic inflammation. PET/CT also involves radiation and FDG uptake is inflammatory rather than sarcoidosis-specific, so it cannot reliably distinguish sarcoidosis from infection or malignancy without clinical/histologic context.",
+          "source_tools": [
+            {
+              "relevance": "Review identifies limited evidence and need for further studies",
+              "tool_call_id": "call_TH7c5t5cDdiztXdlydbL9sJq"
+            },
+            {
+              "relevance": "Guideline emphasizes pitfalls and insufficient treatment-monitoring evidence",
+              "tool_call_id": "call_oNQNg7ERCCSXyS5Zs3EW7Vtt"
+            },
+            {
+              "relevance": "Cardiac review describes PET as monitoring active inflammation but low-quality observational treatment evidence",
+              "tool_call_id": "call_hmNbPfvDWPM15kkzjhSdkZZr"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_V15DdArbUvYzOyXqpgzd9V3X",
+    "parent_tool_call_id": "call_vt3WrGBQHHfBL54GUt1u7XXC",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE",
+          "name": "Sarcoidosis",
+          "observations": [
+            "18F-FDG PET/CT is used as an adjunct to assess inflammatory activity and treatment response in selected pulmonary, multisystem, extrapulmonary, and cardiac sarcoidosis.",
+            "Metabolic response does not consistently equal clinical remission or organ recovery; PET/CT is not a validated standalone treatment endpoint."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Treatment-monitoring evidence and limitations",
+              "tool_call_id": "call_O7qvz3vwLToFg2Me7iATgc2A"
+            },
+            {
+              "relevance": "Systematic review and guideline evidence",
+              "tool_call_id": "call_TH7c5t5cDdiztXdlydbL9sJq"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL",
+          "name": "18F-FDG",
+          "observations": [
+            "18F-FDG uptake is used as a marker of active inflammatory lesions in sarcoidosis, including serial assessment during immunosuppressive treatment."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Serial PET treatment-response studies",
+              "tool_call_id": "call_fjOSQNksNY37YLqF3XQ9lO1u"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "PET treatment response",
+          "observations": [
+            "In a 30-patient follow-up cohort, median SUVmax decreased from 8.46 to 4.90 after approximately 12 months of treatment, and PET changes agreed with patient-reported clinical status."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Pulmonary/multisystem treatment monitoring",
+              "tool_call_id": "call_O7qvz3vwLToFg2Me7iATgc2A"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "PET relapse association",
+          "observations": [
+            "In a prospective 27-patient corticosteroid study, PET responders had fewer relapses than nonresponders (14.2% versus 61.5%; P=0.018), but clinical remission rates did not differ."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Prognostic treatment-response evidence",
+              "tool_call_id": "call_fjOSQNksNY37YLqF3XQ9lO1u"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Cardiac PET monitoring",
+          "observations": [
+            "Serial PET detected myocardial inflammatory response and rebound uptake after immunosuppression reduction in cardiac sarcoidosis, but associations with hard clinical outcomes remain unproven."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Cardiac serial PET study",
+              "tool_call_id": "call_xCcGZqcD3HTN8sWNT8cYFGDn"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "PET evidence limitations",
+          "observations": [
+            "Evidence is mainly from small observational cohorts with variable PET quantification and no universal treatment-response gold standard; physiologic uptake, radiation, and nonspecific inflammation limit routine use."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Guideline and evidence limitations",
+              "tool_call_id": "call_TH7c5t5cDdiztXdlydbL9sJq"
+            },
+            {
+              "relevance": "Inflammation imaging guideline limitations",
+              "tool_call_id": "call_oNQNg7ERCCSXyS5Zs3EW7Vtt"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "18F-FDG",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Sarcoidosis"
+        },
+        {
+          "from_entity": "PET treatment response",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Sarcoidosis"
+        },
+        {
+          "from_entity": "PET relapse association",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Sarcoidosis"
+        },
+        {
+          "from_entity": "Cardiac PET monitoring",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Sarcoidosis"
+        },
+        {
+          "from_entity": "PET evidence limitations",
+          "relation_type": "INCONCLUSIVE_FOR",
+          "to_entity": "Sarcoidosis"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 6, \"entities\": [{\"name\": \"Sarcoidosis\", \"entityType\": \"DISEASE\", \"observations\": [\"18F-FDG PET/CT is used as an adjunct to assess inflammatory activity and treatment response in selected pulmonary, multisystem, extrapulmonary, and cardiac sarcoidosis.\", \"Metabolic response does not consistently equal clinical remission or organ recovery; PET/CT is not a validated standalone treatment endpoint.\"]}, {\"name\": \"18F-FDG\", \"entityType\": \"CHEMICAL\", \"observations\": [\"18F-FDG uptake is used as a marker of active inflammatory lesions in sarcoidosis, including serial assessment during immunosuppressive treatment.\"]}, {\"name\": \"PET treatment response\", \"entityType\": \"FINDING\", \"observations\": [\"In a 30-patient follow-up cohort, median SUVmax decreased from 8.46 to 4.90 after approximately 12 months of treatment, and PET changes agreed with patient-reported clinical status.\"]}, {\"name\": \"PET relapse association\", \"entityType\": \"FINDING\", \"observations\": [\"In a prospective 27-patient corticosteroid study, PET responders had fewer relapses than nonresponders (14.2% versus 61.5%; P=0.018), but clinical remission rates did not differ.\"]}, {\"name\": \"Cardiac PET monitoring\", \"entityType\": \"FINDING\", \"observations\": [\"Serial PET detected myocardial inflammatory response and rebound uptake after immunosuppression reduction in cardiac sarcoidosis, but associations with hard clinical outcomes remain unproven.\"]}, {\"name\": \"PET evidence limitations\", \"entityType\": \"FINDING\", \"observations\": [\"Evidence is mainly from small observational cohorts with variable PET quantification and no universal treatment-response gold standard; physiologic uptake, radiation, and nonspecific inflammation limit routine use.\"]}]}, \"relations_created\": {\"count\": 5, \"relations\": [{\"from\": \"18F-FDG\", \"to\": \"Sarcoidosis\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"PET treatment response\", \"to\": \"Sarcoidosis\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PET relapse association\", \"to\": \"Sarcoidosis\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Cardiac PET monitoring\", \"to\": \"Sarcoidosis\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PET evidence limitations\", \"to\": \"Sarcoidosis\", \"relationType\": \"INCONCLUSIVE_FOR\"}]}}, \"provenance\": {\"tool_call_id\": \"call_V15DdArbUvYzOyXqpgzd9V3X\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_vt3WrGBQHHfBL54GUt1u7XXC\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

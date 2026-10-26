@@ -1,0 +1,1 @@
+{"answer": "Cc1ccc2nc(Nc3ncnc(Nc4ccc(OC(F)(F)F)cc4)c3[N+](=O)[O-])sc2c1"}

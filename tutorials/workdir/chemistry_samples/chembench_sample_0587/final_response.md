@@ -1,0 +1,1 @@
+{"answer":"CN(CCNC1CC1)CC1CCCN1C"}

@@ -1,0 +1,3 @@
+Yes. In a cross-sectional analysis of 2,003 Helsinki Birth Cohort participants, approximately 57–61 years old, higher fructose intake was associated with lower odds of index-defined NAFLD. Comparing the highest with the lowest intake quartile, the fully adjusted odds ratio for Fatty Liver Index-defined NAFLD was 0.68 (95% CI 0.47–0.84). The study used liver-fat indices rather than imaging or biopsy, and its observational design does not show that fructose prevents NAFLD.
+
+FINAL DECISION: YES

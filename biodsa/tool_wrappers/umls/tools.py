@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Type
+from typing import Literal, Optional, Type, List
 from pydantic import BaseModel, Field
 from langchain_core.tools import BaseTool
 import json
@@ -58,6 +58,14 @@ class SearchUMLSEntitiesToolInput(BaseModel):
             "'sourceConcept', 'sourceDescriptor', 'sourceUi'."
         )
     )
+    context_tool_call_ids: List[str] = Field(
+        default_factory=list,
+        description=(
+            "The tool_call_id of the immediately previous useful tool "
+            "result used for this action. Use [] if no previous tool "
+            "result is directly used."
+        )
+    )
 
 
 class SearchUMLSEntitiesTool(BaseTool):
@@ -110,6 +118,7 @@ class SearchUMLSEntitiesTool(BaseTool):
         return_id_type: Literal[
             "concept", "code", "aui", "sourceConcept", "sourceDescriptor", "sourceUi"
         ] = "concept",
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to search UMLS entities."""
         

@@ -1,0 +1,299 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_Z8oSQyqWMduYWi3H1WlkeTPj",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether residual pulmonary perfusion defects after acute pulmonary embolism are associated with impaired fibrinolytic capacity. Search for human studies assessing persistent perfusion defects, chronic thromboembolic disease, or residual vascular obstruction after PE alongside fibrinolysis measures such as plasmin generation, fibrinolytic potential, PAI-1, tPA, D-dimer, clot lysis time, or thrombophilia. Report study design, patient population, fibrinolysis assay, main quantitative or qualitative findings, and whether the evidence supports a direct association."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_WTVuhtnbvV6W7LP7xx9PDF2r",
+    "parent_tool_call_id": "call_Z8oSQyqWMduYWi3H1WlkeTPj",
+    "round": 1,
+    "tool_input": {
+      "task_name": "plasmin PE obstruction",
+      "boolean_query_text": "pulmonary embolism plasmin generation fibrinolytic potential perfusion",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='pulmonary embolism plasmin generation fibrinolytic potential perfusion',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='pulmonary embolism plasmin generation fibrinolytic potential perfusion',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/plasmin_PE_obstruction.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/plasmin_PE_obstruction.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/plasmin_PE_obstruction.csv'\nTotal results found: 30\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 41242982\nTitle: Cerebral venous thrombosis: Current management, recent advances and future directions\nSource: Int J Stroke (2025)\nAbstract: Two ongoing Phase II studies are testing monoclonal @GENE_SERPINF2 @GENE_5345 @@@alpha2-antiplasmin@@@ inhibition in the treatment of acute @DISEASE_Venous_Thrombosis @DISEASE_MESH:D020246 @@@deep vein thrombosis@@@ and @DISEASE_Pulmonary_Embolism @DISEASE_MESH:D011655 @@@<m>pulmonary</m> <m>embolism</m>@@@ (ClinicalTrials.gov identifier NCT05408546; NCT06149520).\n--------------------------------------------------------------------------------\nPMID: 41262558\nTitle: Advances in Transdermal Drug Delivery Systems for Antithrombotic Therapy: A Systematic Review\nSource: ACS Pharmacol Transl Sci (2025)\nAbstract: Clinical manifestations include @DISEASE_Venous_Thrombosis @DISEASE_MESH:D020246 @@@deep vein thrombosis@@@ typically affecting the lower limbs and @DISEASE_Pulmonary_Embolism @DISEASE_MESH:D011655 @@@<m>pulmonary</m> <m>embolism</m>@@@, a <m>potentially</m> fatal condition caused by clot migration to the lungs.\n--------------------------------------------------------------------------------\nPMID: 41415012\nTitle: Necrotizing enterocolitis in a neonate with severe congenital pulmonary valve stenosis complicated by a postoperative right atrial thrombus: a case report\nSource: Front Pediatr (2025)\nAbstract: @DISEASE_Anti_plasmin_deficiency_congenital @DISEASE_MESH:C537777 @@@PIC@@@ reflects the amount of @GENE_PLG @GENE_5340 @@@<m>plasmin</m>@@@ generated or the degree of <m>fibrinolytic</m> system activation and an elevation suggests hyperfibrinolysis.\n--------------------------------------------------------------------------------\nPMID: 41549721\nTitle: Coagulation Markers and Myocardial Blush Grade in STEMI: Identifying Potential Predictors of Microvascular Reperfusion\nSource: Clin Appl Thromb Hemost (2026)\nAbstract: However, troponins can also be elevated in many non-coronary conditions such as @DISEASE_Renal_Insufficiency @DISEASE_MESH:D051437 @@@renal failure@@@, @DISEASE_Pulmonary_Embolism @DISEASE_MESH:D011655 @@@<m>pulmonary</m> <m>embolism</m>@@@, @DISEASE_Heart_Failure @DISEASE_MESH:D006333 @@@heart failure@@@, and @DISEASE_Tachycardia @DISEASE_MESH:D013610 @@@tachyarrhythmias@@@.\n--------------------------------------------------------------------------------\nPMID: 35719336\nTitle: Pathophysiology of COVID-19: Critical Role of Hemostasis\nSource: Front Cell Infect Microbiol (2022)\nAbstract: ...The <m>pulmonary</m> vasculature is responsible for the <m>perfusion</m> of these organs and is essential for proper hemostasis.\n--------------------------------------------------------------------------------\nPMID: 33600700\nTitle: Development and Testing of Thrombolytics in Stroke\nSource: J Stroke (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38792186\nTitle: Advances in Nano-Functional Materials in Targeted Thrombolytic Drug Delivery\nSource: Molecules (2024)\nAbstract: Alteplase is widely used in the intervention of acute @DISEASE_Cerebral_Infarction @DISEASE_MESH:D002544 @@@ischemic stroke@@@ and @DISEASE_Pulmonary_Embolism @DISEASE_MESH:D011655 @@@acute <m>pulmonary</m> <m>embolism</m>@@@ in developing countries such as India. Third-<m>generation</m> thrombolytic drugs include reteplase and teneplase.\n--------------------------------------------------------------------------------\nPMID: 34893967\nTitle: Clinical Pharmacokinetics and Pharmacodynamics of Desmoteplase\nSource: Eur J Drug Metab Pharmacokinet (2022)\nAbstract: Desmoteplase was tested in @DISEASE_Myocardial_Infarction @DISEASE_MESH:D009203 @@@myocardial infarction@@@ and @DISEASE_Pulmonary_Embolism @DISEASE_MESH:D011655 @@@<m>pulmonary</m> <m>embolism</m>@@@ and showed promising results versus @GENE_PLAT @GENE_5327 @@@alteplase@@@.\n--------------------------------------------------------------------------------\nPMID: 36923287\nTitle: SHock-INduced Endotheliopathy (SHINE): A mechanistic justification for viscoelastography-guided resuscitation of traumatic and non-traumatic shock\nSource: Front Physiol (2023)\nAbstract: The defining treatment for @DISEASE_Shock @DISEASE_MESH:D012769 @@@obstructive shock@@@ is to find the source of obstruction (e.g., @DISEASE_Cardiac_Tamponade @DISEASE_MESH:D002305 @@@cardiac tamponade@@@, @DISEASE_Pneumothorax @DISEASE_MESH:D011030 @@@tension pneumothorax@@@, or @DISEASE_Pulmonary_Embolism @DISEASE_MESH:D011655 @@@<m>pulmonary</m> <m>embolism</m>@@@) and relieve it.\n--------------------------------------------------------------------------------\nPMID: 34290322\nTitle: Joint analysis of D-dimer, N-terminal pro b-type natriuretic peptide, and cardiac troponin I on predicting acute pulmonary embolism relapse and mortality\nSource: Sci Rep (2021)\nAbstract: @DISEASE_Pulmonary_Embolism @DISEASE_MESH:D011655 @@@APE@@@ was diagnosed according to the 2015 Chinese Expert Consensus on Diagnosis and Management of Acute @DISEASE_Pulmonary_Embolism @DISEASE_MESH:D011655 @@@<m>Pulmonary</m> <m>Embolism</m>@@@. @SPECIES_9606 @@@Patients@@@ received and were diagnosed on at least one of the following examinations: computed tomographic <m>pulmonary</m> angiography, ventilation-<m>perfusion</m> scintigraphy, and <m>pulmonary</m> artery angiography.\n--------------------------------------------------------------------------------\nPMID: 34184164\nTitle: COVID-19 is a systemic vascular hemopathy: insight for mechanistic and clinical aspects\nSource: Angiogenesis (2021)\nAbstract: This phenomenon, described as 'fibrinolysis shutdown', has been shown to be a predictor of first and recurrent @DISEASE_Pulmonary_Embolism @DISEASE_MESH:D011655 @@@<m>pulmonary</m> <m>embolism</m>@@@, @DISEASE_Warburg_Sjo_Fledelius_syndrome @DISEASE_MESH:C536681 @@@micro- and macrovascular thrombosis@@@ and <m>potentially</m> alveolar fibrin deposition.\n--------------------------------------------------------------------------------\nPMID: 38610717\nTitle: Cutting-Edge Techniques and Drugs for the Treatment of Pulmonary Embolism: Current Knowledge and Future Perspectives\nSource: J Clin Med (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34682916\nTitle: The Pathophysiology and Management of Hemorrhagic Shock in the Polytrauma Patient\nSource: J Clin Med (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33493983\nTitle: Mechanisms of thrombosis and cardiovascular complications in COVID-19\nSource: Thromb Res (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35908022\nTitle: Pharmacotherapy consideration of thrombolytic medications in COVID-19-associated ARDS\nSource: J Intensive Care (2022)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_mINNYXmtTnJdIdl1rQxnRMoR",
+    "parent_tool_call_id": "call_WTVuhtnbvV6W7LP7xx9PDF2r",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|Patients|fibrinolytic|lysis|plasminogen activator inhibitor|PAI-1|tPA|D-dimer|Conclusion|odds|regression",
+      "pmid": "25074740"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25074740')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|Patients|fibrinolytic|lysis|plasminogen activator inhibitor|PAI-1|tPA|D-dimer|Conclusion|odds|regression')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (4):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|Patients|fibrinolytic|lysis|plasminog ... |PAI-1|tPA|D-dimer|Conclusion|odds|regression\n      \u001b[90mpmid:\u001b[0m 25074740\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|fibrin clot|permeability|lysis|residu ... r obstruction|RPVO|odds|regression|Conclusion\n      \u001b[90mpmid:\u001b[0m 37932588\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|clot lysis|CLT|t50|vascular obstruction|perfusion|recurrence|Conclusion\n      \u001b[90mpmid:\u001b[0m 40544392\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|fibrinogen|THR312ALA|polymorphism|CTEPH|thrombophilia|Conclusion\n      \u001b[90mpmid:\u001b[0m 36856592\n\n=== PMID: 25074740 ===\n\nTitle: Residual perfusion defects in patients with pulmonary embolism are related to impaired fibrinolytic capacity.\n\nJournal/Date: Thrombosis research (2014)\n\nMeSH Keywords: Adult, Aged, Anticoagulants, Biomarkers, Blood Coagulation Tests, Female, Fibrinolysis, Humans\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Few studies investigated the relationship between fibrinolysis abnormalities and residual pulmonary perfusion defects after acute pulmonary embolism (PE).\n[OBJECTIVE]: To assess the fibrinolytic profile in patients with prior PE in relation to the extent of scintigraphically detectable residual perfusion abnormalities.\n[PATIENTS AND METHODS]: We studied 71 consecutive patients with a prior episode of PE, who were examined after one year of the incident embolic event, and at least one month after anticoagulation withdrawal. They underwent lung scintigraphy to assess the recovery of pulmonary perfusion, echocardiography and chest radiography to look for signs of pulmonary hypertension. Clot formation and lysis were evaluated by two turbidimetric methods: Clot and Lysis Assay and Clot Lysis Time. We also measured the in vitro plasmin-mediated lysis of fibrin from purified fibrinogen, and the circulating levels of fibrinolytic inhibitors. The sample was split in two categories based on the extent of residual perfusion defects: <10% (n=53), ≥ 10% (n=18).\n[RESULTS]: Patients with perfusion defects >10% had significantly longer lysis time (p<0.05), and higher levels of plasminogen activator inhibitor-1 (p<0.01) than those with perfusion defects <10%. The time interval between symptoms onset and PE diagnosis (time-to-diagnosis) was significantly longer in patients with perfusion defects >10% than in the others (p=0.005). In multivariate logistic regression, both lysis time and time-to-diagnosis were independently associated with perfusion defects >10% (p<0.001). None of the sampled patients had echocardiographic or radiologic signs of pulmonary hypertension.\n[CONCLUSION]: Prolonged time-to-diagnosis and fibrinolysis imbalance are independent predictors of incomplete perfusion recovery after acute PE.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_m8J7dDWQ4WcgFAOWA5cbBeHM",
+    "parent_tool_call_id": "call_WTVuhtnbvV6W7LP7xx9PDF2r",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|fibrin clot|permeability|lysis|residual pulmonary vascular obstruction|RPVO|odds|regression|Conclusion",
+      "pmid": "37932588"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('37932588')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|fibrin clot|permeability|lysis|residual pulmonary vascular obstruction|RPVO|odds|regression|Conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 37932588 ===\n\nTitle: Reduced fibrin clot permeability on admission and elevated E-selectin at 3 months as novel risk factors of residual pulmonary vascular obstruction in patients with acute pulmonary embolism.\n\nJournal/Date: Journal of thrombosis and thrombolysis (2024)\n\nMeSH Keywords: Humans, E-Selectin, Pulmonary Embolism, Thrombosis, Vascular Diseases, Risk Factors, Fibrinolysis, Fibrin\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Residual pulmonary vascular obstruction (RPVO) is common following pulmonary embolism (PE) but its association with fibrin clot properties is poorly understood. We investigated whether prothrombotic state and hypofibrinolysis markers can identify patients with RPVO.\n[METHODS]: In 79 normotensive noncancer patients (aged 56 ± 13.3 years) with acute PE, we determined fibrin clot permeability (Ks), clot lysis time (CLT), endogenous thrombin potential (ETP), fibrinolysis proteins, oxidative stress markers, and E-selectin on admission before initiation of anticoagulant therapy, after 5-7 days, and 3 months of anticoagulation. RPVO was diagnosed using computed tomography angiography 3-6 months since PE.\n[RESULTS]: Patients with RPVO (n = 23, 29.1%) had at baseline higher simplified Pulmonary Embolism Severity Index (sPESI) (P = 0.004), higher N-terminal brain natriuretic propeptide (P = 0.006) and higher D-dimer (P = 0.044). Patients with versus without RPVO had lower Ks (P < 0.001) and longer CLT (P < 0.05), both at baseline and 5-7 days since admission, but not at 3 months. Patients with RPVO showed 40.6% higher E-selectin (P < 0.001) solely at 3 months. By multivariable logistic regression, baseline Ks (odds ratio [OR] 0.010, 95% confidence interval [CI] 0.001-0.837, P = 0.042, per 10- 9 cm2), baseline D-dimer (OR 1.105, 95% CI 1.000-1.221, P = 0.049, per 100 ng/ml), and E-selectin levels after 3 months (OR 3.874, 95% CI 1.239-12.116, P = 0.020, per 1 ng/ml) were associated with RPVO.\n[CONCLUSIONS]: RPVO patients despite anticoagulation characterize with the formation of denser fibrin clots on admission and higher E-selectin at 3 months. Those parameters could be the potential novel RPVO risk factors that warrant further evaluation in an independent cohort.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nAmong 79 normotensive noncancer PE patients (aged 56 ± 13.3 years) 63.3% had unprovoked events (Table 1). Based on the angio-CT performed after 4 ± 1 months since the diagnosis of PE and after at least 3 months of oral anticoagulation therapy (rivaroxaban – 77.2%, apixaban – 19.0%, warfarin – 3.8%), we detected RPVO in 23 individuals (29.1%).\n\nAt baseline\n\nAs shown in Table 1, at baseline the RPVO group, as compared to the non-RPVO group, had a more severe PE manifestation as reflected by the early mortality risk assessment (P = 0.007) and sPESI (P = 0.004), along with increased prevalence of positive TnT (P = 0.007) and RV dysfunction (P = 0.019). There were no differences in the initial embolic material location. In both groups cardiovascular risk factors were similarly distribu...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_W4mtOgs73VV846Ya1BVGDPWi",
+    "parent_tool_call_id": "call_WTVuhtnbvV6W7LP7xx9PDF2r",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|clot lysis|CLT|t50|vascular obstruction|perfusion|recurrence|Conclusion",
+      "pmid": "40544392"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('40544392')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|clot lysis|CLT|t50|vascular obstruction|perfusion|recurrence|Conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 40544392 ===\n\nTitle: Potential association of TGFβ1 plasma levels and fibrinolysis parameters with the risk of recurrence and vascular obstruction after a first unprovoked pulmonary embolism episode.\n\nJournal/Date: Journal of thrombosis and thrombolysis (2025)\n\nMeSH Keywords: Humans, Pulmonary Embolism, Recurrence, Transforming Growth Factor beta1, Middle Aged, Aged, Fibrinolysis, Female\n\n\n--- ABSTRACT ---\nThe pathophysiology of residual pulmonary vascular obstruction (RPVO) and recurrent venous thromboembolism (VTE) after unprovoked pulmonary embolism (PE) remains poorly understood. The purpose was to evaluate fibrinolytic and tissue remodeling markers as indicators of RPVO and recurrence after a first unprovoked PE. Analyses were conducted in the 18 to 70-year-old patients included in the PADIS-PE trial, with a pulmonary vascular obstruction (PVO) index ≥ 30% at PE diagnosis. After an initial six-month vitamin K antagonist treatment, patients were randomised to receive placebo or warfarin for 18 months and assessed for the absence or presence of residual pulmonary vascular obstruction (RPVO < or ≥ 5%, respectively). Quantitative assessment of fibrinolytic (D-dimer, tPA, uPA, TFPI) and tissue remodeling (TGFβ1) markers, and a tissue-factor-based turbidimetric clot lysis assay (CLA) were performed one month after warfarin discontinuation. Symptomatic recurrent VTE was monitored for 42 months after randomisation. Among the 371 patients included in PADIS-PE, 23 fulfilled clinico-radiological criteria and had an available blood sample. Six (26%) patients presented RPVO ≥ 5% and symptomatic recurrent VTE occurred in nine (39%) patients. Clot formation and lysis parameters were not associated with RPVO. TGFβ1 plasma levels were higher in patients with RPVO. Clot formation potential measured with CLA was higher in patients with recurrent VTE. No association between recurrent VTE and TGFβ1 was observed. In adult patients with a first unprovoked PE and a PVO index ≥ 30%, TGFβ1 plasma levels were associated with RPVO, whereas clot formation parameters measured with CLA were associated with VTE recurrence.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nAmong the 371 patients enrolled in the PADIS-PE study, 49 were eligible to this ancillary study. Twenty-six patients without warfarin-free samples were excluded. Therefore, 23 (6%) patients were included in the analysis (Fig. 1).\n\nCharacteristics of the overall study population\n\nAs shown in Table 1, median (IQR) age was 56.0 (50.0–59.0) years, and seven (30%) patients were female. Median PVO index at PE diagnosis was 57.5% (48.8–62.8). Median follow-up duration was 41 months (41–42). Symptomatic recurrent VTE occurred during follow-up in nine (39%) patients. All events occurred in the absence of anticoagulation, five events being non-fatal PE and four events being isolated DVT. Included patients had similar baseline clinical characteristics with patients that were excluded for abs...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_6NOGizfWlwDWruqCIPHufzlD",
+    "parent_tool_call_id": "call_WTVuhtnbvV6W7LP7xx9PDF2r",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|fibrinogen|THR312ALA|polymorphism|CTEPH|thrombophilia|Conclusion",
+      "pmid": "36856592"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('36856592')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|fibrinogen|THR312ALA|polymorphism|CTEPH|thrombophilia|Conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 36856592 ===\n\nTitle: Fibrinogen-Aα THR312ALA Polymorphism is Associated to Chronic Thromboembolic Pulmonary Hypertension in Turkey.\n\nJournal/Date: Anatolian journal of cardiology (2023)\n\nMeSH Keywords: Humans, Cross-Sectional Studies, Cytochrome P-450 CYP2C9, Fibrinogen, Hypertension, Pulmonary, Polymorphism, Genetic, Prospective Studies, Turkey\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Chronic thromboembolic pulmonary hypertension is a condition that occurs after mechanical obstruction of the pulmonary arteries by thrombus. Since the frequency and demographics of chronic thromboembolic pulmonary hypertension differ between countries, it is thought that genetic factors may play a role in its development. The aim of this study is to reveal the status of VKORC1, CYP2C9*3, CYP2C9*7, and fibrinogen-Aα THR312ALA gene polymorphisms in chronic thromboembolic pulmonary hypertension patients in Turkey.\n[METHODS]: In this prospective cross-sectional study, a total of 46 chronic thromboembolic pulmonary hypertension patients and 106 healthy volunteers were included. Polymerase chain reaction-restriction fragment length polymorphism method was used to determine candidate gene polymorphisms for chronic thromboembolic pulmonary hypertension. The general population parameters of each locus were calculated, and the relationship between dominant, codominant, and recessive genotype models and chronic thromboembolic pulmonary hypertension was analyzed.\n[RESULTS]: For the fibrinogen-Aα gene, those with the THR/THR genotype were found to have a 13.51 (95% CI: 2.688-33.333) times less susceptibility rate to the disease than those with the ALA/THR genotype, the susceptibility of THR/ALA genotype to the disease was 5.026 (95% CI: 1.774-14.242) times more than those with ALA/ALA genotype. There was no difference between patient groups for VKORC1, CYP2C9*3 genes (P >.05). Since the CYP2C9*7 patient group was monomorphic for the ILE allele, the patient/control odds ratio and 95% CI could not be calculated.\n[CONCLUSION]: This study shows that there is an association between the fibrinogen-Aα gene ALA polymorphism at the amino acid position of 312 and the development of chronic thromboembolic pulmonary hypertension, but not between the CYP2C9 and VKORC1 gene polymorphisms.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nThe study included 46 patients including 25 (54.35%) men and 106 healthy volunteers including 55 (51.89%) men. As a result of the Chi-square test, there was no statistically significant difference in terms of gender distribution in the patient and control groups. As a result of the Anderson–Darling test, it was understood that the ages of the individuals included in the study did not show a normal distribution (P < .05). While there was a significant difference between the median values for age of the patient (53.5) and control (39.0) groups, no significant difference was found in terms of other parameters. The details of the demographic information of the volunteers included in the study are given in Table 2.\n\nHardy–Weinberg Equilibrium analysis results are given in Table 3. Whil...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_ICuFt7HdGeVQGY4UZGCpMAEA",
+    "parent_tool_call_id": "call_6NOGizfWlwDWruqCIPHufzlD",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Direct human evidence supports an association between impaired fibrinolysis and persistent perfusion defects after acute PE: in a 71-patient follow-up study at 1 year (off anticoagulation), patients with ≥10% scintigraphic residual perfusion defects (n=18) had significantly longer clot-lysis time (p<0.05) and higher PAI-1 (p<0.01) than those with <10% defects (n=53); lysis time and time-to-diagnosis were independently associated with ≥10% defects in multivariable logistic regression (p<0.001). No pulmonary hypertension was present, so this pertains to residual defects rather than established CTEPH.",
+          "source_tools": [
+            {
+              "relevance": "Primary study abstract and results",
+              "tool_call_id": "call_mINNYXmtTnJdIdl1rQxnRMoR"
+            }
+          ]
+        },
+        {
+          "finding": "A prospective observational study of 79 normotensive, noncancer acute-PE patients assessed at admission, 5–7 days, and 3 months, with CT angiographic RPVO at 3–6 months, found RPVO in 23/79 (29.1%). RPVO patients had denser fibrin clots (lower fibrin-clot permeability Ks, p<0.001) and longer clot-lysis time (p<0.05) at baseline and day 5–7; baseline Ks, baseline D-dimer, and 3-month E-selectin were independently associated with RPVO. This supports an association with hypofibrinolytic/prothrombotic clot phenotype, although CLT was not independently reported as an RPVO predictor and the study was not designed to establish causality.",
+          "source_tools": [
+            {
+              "relevance": "Primary RPVO cohort study",
+              "tool_call_id": "call_m8J7dDWQ4WcgFAOWA5cbBeHM"
+            }
+          ]
+        },
+        {
+          "finding": "Evidence is not uniformly positive: an ancillary analysis of the PADIS-PE randomized trial included only 23 adults with first unprovoked PE and initial pulmonary vascular obstruction ≥30%; after anticoagulation and warfarin discontinuation, 6 (26%) had RPVO ≥5%. Quantitative D-dimer, tPA, uPA, TFPI and a tissue-factor-based turbidimetric clot-lysis assay were measured, but clot formation/lysis parameters were not associated with RPVO. TGFβ1, not the fibrinolysis measures, was higher in RPVO. Thus, this small study does not replicate the direct fibrinolysis-RPVO association.",
+          "source_tools": [
+            {
+              "relevance": "Primary ancillary PADIS-PE analysis",
+              "tool_call_id": "call_W4mtOgs73VV846Ya1BVGDPWi"
+            }
+          ]
+        },
+        {
+          "finding": "A prospective cross-sectional genetic study compared 46 Turkish CTEPH patients with 106 healthy volunteers and found association of the fibrinogen Aα THR312ALA polymorphism with CTEPH (e.g., THR/ALA vs ALA/ALA susceptibility OR 5.026, 95% CI 1.774–14.242; THR/THR vs ALA/THR showed lower susceptibility). VKORC1 and CYP2C9 polymorphisms were not associated. This is indirect thrombophilia/fibrin-structure evidence in established CTEPH, not a direct assay of impaired fibrinolytic capacity or a longitudinal demonstration after acute PE.",
+          "source_tools": [
+            {
+              "relevance": "Primary CTEPH genetic association study",
+              "tool_call_id": "call_6NOGizfWlwDWruqCIPHufzlD"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: residual pulmonary perfusion defects/RPVO after PE are plausibly and in several human cohorts associated with impaired fibrinolytic capacity—especially prolonged clot-lysis time, elevated PAI-1, and dense/less permeable fibrin clots—but the evidence base is small, heterogeneous, and partly conflicting. Direct evidence is strongest for residual defects without pulmonary hypertension; evidence in established CTEPH is more indirect and genetic/structural, and available studies do not establish that hypofibrinolysis causes persistent obstruction.",
+          "source_tools": [
+            {
+              "relevance": "Synthesis supported by direct residual-defect and RPVO studies plus conflicting PADIS-PE analysis",
+              "tool_call_id": "call_mINNYXmtTnJdIdl1rQxnRMoR"
+            },
+            {
+              "relevance": "RPVO clot phenotype study",
+              "tool_call_id": "call_m8J7dDWQ4WcgFAOWA5cbBeHM"
+            },
+            {
+              "relevance": "Conflicting PADIS-PE analysis",
+              "tool_call_id": "call_W4mtOgs73VV846Ya1BVGDPWi"
+            },
+            {
+              "relevance": "Indirect CTEPH thrombophilia study",
+              "tool_call_id": "call_6NOGizfWlwDWruqCIPHufzlD"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_yQz51EesLUhUuWxTvE3MkLIF",
+    "parent_tool_call_id": "call_vS3eE7K1SEcXeHuwnxyI6TAg",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25074740",
+          "observations": [
+            "In 71 patients approximately 1 year after pulmonary embolism, those with ≥10% residual scintigraphic perfusion defects had longer clot-lysis time and higher PAI-1 than those with <10% defects; lysis time was independently associated with larger defects.",
+            "Residual defects occurred without echocardiographic or radiologic pulmonary hypertension, supporting an association outside established CTEPH."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct human evidence linking residual perfusion defects to prolonged lysis and elevated PAI-1.",
+              "tool_call_id": "call_mINNYXmtTnJdIdl1rQxnRMoR"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:37932588",
+          "observations": [
+            "In a prospective cohort of 79 acute PE patients, RPVO occurred in 23/79 (29.1%) at 3–6 months; RPVO was associated with lower fibrin-clot permeability and longer clot-lysis time at baseline and day 5–7.",
+            "Baseline clot permeability, D-dimer, and later E-selectin were independently associated with RPVO; the study supports a hypofibrinolytic/prothrombotic clot phenotype but does not establish causality."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct prospective evidence linking fibrin structure and lysis resistance to residual pulmonary vascular obstruction.",
+              "tool_call_id": "call_m8J7dDWQ4WcgFAOWA5cbBeHM"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:40544392",
+          "observations": [
+            "In a small PADIS-PE ancillary analysis of 23 patients with first unprovoked PE, quantitative D-dimer, tPA, uPA, TFPI, and tissue-factor-based clot-lysis parameters were not associated with residual pulmonary vascular obstruction; 6/23 had RPVO.",
+            "The negative result conflicts with other cohorts but is limited by the small sample and selected population."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct negative human evidence regarding measured fibrinolysis parameters and RPVO.",
+              "tool_call_id": "call_W4mtOgs73VV846Ya1BVGDPWi"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:36856592",
+          "observations": [
+            "In a cross-sectional study of 46 CTEPH patients and 106 controls, fibrinogen Aα THR312ALA polymorphism was associated with CTEPH, with one genotype comparison showing OR 5.026 (95% CI 1.774–14.242).",
+            "This is indirect evidence compatible with altered fibrin structure or thrombophilia, not a direct functional fibrinolysis assay after acute PE."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Indirect genetic evidence in established CTEPH.",
+              "tool_call_id": "call_6NOGizfWlwDWruqCIPHufzlD"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Residual PE hypofibrinolysis",
+          "observations": [
+            "Across small human cohorts, residual perfusion defects or RPVO after PE are associated in several studies with prolonged clot-lysis time, elevated PAI-1, or dense less-permeable fibrin clots.",
+            "Evidence is heterogeneous and partly conflicting; available studies support association but do not establish that impaired fibrinolysis causes persistent obstruction."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Integrated conclusion from direct positive, direct negative, and indirect studies.",
+              "tool_call_id": "call_mINNYXmtTnJdIdl1rQxnRMoR"
+            },
+            {
+              "relevance": "Integrated prospective RPVO evidence.",
+              "tool_call_id": "call_m8J7dDWQ4WcgFAOWA5cbBeHM"
+            },
+            {
+              "relevance": "Conflicting negative evidence.",
+              "tool_call_id": "call_W4mtOgs73VV846Ya1BVGDPWi"
+            },
+            {
+              "relevance": "Indirect CTEPH evidence.",
+              "tool_call_id": "call_6NOGizfWlwDWruqCIPHufzlD"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:25074740",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Residual PE hypofibrinolysis"
+        },
+        {
+          "from_entity": "PMID:37932588",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Residual PE hypofibrinolysis"
+        },
+        {
+          "from_entity": "PMID:40544392",
+          "relation_type": "REFUTES",
+          "to_entity": "Residual PE hypofibrinolysis"
+        },
+        {
+          "from_entity": "PMID:36856592",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Residual PE hypofibrinolysis"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 5, \"entities\": [{\"name\": \"PMID:25074740\", \"entityType\": \"PAPER\", \"observations\": [\"In 71 patients approximately 1 year after pulmonary embolism, those with \\u226510% residual scintigraphic perfusion defects had longer clot-lysis time and higher PAI-1 than those with <10% defects; lysis time was independently associated with larger defects.\", \"Residual defects occurred without echocardiographic or radiologic pulmonary hypertension, supporting an association outside established CTEPH.\"]}, {\"name\": \"PMID:37932588\", \"entityType\": \"PAPER\", \"observations\": [\"In a prospective cohort of 79 acute PE patients, RPVO occurred in 23/79 (29.1%) at 3\\u20136 months; RPVO was associated with lower fibrin-clot permeability and longer clot-lysis time at baseline and day 5\\u20137.\", \"Baseline clot permeability, D-dimer, and later E-selectin were independently associated with RPVO; the study supports a hypofibrinolytic/prothrombotic clot phenotype but does not establish causality.\"]}, {\"name\": \"PMID:40544392\", \"entityType\": \"PAPER\", \"observations\": [\"In a small PADIS-PE ancillary analysis of 23 patients with first unprovoked PE, quantitative D-dimer, tPA, uPA, TFPI, and tissue-factor-based clot-lysis parameters were not associated with residual pulmonary vascular obstruction; 6/23 had RPVO.\", \"The negative result conflicts with other cohorts but is limited by the small sample and selected population.\"]}, {\"name\": \"PMID:36856592\", \"entityType\": \"PAPER\", \"observations\": [\"In a cross-sectional study of 46 CTEPH patients and 106 controls, fibrinogen A\\u03b1 THR312ALA polymorphism was associated with CTEPH, with one genotype comparison showing OR 5.026 (95% CI 1.774\\u201314.242).\", \"This is indirect evidence compatible with altered fibrin structure or thrombophilia, not a direct functional fibrinolysis assay after acute PE.\"]}, {\"name\": \"Residual PE hypofibrinolysis\", \"entityType\": \"FINDING\", \"observations\": [\"Across small human cohorts, residual perfusion defects or RPVO after PE are associated in several studies with prolonged clot-lysis time, elevated PAI-1, or dense less-permeable fibrin clots.\", \"Evidence is heterogeneous and partly conflicting; available studies support association but do not establish that impaired fibrinolysis causes persistent obstruction.\"]}]}, \"relations_created\": {\"count\": 4, \"relations\": [{\"from\": \"PMID:25074740\", \"to\": \"Residual PE hypofibrinolysis\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:37932588\", \"to\": \"Residual PE hypofibrinolysis\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:40544392\", \"to\": \"Residual PE hypofibrinolysis\", \"relationType\": \"REFUTES\"}, {\"from\": \"PMID:36856592\", \"to\": \"Residual PE hypofibrinolysis\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_yQz51EesLUhUuWxTvE3MkLIF\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_vS3eE7K1SEcXeHuwnxyI6TAg\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

@@ -1,0 +1,5 @@
+The most directly relevant study was a retrospective cohort of **655 patients with grade 1 endometrioid endometrial carcinoma**; 137 had mucinous differentiation. Stage IA was similarly common in both groups (85.4% with mucinous differentiation vs 86.3% without). Although mucinous differentiation was associated with more myometrial invasion (61.3% vs 51.5%), the study found no statistically significant difference in progression-free survival (mean 98 vs 93.4 months; p=0.07) or recurrence risk (PMID: 25088333; evidence source: `call_RxLaoOIuKRuOgMWx9u6p0BpI`).
+
+**Conclusion:** Available direct evidence does not suggest that mucinous differentiation increases stage or recurrence risk in grade 1 endometrioid carcinoma. Confidence is limited: the evidence is mainly one retrospective cohort, and it did not report an adjusted survival model. This conclusion concerns mucinous differentiation within endometrioid carcinoma, not pure or predominantly mucinous carcinoma.
+
+FINAL DECISION: NO

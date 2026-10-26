@@ -1,0 +1,269 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_z0XxPhMXYOsbqUKmu49ZtpuV",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 4,
+      "search_target": "Determine whether moderate-intensity physical activity or exercise is associated with cardiac remodeling in healthy adults. Find human studies and reviews reporting cardiac structural changes (LV mass, chamber size, wall thickness, atrial size) and distinguish moderate activity from high-volume endurance training and pathological remodeling. Provide citations and key results."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_VEJZA33xZQevXT1nRFeRxpVH",
+    "parent_tool_call_id": "call_z0XxPhMXYOsbqUKmu49ZtpuV",
+    "round": 1,
+    "tool_input": {
+      "task_name": "endurance athlete heart comparison",
+      "boolean_query_text": "endurance training athlete heart physiological pathological remodeling left ventricular mass review",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='endurance training athlete heart physiological pathological remodeling left ventricular mass review',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='endurance training athlete heart physiological pathological remodeling left ventricular mass review',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/endurance_athlete_heart_comparison.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/endurance_athlete_heart_comparison.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/endurance_athlete_heart_comparison.csv'\nTotal results found: 13\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 27486490\nTitle: Cardiac Imaging In Athletes.\nSource: Methodist DeBakey cardiovascular journal (2016)\nAbstract: Athletic heart syndrome refers to the physiological and morphological changes that occur in a human heart after repetitive strenuous physical exercise. Examples of exercise-induced changes in the heart include increases in heart cavity dimensions, augmentation of cardiac output, and increases in heart muscle mass. These cardiac adaptations vary based on the type of exercise performed and are often referred to as sport-specific cardiac remodeling. The hemodynamic effects of endurance and strength training exercise lead to these adaptations. Any abnormalities in chamber dilatation and left ventricular function usually normalize with cessation of exercise. Athletic heart syndrome is rare and should be differentiated from pathologic conditions such as hypertrophic cardiomyopathy, left ventricular noncompaction, and arrhythmogenic right ventricular dysplasia when assessing a patient for athletic heart syndrome. This paper describes specific adaptations that occur in athletic heart syndrome and tools to distinguish between healthy alterations versus underlying pathology.\n--------------------------------------------------------------------------------\nPMID: 22495644\nTitle: [Physiological versus pathological left ventricular remodeling in athletes].\nSource: Giornale italiano di cardiologia (2006) (2012)\nAbstract: Intense and chronic athletic training is associated with left ventricular remodeling, including an increase in wall thickness, cavity size and mass. The extent of morphological cardiac changes depends on a variety of factors, namely body size, gender, type of sport, ethnicity and, likely, genetic factors. A subset of male athletes engaged in intense endurance sports, such as cycling and rowing, develops a more substantial increase in left ventricular dimensions that may overlap with the phenotypic expression of cardiomyopathies. A common clinical challenge in sports cardiology is the differential diagnosis between physiological left ventricular hypertrophy (i.e., \"athlete's heart\") and hypertrophic cardiomyopathy, which is one of the most common causes of sudden cardiac death in young athletes. This review describes the physiological determinants, characteristics and upper limits of left ventricular hypertrophy in athletes, and analyzes the criteria that can be useful in the differential diagnosis between \"athlete's heart\" and hypertrophic cardiomyopathy.\n--------------------------------------------------------------------------------\nPMID: 22386289\nTitle: Assessment of left ventricular hypertrophy in a trained athlete: differential diagnosis of physiologic athlete's heart from pathologic hypertrophy.\nSource: Progress in cardiovascular diseases (2012)\nAbstract: Physiologic LV remodeling in young trained athletes as a consequence of chronic training can occasionally mimic certain pathologic conditions associated with sudden death, such as HCM. A small but important subset of elite male athletes may show a borderline increased LV wall thickness of 13 to 15 mm, which defines a gray zone of overlap between the extreme expressions of athlete's heart and a mild HCM phenotype. Such diagnostic ambiguity can be resolved by using the paradigm of noninvasive parameters including testing with echocardiography (and, more recently, with CMR): left atrial and LV chamber dimensions and shape, brief periods of deconditioning to alter LV mass, measurement of oxygen consumption and diastolic filling, and recognition of familial occurrence of HCM or a pathogenic HCM-causing sarcomere mutation. Such distinctions between physiologic/benign athlete's heart and HCM, the most common cause of sudden death in the young in the United States, can be crucial. The recognition of HCM leads to disqualification from intense competitive sports to reduce sudden death risk and, when appropriate, permits initiation of therapeutic interventions.\n--------------------------------------------------------------------------------\nPMID: 35392369\nTitle: Sex Matters: A Comprehensive Comparison of Female and Male Hearts\nSource: Front Physiol (2022)\nAbstract: ...Differentiating <m>physiological</m> from <m>pathological</m> adaptation. Wall thickness and cavity size are diagnostic criteria for which a subset of <m>physiologically</m> <m>remodeled</m> <m>athlete</m>@DISEASE_Parkinson_Disease @DISEASE_MESH:D010300 @@@'s@@@ <m>hearts</m> overlaps with <m>pathologically</m> <m>remodeled</m> @DISEASE_Cardiomyopathy_Dilated @DISEASE_MESH:D002311 @@@dilated and hypertrophic cardiomyopathy <m>hearts</m>@@@, <m>left</m>.\n--------------------------------------------------------------------------------\nPMID: 36091408\nTitle: The elite judo female athlete's heart\nSource: Front Physiol (2022)\nAbstract: Whyte et al. performed a study exclusively on judokas and found that <m>left</m> @DISEASE_Ventricular_Remodeling @DISEASE_MESH:D020257 @@@<m>ventricular</m> <m>remodeling</m>@@@ was similar between sexes with increased <m>ventricular</m> thickness and <m>left</m> <m>ventricular</m> <m>mass</m> compared to matched controls in contrary to Laskowski et al. who reported that <m>heart</m> adaptations such as the increased diastolic dimension of the <m>left</m> ventricle in elite male and female judoists resemble adaptations observed in <m>endurance</m> <m>athletes</m>.\n--------------------------------------------------------------------------------\nPMID: 41546848\nTitle: Echocardiography in Athletes: the Ever-Evolving Assessment of Physiology Versus Pathology\nSource: Curr Cardiol Rep (2026)\nAbstract: @DISEASE_Cardiomyopathy_Dilated_with_Left_Ventricular_Noncompaction @DISEASE_MESH:C565277 @@@<m>Left</m> <m>ventricular</m> dilation@@@ is an expected <m>physiologic</m> adaptation in <m>endurance</m> <m>athletes</m> and will commonly be found on echocardiography.\n--------------------------------------------------------------------------------\nPMID: 38098064\nTitle: Cardiac imaging in athlete's heart: current status and future prospects\nSource: Cardiovasc Ultrasound (2023)\nAbstract: The results of this meta-analysis confirm the hypothesis of divergent cardiac adaptations in dynamic and static sports. <m>Left</m> <m>ventricular</m> <m>mass</m> did not differ significantly between the 3 groups of <m>athletes</m>.\n--------------------------------------------------------------------------------\nPMID: 35886693\nTitle: Echocardiographic Characterization of Left Heart Morphology and Function in Highly Trained Male Judo Athletes\nSource: Int J Environ Res Public Health (2022)\nAbstract: These changes in <m>left</m> <m>heart</m> morphology, combined with normal diastolic function, ejection fraction, and shortening fraction, indicate that the judokas' cardiac adaptation was <m>physiological</m> rather than <m>pathological</m>, showing the pattern of @DISEASE_Ventricular_Remodeling @DISEASE_MESH:D020257 @@@<m>left</m> <m>ventricular</m> <m>remodeling</m>@@@ commonly observed in strength and power <m>training</m>, with a limited <m>endurance</m> <m>training</m> contribution.\n--------------------------------------------------------------------------------\nPMID: 36293734\nTitle: Left Ventricular, Left Atrial and Right Ventricular Strain Modifications after Maximal Exercise in Elite Ski-Mountaineering Athletes: A Feasibility Speckle Tracking Study\nSource: Int J Environ Res Public Health (2022)\nAbstract: This report provides, for the first time, new evidence of sport-specific dynamic <m>remodeling</m> of the Ski-Mo <m>athlete's</m> <m>heart</m> and elucidates differences at resting and post-exercise conditions in the strain pattern of the <m>left</m> <m>heart</m> against the sport-specific altitude <m>training</m> background of Ski-Mo <m>athletes</m>.\n--------------------------------------------------------------------------------\nPMID: 37848973\nTitle: The athlete's heart: insights from echocardiography\nSource: Echo Res Pract (2023)\nAbstract: Therefore, in this narrative <m>review</m>, we consider the effects of sporting discipline and <m>training</m> volume on the holistic <m>athlete's</m> <m>heart</m>, as well as demographic factors including ethnicity, body size, sex, and age.\n--------------------------------------------------------------------------------\nPMID: 34768646\nTitle: The Role of Multimodality Imaging in Athlete's Heart Diagnosis: Current Status and Future Directions\nSource: J Clin Med (2021)\nAbstract: HyperDoppler flow analysis in an <m>endurance</m> <m>athlete</m>. On the <m>left</m>, the flow velocity vector map shows the blood flow that circulates towards the direction of the <m>left</m> <m>ventricular</m> outflow tract.\n--------------------------------------------------------------------------------\nPMID: 35050218\nTitle: Athlete's Heart in Elite Biathlon, Nordic Cross:Country and Ski-Mountaineering Athletes: Cardiac Adaptions Determined Using Echocardiographic Data\nSource: J Cardiovasc Dev Dis (2021)\nAbstract: In this context, especially pronounced changes due to @DISEASE_Ventricular_Remodeling @DISEASE_MESH:D020257 @@@<m>left</m> <m>ventricular</m> (LV) and atrial <m>remodeling</m>@@@ can be proven in elite <m>endurance</m> <m>athletes</m>.\n--------------------------------------------------------------------------------\nPMID: 33795916\nTitle: Benefits and limitations of electrocardiographic and echocardiographic screening in top level endurance athletes\nSource: Biol Sport (2021)\nAbstract: ECG and TTE screening complement each other in identifying <m>endurance</m> <m>athletes</m> requiring treatment or verification. Unlike abnormal ECG changes, adaptive ECG changes and @DISEASE_Abnormalities_Drug_Induced @DISEASE_MESH:D000014 @@@TTE abnormalities@@@ are strongly related to the <m>training</m> duration, which reflects <m>physiological</m> adaptation of the <m>heart</m> to physical exertion in high <m>endurance</m> <m>athletes</m>.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_taDcXKTr4JOLmTUpg6WoWTZS",
+    "parent_tool_call_id": "call_VEJZA33xZQevXT1nRFeRxpVH",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "LV mass left atrial volume moderate activity results",
+      "pmid": "37993041"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('37993041')\noutput = format_paper_content_output(result, filter_keywords='LV mass left atrial volume moderate activity results')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (5):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m LV mass left atrial volume moderate activity results\n      \u001b[90mpmid:\u001b[0m 37993041\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m moderate intensity 3 to 5 hours LV mass volume Dawes\n      \u001b[90mpmid:\u001b[0m 34501285\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m MVPA LV structure physical activity results ECHO-SOL\n      \u001b[90mpmid:\u001b[0m 34261776\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m moderate exercise LV mass relative left ventricular muscular mass results\n      \u001b[90mpmid:\u001b[0m 29589406\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m aerobic exercise programs remodeling chamber dimensions wall thickness left atrial size\n      \u001b[90mpmid:\u001b[0m 37629599\n\n=== PMID: 37993041 ===\n\nTitle: Lifestyle and Cardiac Structure and Function in Healthy Midlife Population.\n\nJournal/Date: The American journal of cardiology (2024)\n\nMeSH Keywords: Adult, Male, Middle Aged, Humans, Female, Heart, Echocardiography, Alcohol Drinking\n\n\n--- ABSTRACT ---\nThe association between lifestyle and cardiac structure and function measures, such as global longitudinal strain and diastolic function in a healthy midlife general population, is not well known. A subpopulation of the Northern Finland Birth Cohort 1966 took part in follow-up, including echocardiography (n = 1,155) at the age of 46. All antihypertensive medication users (n = 164), patients with diabetes (n = 70), subjects with any cardiac diseases (n = 24), and subjects with echocardiography abnormalities (n = 21) were excluded. Moderate to vigorous physical activity (MVPA) was recorded with a wrist-worn accelerometer over 14 days and categorized into high, moderate, and low MVPA groups. Similarly, alcohol consumption was categorized as low, moderate, and high-dose users of alcohol and smoking as nonsmokers, former, and current smokers. The total number of healthy subjects included in the study was 715 (44% males). Left ventricular mass index and left atrial end-systolic volume index were significantly higher in the high MVPA group compared with the low MVPA group (adjusted main effect p = 0.002 and p <0.001, respectively). Cardiac function did not differ among the physical activity groups. High alcohol consumption was associated with impaired global longitudinal strain and diastolic function (adjusted main effect p = 0.002 and p = 0.004, respectively) but not with any cardiac structure variables. Smoking was not associated with cardiac structure or function. In healthy middle-aged adults, MVPA was independently associated with structural changes in the heart but not with cardiac function. High alcohol consumption was associated with impaired modern cardiac function measures but not with cardiac structure.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_YcricYvKyKtfjVrtVeYjzpqi",
+    "parent_tool_call_id": "call_VEJZA33xZQevXT1nRFeRxpVH",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "MVPA LV structure physical activity results ECHO-SOL",
+      "pmid": "34261776"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('34261776')\noutput = format_paper_content_output(result, filter_keywords='MVPA LV structure physical activity results ECHO-SOL')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 34261776 ===\n\nTitle: Associations between physical activity, sedentary behaviour and left ventricular structure and function from the Echocardiographic Study of Latinos (ECHO-SOL).\n\nJournal/Date: Open heart (2021)\n\nMeSH Keywords: Accelerometry, Adolescent, Adult, Aged, Cardiovascular Diseases, Cross-Sectional Studies, Echocardiography, Exercise\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: The cross-sectional association between accelerometer-measured physical activity (PA), sedentary behaviour (SB) and cardiac structure and function is less well described. This study's primary aim was to compare echocardiographic measures of cardiac structure and function with accelerometer measured PA and SB.\n[METHODS]: Participants included 1206 self-identified Hispanic/Latino men and women, age 45-74 years, from the Echocardiographic Study of Latinos. Standard echocardiographic measures included M-mode, two-dimensional, spectral, tissue Doppler and myocardial strain. Participants wore an Actical accelerometer at the hip for 1 week.\n[RESULTS]: The mean±SE age for the cohort was 56±0.4 years, 57% were women. Average moderate to vigorous PA (MVPA) was 21±1.1 min/day, light PA was 217±4.2 min/day and SB was 737±8.1 min/day. Both higher levels of light PA and MVPA (min/day) were associated with lower left ventricular (LV) mass index (LVMI)/end-diastolic volume and a lower E/e' ratio. Higher levels of MVPA (min/day) were associated with better right ventricular systolic function. Higher levels of SB were associated with increased LVMI. In a multivariable linear regression model adjusted for demographics and cardiovascular disease modifiable factors, every 10 additional min/day of light PA was associated with a 0.03 mL/m2 increase in left atrial volume index (LAVI) (p<0.01) and a 0.004 cm increase in tricuspid annular plane systolic excursion (p<0.01); every 10 additional min/day of MVPA was associated with a 0.18 mL/m2 increase in LAVI (p<0.01) and a 0.24% improvement in global circumferential strain (p<0.01).\n[CONCLUSIONS]: Our findings highlight the potential positive association between the MVPA and light PA on cardiac structure and function.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nBaseline characteristics of the study population are provided in table 1. The mean age of included participants was 56 years; 57% were women, 28% had diabetes, 50% had hypertension and 18% reported current cigarette smoking. On average, participants accumulated (mean±SD) 21±1.1 min/day of MVPA; 217±4.2 min/day of light PA and 737±8.1 min/day of SB. Men accumulated more MVPA compared with women (27±1.6 vs 17±1.3 min/day, p<0.001) (figure 1). Participants aged >65 years had less MVPA accumulation than participants aged <55 years (17±3.0 vs 24±1.5, p=0.03). Overall, participants aged >55 years spent less time in both light PA and MVPA than those less than 55 years of age (figure 2). Online supplemental table 1 shows the prevalent self-reported PA in ECHO/SOL.\n\nAssociations between PA...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_N7bbLf4heQYDqJ7nlUEXHUsr",
+    "parent_tool_call_id": "call_VEJZA33xZQevXT1nRFeRxpVH",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "moderate exercise LV mass relative left ventricular muscular mass results",
+      "pmid": "29589406"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('29589406')\noutput = format_paper_content_output(result, filter_keywords='moderate exercise LV mass relative left ventricular muscular mass results')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 29589406 ===\n\nTitle: Improved cardiorespiratory fitness following moderate exercise may encourage inactive people for doable and sustainable behavioral change.\n\nJournal/Date: The Journal of sports medicine and physical fitness (2019)\n\nMeSH Keywords: Adult, Cardiorespiratory Fitness, Cross-Sectional Studies, Echocardiography, Exercise, Female, Health Behavior, Humans\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Global physical inactivity pandemic is responsible for more than 5 million deaths annually through its effects on non-communicable diseases. This requires urgent intervention. The aim of this study was to investigate the associations of physical activity with cardiovascular fitness in a cross-sectional retrospective observational fashion. Data were collected for 21 years from 2530 healthy volunteers and athletes representing the entire spectrum of physical activity from the totally inactive sedentary persons to the highly trained national athletes.\n[METHODS]: Cardiac fitness was investigated echocardiographically, which is characterized by reduced resting heart rate (RHR), increased relative left ventricular muscular mass (rLVMM), improved left ventricular diastolic function (characterized by the ratio of early to late ventricular peak velocities, E/A) and peak exercise oxygen consumption.\n[RESULTS]: We found that even moderate exercise is associated with improved cardiac characteristics. With increasing exercise level, the RHR decreased from 69 to 63.3, 61.4, 58.6, 56.1, and 55.8/min in non-athletes, leisure athletes, lower class athletes, 2nd class athletes, 1st class athletes, and national athletes, respectively. While the rLVMM was increased from 64.6 to 70.7, 76.3, 78.5, 86.7, and 88.9 in the same groups. The E/A ratio also increased from 1.71 to 1.72, 1.85, 2.04 in the non-athletes, leisure athletes, lower class athletes, and 2nd class athletes, respectively, but then decreased to 1.92 and 1.98 in the 1st class athletes and national athletes. The largest exercise-induced improvement of cardiac fitness was observed between the inactive and the least active group, which did not increase further in the highly trained national athletes enduring up to 20 training hours per week.\n[CONCLUSIONS]: Our findings indicate that cardiac fitness can be improved by moderate exercise in sedentary persons. This information would help physicians to encourage inactive patients, who find physical exercise intimidating, for doable and sustainable behavioral change.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_kWt2JrH31DVJdt1aHoe4hxb8",
+    "parent_tool_call_id": "call_VEJZA33xZQevXT1nRFeRxpVH",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "aerobic exercise programs remodeling chamber dimensions wall thickness left atrial size",
+      "pmid": "37629599"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('37629599')\noutput = format_paper_content_output(result, filter_keywords='aerobic exercise programs remodeling chamber dimensions wall thickness left atrial size')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 37629599 ===\n\nTitle: Exercise Effects on Left Ventricular Remodeling in Patients with Cardiometabolic Risk Factors.\n\nJournal/Date: Life (Basel, Switzerland) (2023)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nLeft ventricular (LV) remodeling is a dynamic process, which is characterized by changes in ventricular size, shape, and wall thickness, thus altering myocardial geometry and function, and is considered as a negative prognostic factor in patients with heart failure (HF). Hypertension, type 2 diabetes (T2D), and obesity are strongly correlated with the development and the progression of LV remodeling, LV hypertrophy, and LV systolic and/or diastolic dysfunction. Indeed, the beneficial impact of exercise training on primary and secondary prevention of cardiovascular disease (CVD) has been well-established. Recent studies have highlighted that exercise training enhances functional capacity, muscle strength and endurance, cardiac function, and cardiac-related biomarkers among patients with established coronary artery disease (CAD) or HF, thus substantially improving their cardiovascular prognosis, survival rates, and need for rehospitalization. Therefore, in this review article, we discuss the evidence of LV remodeling in patients with cardiometabolic risk factors, such as hypertension, T2D, and obesity, and also highlight the current studies evaluating the effect of exercise training on LV remodeling in these patients.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[DISCUSS]\n5. Recommendations and New Perspectives\n\nAccording to the 2019 American College of Cardiology (ACC) in collaboration with (AHA) Guideline on the Primary Prevention of CVD, in general, healthy individuals should undergo at least 150 min/week of accumulated moderate-intensity physical activity. Otherwise, 75 min/week of vigorous-intensity physical activity to reduce the risk of atherosclerotic CVD. In total agreement to previous recommendations, the European Society of Cardiology (ESC) highlights that additional benefit is achieved by doubling the previous exercise duration, with multiple sessions of exercise carried out throughout the week. More specifically, hypertensive patients should be advised to participate in at least 30 min of moderate-intensity dynamic aerobic exercise (walking, jo...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_AUPDFZo9D9xQgqmb32dtFTSO",
+    "parent_tool_call_id": "call_kWt2JrH31DVJdt1aHoe4hxb8",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Evidence supports modest physiological structural association with activity in otherwise healthy adults, but it is observational and does not show that ordinary moderate activity consistently produces clinically significant remodeling. In 715 healthy 46-year-olds, the high versus low accelerometer-measured MVPA group had higher LV mass index and left-atrial end-systolic volume index (adjusted p=0.002 and <0.001), with no differences in cardiac function; intensity-volume cutoffs and absolute size changes are not given in the abstract. [PMID 37993041]",
+          "source_tools": [
+            {
+              "relevance": "Healthy population study with measured MVPA and echocardiographic structural outcomes",
+              "tool_call_id": "call_taDcXKTr4JOLmTUpg6WoWTZS"
+            }
+          ]
+        },
+        {
+          "finding": "In a diverse adult cohort aged 45–74, higher accelerometer-measured MVPA was associated with better LV mass-to-volume ratio and small higher LA volume index per 10 min/day (+0.18 mL/m²), as well as better circumferential strain; participants averaged only 21 min/day MVPA. This cross-sectional cohort included substantial hypertension and diabetes prevalence, so it is not a strictly healthy-adult sample and does not isolate moderate from vigorous activity.",
+          "source_tools": [
+            {
+              "relevance": "Accelerometer and echocardiographic findings with quantified association and population caveat",
+              "tool_call_id": "call_YcricYvKyKtfjVrtVeYjzpqi"
+            }
+          ]
+        },
+        {
+          "finding": "A large 21-year cross-sectional series of 2,530 healthy volunteers/athletes reported graded increases in relative LV muscular mass from 64.6 in non-athletes to 70.7 in leisure athletes and 76.3 in lower-class athletes; the largest fitness gains occurred from inactivity to the least-active group. It supports an association at relatively modest activity but does not establish causality or provide chamber/wall/atrial dimensions in the abstract.",
+          "source_tools": [
+            {
+              "relevance": "Healthy participants across activity spectrum and reported LV muscular-mass gradient",
+              "tool_call_id": "call_N7bbLf4heQYDqJ7nlUEXHUsr"
+            }
+          ]
+        },
+        {
+          "finding": "High-volume endurance athlete remodeling is a distinct, training-dose-dependent physiological phenotype: chronic strenuous training can enlarge cardiac cavities and increase myocardial mass/wall thickness; marked changes in elite athletes may overlap with hypertrophic cardiomyopathy. Normal function and clinical context help distinguish adaptation from pathology; these athlete data should not be generalized to routine moderate activity.",
+          "source_tools": [
+            {
+              "relevance": "Athlete imaging review distinguishes exercise adaptation from pathological hypertrophy",
+              "tool_call_id": "call_VEJZA33xZQevXT1nRFeRxpVH"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: moderate or routine activity may be associated with small, physiological changes in cardiac structure (especially LV mass indices and atrial volume), but direct evidence for substantial structural remodeling from moderate exercise alone is limited; evidence is mainly observational, with heterogeneous populations and exposure definitions. Do not conflate it with pronounced high-volume endurance remodeling or pathological hypertrophy.",
+          "source_tools": [
+            {
+              "relevance": "Healthy midlife MVPA association",
+              "tool_call_id": "call_taDcXKTr4JOLmTUpg6WoWTZS"
+            },
+            {
+              "relevance": "Adult cohort quantified activity associations",
+              "tool_call_id": "call_YcricYvKyKtfjVrtVeYjzpqi"
+            },
+            {
+              "relevance": "Healthy volunteers across activity spectrum",
+              "tool_call_id": "call_N7bbLf4heQYDqJ7nlUEXHUsr"
+            },
+            {
+              "relevance": "Athlete versus pathology context",
+              "tool_call_id": "call_VEJZA33xZQevXT1nRFeRxpVH"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_JNaHHQdSYZVUqPHbpLS4VsP4",
+    "parent_tool_call_id": "call_z0XxPhMXYOsbqUKmu49ZtpuV",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:37993041",
+          "observations": [
+            "In 715 healthy 46-year-olds, high versus low accelerometer-measured MVPA was associated with higher LV mass index and left-atrial end-systolic volume index; cardiac function did not differ. Abstract did not report activity cutoffs or absolute structural differences."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Healthy adult activity and echocardiographic remodeling evidence",
+              "tool_call_id": "call_taDcXKTr4JOLmTUpg6WoWTZS"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:34261776",
+          "observations": [
+            "In a mixed-health cohort aged 45–74, each additional 10 min/day MVPA was associated with +0.18 mL/m² LA volume index, better LV mass-to-volume ratio, and better circumferential strain; cross-sectional and not restricted to healthy adults."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Contextual evidence on MVPA and cardiac structure",
+              "tool_call_id": "call_YcricYvKyKtfjVrtVeYjzpqi"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:29589406",
+          "observations": [
+            "Cross-sectional series of 2,530 healthy volunteers and athletes reported graded relative LV muscular mass from non-athletes to leisure and lower-class athletes; does not isolate moderate intensity or establish causality."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Healthy activity spectrum and LV mass association",
+              "tool_call_id": "call_N7bbLf4heQYDqJ7nlUEXHUsr"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Moderate activity remodeling",
+          "observations": [
+            "Evidence suggests activity may associate with modest physiological cardiac structural differences, especially LV mass and atrial volume, but direct causal evidence for substantial remodeling from moderate activity alone is limited."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Synthesis of searched evidence",
+              "tool_call_id": "call_taDcXKTr4JOLmTUpg6WoWTZS"
+            },
+            {
+              "relevance": "Synthesis of searched evidence",
+              "tool_call_id": "call_YcricYvKyKtfjVrtVeYjzpqi"
+            },
+            {
+              "relevance": "Synthesis of searched evidence",
+              "tool_call_id": "call_N7bbLf4heQYDqJ7nlUEXHUsr"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:37993041",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Moderate activity remodeling"
+        },
+        {
+          "from_entity": "PMID:34261776",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Moderate activity remodeling"
+        },
+        {
+          "from_entity": "PMID:29589406",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Moderate activity remodeling"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 4, \"entities\": [{\"name\": \"PMID:37993041\", \"entityType\": \"PAPER\", \"observations\": [\"In 715 healthy 46-year-olds, high versus low accelerometer-measured MVPA was associated with higher LV mass index and left-atrial end-systolic volume index; cardiac function did not differ. Abstract did not report activity cutoffs or absolute structural differences.\"]}, {\"name\": \"PMID:34261776\", \"entityType\": \"PAPER\", \"observations\": [\"In a mixed-health cohort aged 45\\u201374, each additional 10 min/day MVPA was associated with +0.18 mL/m\\u00b2 LA volume index, better LV mass-to-volume ratio, and better circumferential strain; cross-sectional and not restricted to healthy adults.\"]}, {\"name\": \"PMID:29589406\", \"entityType\": \"PAPER\", \"observations\": [\"Cross-sectional series of 2,530 healthy volunteers and athletes reported graded relative LV muscular mass from non-athletes to leisure and lower-class athletes; does not isolate moderate intensity or establish causality.\"]}, {\"name\": \"Moderate activity remodeling\", \"entityType\": \"FINDING\", \"observations\": [\"Evidence suggests activity may associate with modest physiological cardiac structural differences, especially LV mass and atrial volume, but direct causal evidence for substantial remodeling from moderate activity alone is limited.\"]}]}, \"relations_created\": {\"count\": 3, \"relations\": [{\"from\": \"PMID:37993041\", \"to\": \"Moderate activity remodeling\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:34261776\", \"to\": \"Moderate activity remodeling\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:29589406\", \"to\": \"Moderate activity remodeling\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_JNaHHQdSYZVUqPHbpLS4VsP4\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_z0XxPhMXYOsbqUKmu49ZtpuV\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

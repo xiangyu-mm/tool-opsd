@@ -1,0 +1,1 @@
+{"answer":"C=C1CC2C3CCC(=O)C3(C)CCC2C2(C)CCC(=O)C(O)=C12"}

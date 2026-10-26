@@ -1,0 +1,1 @@
+{"answer":"O=Cc1cc(-c2ccc(Cl)cc2)sc1C(=O)O"}

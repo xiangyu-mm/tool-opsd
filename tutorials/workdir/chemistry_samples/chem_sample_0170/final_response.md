@@ -1,0 +1,1 @@
+{"answer": "N#CC1C(NC(=O)c2ccco2)NC(=C2C=CC(Cl)=CC2=O)CC1c1cccc(NC(=O)C(N)Cc2cnc[nH]2)c1"}

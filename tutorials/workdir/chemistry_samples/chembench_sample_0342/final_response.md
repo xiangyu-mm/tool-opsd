@@ -1,0 +1,1 @@
+{"answer":"CC(C)(C)OC(=O)c1cccc([N+](=O)[O-])c1"}

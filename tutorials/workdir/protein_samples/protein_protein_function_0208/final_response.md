@@ -1,0 +1,5 @@
+**Likely identification:** a COQ4-family protein involved in mitochondrial ubiquinone (coenzyme Q) biosynthesis.
+
+The 151-aa sequence contains a strong Coq4 domain match (Pfam PF05019; residues 38–135). Its closest reviewed Swiss-Prot hit, bovine COQ4 (Q05B52), is 97.1% identical across 90.7% of the query. That homolog is annotated as a mitochondrial inner-membrane protein associated with the COQ enzyme complex and ubiquinone biosynthesis.
+
+**Likely biological process:** coenzyme Q production. The reviewed homolog is annotated with a decarboxylation step in this pathway, but the sequence analysis did not independently establish that catalytic activity for the provided protein. Accordingly, the pathway assignment is strongly supported by homology; the precise enzymatic role and localization are inferred rather than directly demonstrated for this query sequence.

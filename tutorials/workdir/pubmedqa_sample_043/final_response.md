@@ -1,0 +1,5 @@
+Yes. The primary study, *“Transcriptome analysis of proton pump inhibitor-responsive esophageal eosinophilia reveals proton pump inhibitor-reversible allergic inflammation”* (PMID: **25441638**), compared esophageal biopsy expression profiles from patients with PPI-responsive esophageal eosinophilia (PPI-REE) with those from patients with active eosinophilic esophagitis (EoE), and examined PPI-REE before and after PPI treatment. The profiles substantially overlapped, including genes associated with eosinophil chemotaxis (**CCL26**), epithelial barrier function (**DSG1**), tissue remodeling (**POSTN**), and mast cells (**CPA3**). PPI monotherapy almost completely reversed the allergic-inflammatory transcriptome in PPI-REE.
+
+A later RNA-sequencing study also found broadly similar untreated transcriptomes in PPI-REE and EoE, supporting that overlap (PMID: **29863285**). This supports the claim at the gene-expression level; it does not by itself prove that allergy is the sole cause of PPI-REE or that every patient responds this way.
+
+FINAL DECISION: YES

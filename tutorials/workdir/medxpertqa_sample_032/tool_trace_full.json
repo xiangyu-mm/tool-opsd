@@ -1,0 +1,229 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_2NggmYeOReIYha1maLBW4xnR",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease",
+        "drug",
+        "clinical_trials"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "For patients with muscle-invasive bladder cancer receiving bladder-preserving concurrent chemoradiotherapy and without significant comorbidities, identify accepted radiosensitizing chemotherapy regimens, specifically determine which listed combination (5-FU plus mitomycin, cisplatin-containing doublets, etc.) is appropriate. Cite guideline/trial evidence and distinguish concurrent radiosensitizers from systemic regimens."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "unified_disease_search",
+    "tool_call_id": "call_4zKQVzRuv8XfIYfMUzjtCmkn",
+    "parent_tool_call_id": "call_2NggmYeOReIYha1maLBW4xnR",
+    "round": 1,
+    "tool_input": {
+      "context_tool_call_ids": [],
+      "limit_per_source": 5,
+      "search_term": "muscle-invasive bladder cancer",
+      "sources": [
+        "biothings",
+        "opentargets"
+      ],
+      "task_name": "MIBC"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.diseases import search_diseases_unified\n\n# Perform unified disease search across multiple sources\nresults, output = search_diseases_unified(\n    search_term='muscle-invasive bladder cancer',\n    limit_per_source=5,\n    sources=['biothings', 'opentargets'],\n    save_path='/home/data4/xiangyu/BioDSA/workdir/MIBC.json',\n)\n\n# Display formatted output\nprint(output)\n\n```\n\n### Output:\n# Unified Disease Search Results\n\n## Search Term: 'muscle-invasive bladder cancer'\n\n**Total results:** 0 across 2 sources\n\n### Results by Source:\n- **BioThings (MyDisease.info):** Found 0 diseases in 1ms\n- **Open Targets:** Found 0 diseases\n\n================================================================================\n\n\n================================================================================\n\n## Aggregated Information\n\n\n**Results saved to:** /home/data4/xiangyu/BioDSA/workdir/MIBC.json\n\n\n*Executed locally (no sandbox)*",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_QL39tiuzftvXfTFUr9gBnGnr",
+    "parent_tool_call_id": "call_2NggmYeOReIYha1maLBW4xnR",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "muscle invasive bladder cancer trimodality therapy concurrent radiosensitizing chemotherapy 5-FU mitomycin cisplatin gemcitabine guideline",
+      "task_name": "Bladder radiosensitizers",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='muscle invasive bladder cancer trimodality therapy concurrent radiosensitizing chemotherapy 5-FU mitomycin cisplatin gemcitabine guideline',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='muscle invasive bladder cancer trimodality therapy concurrent radiosensitizing chemotherapy 5-FU mitomycin cisplatin gemcitabine guideline',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/Bladder_radiosensitizers.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/Bladder_radiosensitizers.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/Bladder_radiosensitizers.csv'\nTotal results found: 6\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 39226514\nTitle: Bladder Preserving Trimodality Treatment for High-Grade T1 Bladder Cancer: Results from Phase II Protocol NRG Oncology/RTOG 0926\nSource: J Clin Oncol (2024)\nAbstract: To investigate the use of radiation with <m>radiosensitizing</m> <m>chemotherapy</m> following repeated transurethral resection (<m>trimodality</m> <m>therapy</m>) as an alternative to radical cystectomy in T1 @DISEASE_Urinary_Bladder_Neoplasms @DISEASE_MESH:D001749 @@@<m>bladder</m> <m>cancer</m>@@@ which has failed BCG.\n--------------------------------------------------------------------------------\nPMID: 35347572\nTitle: SEOM-SOGUG clinical guideline for localized muscle invasive and advanced bladder cancer (2021)\nSource: Clin Transl Oncol (2022)\nAbstract: SEOM-SOGUG clinical <m>guideline</m> for localized <m>muscle</m> <m>invasive</m> and advanced @DISEASE_Urinary_Bladder_Neoplasms @DISEASE_MESH:D001749 @@@<m>bladder</m> <m>cancer</m>@@@ (2021)\n--------------------------------------------------------------------------------\nPMID: 34337540\nTitle: Outcomes for Muscle-invasive Bladder Cancer with Radical Cystectomy or Trimodal Therapy in US Veterans\nSource: Eur Urol Open Sci (2021)\nAbstract: Outcomes for <m>Muscle</m>-<m>invasive</m> @DISEASE_Urinary_Bladder_Neoplasms @DISEASE_MESH:D001749 @@@<m>Bladder</m> <m>Cancer</m>@@@ with Radical Cystectomy or <m>Trimodal</m> <m>Therapy</m> in US Veterans\n--------------------------------------------------------------------------------\nPMID: 40960583\nTitle: SEOM-SOGUG clinical guideline for urothelial cancer (2025)\nSource: Clin Transl Oncol (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 30565086\nTitle: SEOM clinical guideline for treatment of muscle-invasive and metastatic urothelial bladder cancer (2018)\nSource: Clin Transl Oncol (2019)\nAbstract: @DISEASE_Anthropophobia @DISEASE_MESH:C000719191 @@@SEOM@@@ clinical <m>guideline</m> for <m>treatment</m> of <m>muscle</m>-<m>invasive</m> and metastatic @DISEASE_Urinary_Bladder_Neoplasms @DISEASE_MESH:D001749 @@@urothelial <m>bladder</m> <m>cancer</m>@@@ (2018)\n--------------------------------------------------------------------------------\nPMID: 32596144\nTitle: Integrating Loco-Regional Hyperthermia Into the Current Oncology Practice: SWOT and TOWS Analyses\nSource: Front Oncol (2020)\nAbstract: However, for @CHEMICAL_Gemcitabine @CHEMICAL_MESH:D000093542 @@@<m>gemcitabine</m>@@@, in vitro studies in @DISEASE_Pancreatic_Neoplasms @DISEASE_MESH:D010190 @@@pancreatic <m>cancer</m>@@@ cell lines have shown that the thermal sensitization of @CHEMICAL_Gemcitabine @CHEMICAL_MESH:D000093542 @@@<m>gemcitabine</m>@@@ is best when @DISEASE_Fever @DISEASE_MESH:D005334 @@@HT@@@ is performed 24 h before @CHEMICAL_Gemcitabine @CHEMICAL_MESH:D000093542 @@@<m>gemcitabine</m>@@@.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_yw6h6pI7XuHV19OTuJkAq7fb",
+    "parent_tool_call_id": "call_QL39tiuzftvXfTFUr9gBnGnr",
+    "round": 2,
+    "tool_input": {
+      "boolean_query_text": "BC2001 trial fluorouracil mitomycin C radiotherapy bladder cancer radiosensitizing cisplatin gemcitabine concurrent guideline",
+      "task_name": "BC2001 regimens",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='BC2001 trial fluorouracil mitomycin C radiotherapy bladder cancer radiosensitizing cisplatin gemcitabine concurrent guideline',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='BC2001 trial fluorouracil mitomycin C radiotherapy bladder cancer radiosensitizing cisplatin gemcitabine concurrent guideline',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/BC2001_regimens.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/BC2001_regimens.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] search_papers\u001b[0m\n      \u001b[90mboolean_query_text:\u001b[0m BC2001 trial fluorouracil mitomycin C radioth ... ng cisplatin gemcitabine concurrent guideline\n      \u001b[90mtask_name:\u001b[0m BC2001 regimens\n      \u001b[90mtop_k:\u001b[0m 10\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m radiosensitizing chemotherapy; fluorouracil; mitomycin; cisplatin; gemcitabine; concurrent\n      \u001b[90mpmid:\u001b[0m 35347572\n\n  \u001b[1m\u001b[93m[3] search_papers\u001b[0m\n      \u001b[90mboolean_query_text:\u001b[0m bladder preserving chemoradiotherapy cisplati ... in guideline radiosensitizer randomized trial\n      \u001b[90mtask_name:\u001b[0m Concurrent chemotherapy evidence\n      \u001b[90mtop_k:\u001b[0m 10\n\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/BC2001_regimens.csv'\nTotal results found: 3\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38379322\nTitle: Comparative survival analysis of bladder preservation therapy versus radical cystectomy in muscle-invasive bladder cancer\nSource: Cancer Med (2024)\nAbstract: The addition of @CHEMICAL_Fluorouracil @CHEMICAL_MESH:D005472 @@@<m>fluorouracil</m>@@@ and @CHEMICAL_Mitomycin @CHEMICAL_MESH:D016685 @@@<m>mitomycin</m> <m>C</m>@@@ to <m>radiotherapy</m> improved survival in the <m>BC2001</m> <m>trial</m>.\n--------------------------------------------------------------------------------\nPMID: 34337540\nTitle: Outcomes for Muscle-invasive Bladder Cancer with Radical Cystectomy or Trimodal Therapy in US Veterans\nSource: Eur Urol Open Sci (2021)\nAbstract: To evaluate real-world clinical outcomes of RC with neoadjuvant chemotherapy (RC-NAC), RC without NAC, @DISEASE_Neoplasms_Second_Primary @DISEASE_MESH:D016609 @@@TMT@@@ with National Comprehensive @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>Cancer</m>@@@ Network <m>guideline</m>-preferred <m>radiosensitizing</m> chemotherapy including @CHEMICAL_Cisplatin @CHEMICAL_MESH:D002945 @@@<m>cisplatin</m>@@@ or @CHEMICAL_Mitomycin @CHEMICAL_MESH:D016685 @@@<m>mitomycin</m>-<m>C</m>@@@ and @CHEMICAL_Fluorouracil @CHEMICAL_MESH:D005472 @@@5-<m>fluorouracil</m>@@@ (pTMT), and @DISEASE_Neoplasms_Second_Primary @DISEASE_MESH:D016609 @@@TMT@@@ with nonpreferred chemotherapy (npTMT).\n--------------------------------------------------------------------------------\nPMID: 35347572\nTitle: SEOM-SOGUG clinical guideline for localized muscle invasive and advanced bladder cancer (2021)\nSource: Clin Transl Oncol (2022)\nAbstract: TURBT transurethral resection of @DISEASE_Urinary_Bladder_Neoplasms @DISEASE_MESH:D001749 @@@<m>bladder</m> <m>tumor</m>@@@. CG <m>Cisplatin</m>-Gemcitabin. CaG carboplatin-<m>Gemcitabine</m>.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_aMI086TVzuQzrwfIboe2L0Cm",
+    "parent_tool_call_id": "call_QL39tiuzftvXfTFUr9gBnGnr",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "radiosensitizing chemotherapy; fluorouracil; mitomycin; cisplatin; gemcitabine; concurrent",
+      "pmid": "35347572"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('35347572')\noutput = format_paper_content_output(result, filter_keywords='radiosensitizing chemotherapy; fluorouracil; mitomycin; cisplatin; gemcitabine; concurrent')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 35347572 ===\n\nTitle: SEOM-SOGUG clinical guideline for localized muscle invasive and advanced bladder cancer (2021).\n\nJournal/Date: Clinical & translational oncology : official publication of the Federation of Spanish Oncology Societies and of the National Cancer Institute of Mexico (2022)\n\nMeSH Keywords: Antineoplastic Combined Chemotherapy Protocols, Carcinoma, Transitional Cell, Cisplatin, Cystectomy, Humans, Muscles, Neoadjuvant Therapy, Neoplasm Invasiveness\n\n\n--- ABSTRACT ---\nMost muscle-invasive bladder cancer (BC) are urothelial carcinomas (UC) of transitional origin, although histological variants of UC have been recognized. Smoking is the most important risk factor in developed countries, and the basis for prevention. UC harbors high number of genomic aberrations that make possible targeted therapies. Based on molecular features, a consensus classification identified six different MIBC subtypes. Hematuria and irritative bladder symptoms, CT scan, cystoscopy and transurethral resection are the basis for diagnosis. Radical cystectomy with pelvic lymphadenectomy is the standard approach for muscle-invasive BC, although bladder preservation is an option for selected patients who wish to avoid or cannot tolerate surgery. Perioperative cisplatin-based neoadjuvant chemotherapy is recommended for cT2-4aN0M0 tumors, or as adjuvant in patients with pT3/4 and or pN + after radical cystectomy. Follow-up is particularly important after the availability of new salvage therapies. It should be individualized and adapted to the risk of recurrence. Cisplatin-gemcitabine is considered the standard first line for metastatic tumors. Carboplatin should replace cisplatin in cisplatin-ineligible patients. According to the EMA label, pembrolizumab or atezolizumab could be an option in cisplatin-ineligible patients with high PD-L1 expression. For patients whose disease respond or did not progress after first-line platinum chemotherapy, maintenance with avelumab prolongs survival with respect to the best supportive care. Pembrolizumab also increases survival versus vinflunine or taxanes in patients with progression after chemotherapy who have not received avelumab, as well as enfortumab vedotin in those progressing to first-line chemotherapy followed by an antiPDL1/PD1. Erdafitinib may be considered in this setting in patients with FGFR alterations. An early onset of supportive and palliative care is always strongly recommended.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[DISCUSS]\nManagement of locoregional disease\n\nRadical cystectomy\n\nRadical cystectomy (RC) with regional lymphadenectomy and urinary diversion is the standard surgical treatment of MIBC cT2-T4aN0M0. In men, RC includes removal of the bladder, distal ureters, and regional lymph nodes as well as the prostate and seminal vesicles, whereas in women, the urethra, uterus, ovaries and part of the vagina should be also resected. Technological developments during the last decade have allowed the implementation of laparoscopic surgery or robot-assisted surgery.\n\nIn retrospective studies, the removal of a greater number of lymph nodes was associated with longer survival, but the optimal extent of LND has not yet been well established. Standard LND includes removal of the distal common, internal, and external il...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_v3Gyvl0phfuJjUAIOSwNMNLn",
+    "parent_tool_call_id": "call_QL39tiuzftvXfTFUr9gBnGnr",
+    "round": 2,
+    "tool_input": {
+      "boolean_query_text": "bladder preserving chemoradiotherapy cisplatin 5-FU mitomycin guideline radiosensitizer randomized trial",
+      "task_name": "Concurrent chemotherapy evidence",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='bladder preserving chemoradiotherapy cisplatin 5-FU mitomycin guideline radiosensitizer randomized trial',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='bladder preserving chemoradiotherapy cisplatin 5-FU mitomycin guideline radiosensitizer randomized trial',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/Concurrent_chemotherapy_evidence.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/Concurrent_chemotherapy_evidence.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/Concurrent_chemotherapy_evidence.csv'\nTotal results found: 5\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 39226514\nTitle: Bladder Preserving Trimodality Treatment for High-Grade T1 Bladder Cancer: Results from Phase II Protocol NRG Oncology/RTOG 0926\nSource: J Clin Oncol (2024)\nAbstract: ...<m>Radiosensitizing</m> chemotherapy included @CHEMICAL_Cisplatin @CHEMICAL_MESH:D002945 @@@<m>cisplatin</m>@@@, @CHEMICAL_Mitomycin @CHEMICAL_MESH:D016685 @@@<m>mitomycin</m>@@@, or @CHEMICAL_Fluorouracil @CHEMICAL_MESH:D005472 @@@<m>5</m>-fluorouracil@@@ (@CHEMICAL_Fluorouracil @CHEMICAL_MESH:D005472 @@@<m>5</m>-<m>FU</m>@@@), chosen by the treating physician.\n--------------------------------------------------------------------------------\nPMID: 35347572\nTitle: SEOM-SOGUG clinical guideline for localized muscle invasive and advanced bladder cancer (2021)\nSource: Clin Transl Oncol (2022)\nAbstract: ...However, no definitive <m>randomized</m> <m>trials</m> have compared <m>bladder</m>-<m>preserving</m> TMT with radical cystectomy.\n--------------------------------------------------------------------------------\nPMID: 40960583\nTitle: SEOM-SOGUG clinical guideline for urothelial cancer (2025)\nSource: Clin Transl Oncol (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 30565086\nTitle: SEOM clinical guideline for treatment of muscle-invasive and metastatic urothelial bladder cancer (2018)\nSource: Clin Transl Oncol (2019)\nAbstract: The benefit of adding chemotherapy to RT compared to RT alone is supported by two <m>randomized</m> <m>trials</m>. In the first <m>randomized</m>, phase III <m>trial</m> conducted in 360 @SPECIES_9606 @@@patients@@@, radiotherapy with concurrent @CHEMICAL_Mitomycin @CHEMICAL_MESH:D016685 @@@<m>mitomycin</m> C@@@ and @CHEMICAL_Fluorouracil @CHEMICAL_MESH:D005472 @@@<m>5</m>-<m>FU</m>@@@ improved 2-year locoregional disease-free survival (DFS) from 54% (radiotherapy alone) to 67% (HR 0.68), and <m>5</m>-year OS from 35 to 48% (HR 0.82), without increasing grade 3-4 acute or late @DISEASE_Drug_Related_Side_Effects_and_Adverse_Reactions @DISEASE_MESH:D064420 @@@toxicity@@@.\n--------------------------------------------------------------------------------\nPMID: 32596144\nTitle: Integrating Loco-Regional Hyperthermia Into the Current Oncology Practice: SWOT and TOWS Analyses\nSource: Front Oncol (2020)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_n7jHy2X2YIdJoDEDFGz4xMlN",
+    "parent_tool_call_id": "call_v3Gyvl0phfuJjUAIOSwNMNLn",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "For bladder-preserving trimodality treatment of MIBC, accepted concurrent radiosensitizers include 5-FU plus mitomycin C (the BC2001-tested combination), cisplatin, and gemcitabine; the evidence retrieved directly supports 5-FU/mitomycin and notes cisplatin or mitomycin/5-FU as guideline-preferred options. If choosing from the combinations listed, 5-FU plus mitomycin C is an established, evidence-based concurrent regimen; cisplatin-containing doublets should not be assumed to be radiosensitizing regimens merely because they are systemic chemotherapy combinations.",
+          "source_tools": [
+            {
+              "relevance": "Guideline search result reports BC2001 randomized evidence: concurrent 5-FU plus mitomycin C with RT improved locoregional DFS and OS compared with RT alone.",
+              "tool_call_id": "call_v3Gyvl0phfuJjUAIOSwNMNLn"
+            },
+            {
+              "relevance": "Veterans cohort abstract distinguishes guideline-preferred TMT radiosensitizers (cisplatin or mitomycin-C/5-FU) from nonpreferred chemotherapy.",
+              "tool_call_id": "call_yw6h6pI7XuHV19OTuJkAq7fb"
+            },
+            {
+              "relevance": "Phase II bladder-preservation trial search result describes radiosensitizing chemotherapy as cisplatin, mitomycin, or 5-FU, selected by treating physician.",
+              "tool_call_id": "call_v3Gyvl0phfuJjUAIOSwNMNLn"
+            }
+          ]
+        },
+        {
+          "finding": "Do not conflate concurrent radiosensitization with systemic perioperative or metastatic regimens: cisplatin-gemcitabine is a standard systemic regimen in metastatic urothelial cancer and cisplatin-based chemotherapy is used perioperatively, but this does not establish cisplatin-gemcitabine as a standard concurrent RT doublet.",
+          "source_tools": [
+            {
+              "relevance": "Guideline abstract identifies cisplatin-based neoadjuvant therapy and cisplatin-gemcitabine as standard first-line metastatic treatment, in contrast to bladder-preserving radiosensitization.",
+              "tool_call_id": "call_aMI086TVzuQzrwfIboe2L0Cm"
+            },
+            {
+              "relevance": "Search result identifies concurrent radiosensitizing 5-FU/mitomycin evidence and distinguishes radiosensitizing chemotherapy from broader chemotherapy.",
+              "tool_call_id": "call_v3Gyvl0phfuJjUAIOSwNMNLn"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_HAfr25d2rwSO29fldnW4vRMz",
+    "parent_tool_call_id": "call_2NggmYeOReIYha1maLBW4xnR",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DRUG",
+          "name": "5-FU + mitomycin C",
+          "observations": [
+            "Concurrent 5-FU plus mitomycin C is an established radiosensitizing regimen for bladder-preserving chemoradiotherapy in muscle-invasive bladder cancer; BC2001 tested this combination."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Search-agent literature finding supporting the listed regimen",
+              "tool_call_id": "call_v3Gyvl0phfuJjUAIOSwNMNLn"
+            }
+          ]
+        },
+        {
+          "entity_type": "DISEASE",
+          "name": "Muscle-invasive bladder cancer",
+          "observations": [
+            "For bladder-preserving chemoradiotherapy, concurrent radiosensitizing approaches include 5-FU plus mitomycin C; systemic cisplatin doublets should not be conflated with concurrent radiosensitization."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Clinical context and distinction between radiosensitization and systemic therapy",
+              "tool_call_id": "call_v3Gyvl0phfuJjUAIOSwNMNLn"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "5-FU + mitomycin C",
+          "relation_type": "TREATS",
+          "to_entity": "Muscle-invasive bladder cancer"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 2, \"entities\": [{\"name\": \"5-FU + mitomycin C\", \"entityType\": \"DRUG\", \"observations\": [\"Concurrent 5-FU plus mitomycin C is an established radiosensitizing regimen for bladder-preserving chemoradiotherapy in muscle-invasive bladder cancer; BC2001 tested this combination.\"]}, {\"name\": \"Muscle-invasive bladder cancer\", \"entityType\": \"DISEASE\", \"observations\": [\"For bladder-preserving chemoradiotherapy, concurrent radiosensitizing approaches include 5-FU plus mitomycin C; systemic cisplatin doublets should not be conflated with concurrent radiosensitization.\"]}]}, \"relations_created\": {\"count\": 1, \"relations\": [{\"from\": \"5-FU + mitomycin C\", \"to\": \"Muscle-invasive bladder cancer\", \"relationType\": \"TREATS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_HAfr25d2rwSO29fldnW4vRMz\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_2NggmYeOReIYha1maLBW4xnR\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_av4i90BGmb4jYicVIMsgZUCH",
+    "parent_tool_call_id": "call_HAfr25d2rwSO29fldnW4vRMz",
+    "round": 3,
+    "tool_input": {
+      "entity_names": "[\"5-FU + mitomycin C\",\"Muscle-invasive bladder cancer\"]",
+      "get_full_map": false,
+      "max_entities": null,
+      "max_observations_per_entity": 5,
+      "query": null,
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"requested_entities\": [\"5-FU + mitomycin C\", \"Muscle-invasive bladder cancer\"], \"results\": {\"entities\": [{\"name\": \"5-FU + mitomycin C\", \"entityType\": \"DRUG\", \"observations\": [\"Concurrent 5-FU plus mitomycin C is an established radiosensitizing regimen for bladder-preserving chemoradiotherapy in muscle-invasive bladder cancer; BC2001 tested this combination.\"]}, {\"name\": \"Muscle-invasive bladder cancer\", \"entityType\": \"DISEASE\", \"observations\": [\"For bladder-preserving chemoradiotherapy, concurrent radiosensitizing approaches include 5-FU plus mitomycin C; systemic cisplatin doublets should not be conflated with concurrent radiosensitization.\"]}], \"relations\": [{\"from\": \"5-FU + mitomycin C\", \"to\": \"Muscle-invasive bladder cancer\", \"relationType\": \"TREATS\"}]}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

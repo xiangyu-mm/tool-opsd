@@ -1,0 +1,338 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_MTifUQ5sKYadLpK8hzMbfO1I",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Find the paper titled or closely matching “Is initiation of nutritional support delayed in critically ill obese patients: a multicenter cohort study?” Retrieve the citation/PMID and the study’s population, comparator if any, definition and timing of nutritional support initiation, key quantitative results, and authors’ conclusion on whether obese critically ill patients experienced delayed initiation."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_ZEiW3LwSQ9OcBA1agSaB7gN7",
+    "parent_tool_call_id": "call_MTifUQ5sKYadLpK8hzMbfO1I",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "Is initiation of nutritional support delayed in critically ill obese patients multicenter cohort study",
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "relation_query": null,
+      "task_name": "find target study",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='Is initiation of nutritional support delayed in critically ill obese patients multicenter cohort study',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='Is initiation of nutritional support delayed in critically ill obese patients multicenter cohort study',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/find_target_study.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/find_target_study.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/find_target_study.csv'\nTotal results found: 11\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 25080456\nTitle: Initiation of nutritional support is delayed in critically ill obese patients: a multicenter cohort study.\nSource: The American journal of clinical nutrition (2014)\nAbstract: BACKGROUND: A high catabolic rate characterizes the acute phase of critical illness. Guidelines recommend an early nutritional support, regardless of the previous nutritional status. OBJECTIVE: We aimed to assess whether the nutritional status of patients, which was defined by the body mass index (BMI) at admission in an intensive care unit (ICU), affected the time of nutritional support initiation. DESIGN: We conducted a cohort study that reported a retrospective analysis of a multicenter ICU database (OUTCOMEREA) by using data prospectively entered from January 1997 to October 2012. Patients who needed orotracheal intubation within the first 72 h and >3 d were included. RESULTS: Data from 3257 ICU stays were analyzed. The delay before feeding was different according to BMI groups (P = 0.035). The delay was longer in obese patients [BMI (in kg/m²) ≥30; n = 663] than in other patients with either low weight (BMI <20; n = 501), normal weight (BMI ≥20 and <25; n = 1135), or overweight (BMI ≥25 and <30; n = 958). The association between nutritional status and a delay in nutrition initiation was independent of potential confounding factors such as age, sex, and diabetes or other chroni ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 36676669\nTitle: The Future of Cardiothoracic Surgical Critical Care Medicine as a Medical Science: A Call to Action\nSource: Medicina (Kaunas) (2022)\nAbstract: Aside from well-established, life-threatening RRT indications, a single-center ELAIN trial showed benefit of early RRT <m>initiation</m> as compared to <m>delayed</m> <m>initiation</m> in a <m>cohort</m> of nearly 50% of @SPECIES_9606 @@@<m>patients</m>@@@ recovering from cardiac surgery.\n--------------------------------------------------------------------------------\nPMID: 25080456\nTitle: Initiation of nutritional support is delayed in critically ill obese patients: a multicenter cohort study.\nSource: Am J Clin Nutr (2014)\nAbstract: <m>Initiation</m> of <m>nutritional</m> <m>support</m> is <m>delayed</m> in @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ @DISEASE_Obesity @DISEASE_MESH:D009765 @@@<m>obese</m>@@@ @SPECIES_9606 @@@<m>patients</m>@@@: a <m>multicenter</m> <m>cohort</m> <m>study</m>.\n--------------------------------------------------------------------------------\nPMID: 34330508\nTitle: Influence of nutritional assistance on mortality by COVID-19 in critically ill patients\nSource: Clin Nutr ESPEN (2021)\nAbstract: ...This is a subset of the <m>cohort</m> \"Influence of <m>nutritional</m> therapy on clinical prognosis in @SPECIES_9606 @@@<m>patients</m>@@@ with @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@: a <m>multicenter</m> retrospective <m>cohort</m> <m>study</m>\".\n--------------------------------------------------------------------------------\nPMID: 37601138\nTitle: Evaluation of nutritional status in pediatric intensive care unit patients: the results of a multicenter, prospective study in Turkey\nSource: Front Pediatr (2023)\nAbstract: The aim of the present <m>study</m> is to analyze anthropometric data, <m>nutritional</m> status, enteral and parenteral feeding <m>support</m>, and calorie and protein intake of @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ pediatric @SPECIES_9606 @@@<m>patients</m>@@@ in Turkey and evaluate the relationship between <m>nutritional</m> <m>support</m> and clinical outcomes.\n--------------------------------------------------------------------------------\nPMID: 41361198\nTitle: Implementation of the nutrition care process on mortality risk in critically ill COVID-19 patients - a registry longitudinal cohort study\nSource: Ann Med (2025)\nAbstract: Implementation of the <m>nutrition</m> care process on mortality risk in @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@ @SPECIES_9606 @@@<m>patients</m>@@@ - a registry longitudinal <m>cohort</m> <m>study</m>\n--------------------------------------------------------------------------------\nPMID: 40186875\nTitle: Late Nutrition and Negative Outcomes in a Brazilian Paediatric Intensive Care Unit: A Retrospective Cohort\nSource: J Paediatr Child Health (2025)\nAbstract: In the present <m>study</m>, <m>delayed</m> <m>initiation</m> of <m>nutrition</m> was significantly associated with the use of vasoactive drugs in the first 24 h and with higher odds of @DISEASE_Death @DISEASE_MESH:D003643 @@@death@@@, which corroborated the correlation of <m>delayed</m> <m>nutritional</m> <m>support</m> in @SPECIES_9606 @@@<m>patients</m>@@@ with more severe conditions.\n--------------------------------------------------------------------------------\nPMID: 34772861\nTitle: Nutrition support for acute kidney injury 2020-consensus of the Taiwan AKI task force\nSource: J Chin Med Assoc (2022)\nAbstract: The <m>nutritional</m> status of @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ @SPECIES_9606 @@@<m>patients</m>@@@ affects plans for <m>nutritional</m> <m>support</m>.\n--------------------------------------------------------------------------------\nPMID: 34330494\nTitle: Nutrition risk prevalence and nutrition care recommendations for hospitalized and critically-ill patients with COVID-19\nSource: Clin Nutr ESPEN (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40665004\nTitle: Expert consensus-based clinical practice guidelines for nutritional support in the intensive care unit: the French Intensive Care Society (SRLF) and the French-Speaking Group of Pediatric Emergency Physicians and Intensivists (GFRUP)\nSource: Ann Intensive Care (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38245768\nTitle: Enhanced exclusive enteral nutrition delivery during the first 7 days is associated with decreased 28-day mortality in critically ill patients with normal lactate level: a post hoc analysis of a multicenter randomized trial\nSource: Crit Care (2024)\nAbstract: This <m>study</m> aimed to assess the association between <m>nutrition</m> intake and 28-day mortality in @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ @SPECIES_9606 @@@<m>patients</m>@@@ receiving exclusive EN.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_05Yh9C7o1Q9UZQ8u0BhrlLqH",
+    "parent_tool_call_id": "call_ZEiW3LwSQ9OcBA1agSaB7gN7",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "population BMI obese definition initiation nutritional support feeding delay results hazard odds adjusted conclusion",
+      "pmid": "25080456"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25080456')\noutput = format_paper_content_output(result, filter_keywords='population BMI obese definition initiation nutritional support feeding delay results hazard odds adjusted conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m population BMI obese definition initiation nu ... delay results hazard odds adjusted conclusion\n      \u001b[90mpmid:\u001b[0m 25080456\n\n=== PMID: 25080456 ===\n\nTitle: Initiation of nutritional support is delayed in critically ill obese patients: a multicenter cohort study.\n\nJournal/Date: The American journal of clinical nutrition (2014)\n\nMeSH Keywords: Aged, Body Mass Index, Cohort Studies, Critical Care, Critical Illness, Electronic Health Records, Enteral Nutrition, Female\n\n\n--- ABSTRACT ---\n[BACKGROUND]: A high catabolic rate characterizes the acute phase of critical illness. Guidelines recommend an early nutritional support, regardless of the previous nutritional status.\n[OBJECTIVE]: We aimed to assess whether the nutritional status of patients, which was defined by the body mass index (BMI) at admission in an intensive care unit (ICU), affected the time of nutritional support initiation.\n[DESIGN]: We conducted a cohort study that reported a retrospective analysis of a multicenter ICU database (OUTCOMEREA) by using data prospectively entered from January 1997 to October 2012. Patients who needed orotracheal intubation within the first 72 h and >3 d were included.\n[RESULTS]: Data from 3257 ICU stays were analyzed. The delay before feeding was different according to BMI groups (P = 0.035). The delay was longer in obese patients [BMI (in kg/m²) ≥30; n = 663] than in other patients with either low weight (BMI <20; n = 501), normal weight (BMI ≥20 and <25; n = 1135), or overweight (BMI ≥25 and <30; n = 958). The association between nutritional status and a delay in nutrition initiation was independent of potential confounding factors such as age, sex, and diabetes or other chronic diseases. In comparison with normal weight, the adjusted RR (95% CI) associated with a delayed nutrition initiation was 0.92 (0.86, 0.98) for patients with low weight, 1.00 (0.94, 1.05) for overweight patients, and 1.06 (1.00, 1.12) for obese patients (P = 0.004).\n[CONCLUSIONS]: The initiation of nutritional support was delayed in obese ICU patients. Randomized controlled trials that address consequences of early compared with delayed beginnings of nutritional support in critically ill obese patients are needed.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_GVsFrrBYpHIlrd1Wh3ynuIXb",
+    "parent_tool_call_id": "call_05Yh9C7o1Q9UZQ8u0BhrlLqH",
+    "round": 3,
+    "tool_input": {
+      "boolean_query_text": "25080456 delayed nutrition initiation definition time feeding ICU BMI obese OUTCOMEREA",
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "relation_query": null,
+      "task_name": "study timing definition",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='25080456 delayed nutrition initiation definition time feeding ICU BMI obese OUTCOMEREA',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='25080456 delayed nutrition initiation definition time feeding ICU BMI obese OUTCOMEREA',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/study_timing_definition.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/study_timing_definition.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] search_papers\u001b[0m\n      \u001b[90mboolean_query_text:\u001b[0m 25080456 delayed nutrition initiation definition time feeding ICU BMI obese OUTCOMEREA\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mrelation_query:\u001b[0m None\n      \u001b[90mtask_name:\u001b[0m study timing definition\n      \u001b[90mtop_k:\u001b[0m 10\n\nNo search results found. Please try again with different query. TIP: Try simpler keyword phrases.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_7yhtl9BoRuUD9mdFMn96bNMA",
+    "parent_tool_call_id": null,
+    "round": 2,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Identify the exact PubMed paper matching the title/question “Is initiation of nutritional support delayed in critically ill obese patients? A multicenter cohort study” (including title variants). Return PMID, publication year, study setting and sample size, obesity classification, timing from ICU admission to enteral/parenteral nutritional support, obese versus non-obese comparison with statistics, and the authors’ conclusion specifically about delayed initiation."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_fOpr9wqHxFs6nFAwUv5Wtjbm",
+    "parent_tool_call_id": "call_7yhtl9BoRuUD9mdFMn96bNMA",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "Is initiation of nutritional support delayed in critically ill obese patients multicenter cohort study",
+      "task_name": "exact title search",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='Is initiation of nutritional support delayed in critically ill obese patients multicenter cohort study',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='Is initiation of nutritional support delayed in critically ill obese patients multicenter cohort study',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/exact_title_search.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/exact_title_search.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] search_papers\u001b[0m\n      \u001b[90mboolean_query_text:\u001b[0m Is initiation of nutritional support delayed  ... y ill obese patients multicenter cohort study\n      \u001b[90mtask_name:\u001b[0m exact title search\n      \u001b[90mtop_k:\u001b[0m 20\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/exact_title_search.csv'\nTotal results found: 21\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 25080456\nTitle: Initiation of nutritional support is delayed in critically ill obese patients: a multicenter cohort study.\nSource: The American journal of clinical nutrition (2014)\nAbstract: BACKGROUND: A high catabolic rate characterizes the acute phase of critical illness. Guidelines recommend an early nutritional support, regardless of the previous nutritional status. OBJECTIVE: We aimed to assess whether the nutritional status of patients, which was defined by the body mass index (BMI) at admission in an intensive care unit (ICU), affected the time of nutritional support initiation. DESIGN: We conducted a cohort study that reported a retrospective analysis of a multicenter ICU database (OUTCOMEREA) by using data prospectively entered from January 1997 to October 2012. Patients who needed orotracheal intubation within the first 72 h and >3 d were included. RESULTS: Data from 3257 ICU stays were analyzed. The delay before feeding was different according to BMI groups (P = 0.035). The delay was longer in obese patients [BMI (in kg/m²) ≥30; n = 663] than in other patients with either low weight (BMI <20; n = 501), normal weight (BMI ≥20 and <25; n = 1135), or overweight (BMI ≥25 and <30; n = 958). The association between nutritional status and a delay in nutrition initiation was independent of potential confounding factors such as age, sex, and diabetes or other chroni ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 36676669\nTitle: The Future of Cardiothoracic Surgical Critical Care Medicine as a Medical Science: A Call to Action\nSource: Medicina (Kaunas) (2022)\nAbstract: Aside from well-established, life-threatening RRT indications, a single-center ELAIN trial showed benefit of early RRT <m>initiation</m> as compared to <m>delayed</m> <m>initiation</m> in a <m>cohort</m> of nearly 50% of @SPECIES_9606 @@@<m>patients</m>@@@ recovering from cardiac surgery.\n--------------------------------------------------------------------------------\nPMID: 25080456\nTitle: Initiation of nutritional support is delayed in critically ill obese patients: a multicenter cohort study.\nSource: Am J Clin Nutr (2014)\nAbstract: <m>Initiation</m> of <m>nutritional</m> <m>support</m> is <m>delayed</m> in @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ @DISEASE_Obesity @DISEASE_MESH:D009765 @@@<m>obese</m>@@@ @SPECIES_9606 @@@<m>patients</m>@@@: a <m>multicenter</m> <m>cohort</m> <m>study</m>.\n--------------------------------------------------------------------------------\nPMID: 34330508\nTitle: Influence of nutritional assistance on mortality by COVID-19 in critically ill patients\nSource: Clin Nutr ESPEN (2021)\nAbstract: ...This is a subset of the <m>cohort</m> \"Influence of <m>nutritional</m> therapy on clinical prognosis in @SPECIES_9606 @@@<m>patients</m>@@@ with @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@: a <m>multicenter</m> retrospective <m>cohort</m> <m>study</m>\".\n--------------------------------------------------------------------------------\nPMID: 37601138\nTitle: Evaluation of nutritional status in pediatric intensive care unit patients: the results of a multicenter, prospective study in Turkey\nSource: Front Pediatr (2023)\nAbstract: The aim of the present <m>study</m> is to analyze anthropometric data, <m>nutritional</m> status, enteral and parenteral feeding <m>support</m>, and calorie and protein intake of @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ pediatric @SPECIES_9606 @@@<m>patients</m>@@@ in Turkey and evaluate the relationship between <m>nutritional</m> <m>support</m> and clinical outcomes.\n--------------------------------------------------------------------------------\nPMID: 41361198\nTitle: Implementation of the nutrition care process on mortality risk in critically ill COVID-19 patients - a registry longitudinal cohort study\nSource: Ann Med (2025)\nAbstract: Implementation of the <m>nutrition</m> care process on mortality risk in @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@ @SPECIES_9606 @@@<m>patients</m>@@@ - a registry longitudinal <m>cohort</m> <m>study</m>\n--------------------------------------------------------------------------------\nPMID: 40186875\nTitle: Late Nutrition and Negative Outcomes in a Brazilian Paediatric Intensive Care Unit: A Retrospective Cohort\nSource: J Paediatr Child Health (2025)\nAbstract: In the present <m>study</m>, <m>delayed</m> <m>initiation</m> of <m>nutrition</m> was significantly associated with the use of vasoactive drugs in the first 24 h and with higher odds of @DISEASE_Death @DISEASE_MESH:D003643 @@@death@@@, which corroborated the correlation of <m>delayed</m> <m>nutritional</m> <m>support</m> in @SPECIES_9606 @@@<m>patients</m>@@@ with more severe conditions.\n--------------------------------------------------------------------------------\nPMID: 34772861\nTitle: Nutrition support for acute kidney injury 2020-consensus of the Taiwan AKI task force\nSource: J Chin Med Assoc (2022)\nAbstract: The <m>nutritional</m> status of @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ @SPECIES_9606 @@@<m>patients</m>@@@ affects plans for <m>nutritional</m> <m>support</m>.\n--------------------------------------------------------------------------------\nPMID: 34330494\nTitle: Nutrition risk prevalence and nutrition care recommendations for hospitalized and critically-ill patients with COVID-19\nSource: Clin Nutr ESPEN (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40665004\nTitle: Expert consensus-based clinical practice guidelines for nutritional support in the intensive care unit: the French Intensive Care Society (SRLF) and the French-Speaking Group of Pediatric Emergency Physicians and Intensivists (GFRUP)\nSource: Ann Intensive Care (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38245768\nTitle: Enhanced exclusive enteral nutrition delivery during the first 7 days is associated with decreased 28-day mortality in critically ill patients with normal lactate level: a post hoc analysis of a multicenter randomized trial\nSource: Crit Care (2024)\nAbstract: This <m>study</m> aimed to assess the association between <m>nutrition</m> intake and 28-day mortality in @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ @SPECIES_9606 @@@<m>patients</m>@@@ receiving exclusive EN.\n--------------------------------------------------------------------------------\nPMID: 35011026\nTitle: Does Route of Full Feeding Affect Outcome among Ventilated Critically Ill COVID-19 Patients: A Prospective Observational Study\nSource: Nutrients (2021)\nAbstract: Are there other data available to date on feeding practices and their effect on outcome among @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19 <m>critically</m> <m>ill</m>@@@ @SPECIES_9606 @@@<m>patients</m>@@@? Only a few <m>studies</m> so far have provided limited data about <m>nutrition</m> <m>support</m>.\n--------------------------------------------------------------------------------\nPMID: 34676507\nTitle: How Differences in the Disease Process of the COVID-19 Pandemic Pose Challenges to the Delivery of Critical Care Nutrition\nSource: Curr Nutr Rep (2021)\nAbstract: Traditionally, provision of <m>nutritional</m> therapy can be a low priority in the management of @DISEASE_Critical_Illness @DISEASE_MESH:D016638 @@@<m>critically</m> <m>ill</m>@@@ @SPECIES_9606 @@@<m>patients</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 39688452\nTitle: Toward Precision in Nutrition Therapy\nSource: Crit Care Med (2024)\nAbstract: Narrative Overview About Available Biomarkers to Guide <m>Nutrition</m> <m>Support</m> in <m>Critically</m> <m>Ill</m> <m>Patients</m>\n--------------------------------------------------------------------------------\nPMID: 40119480\nTitle: The Japanese Critical Care Nutrition Guideline 2024\nSource: J Intensive Care (2025)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_2gAHu1350M1M4RBxIWbUOgT2",
+    "parent_tool_call_id": "call_fOpr9wqHxFs6nFAwUv5Wtjbm",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "all sections; BMI classification; enteral; parenteral; nutritional support; feeding; delay; hours; days; results; conclusion",
+      "pmid": "25080456"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25080456')\noutput = format_paper_content_output(result, filter_keywords='all sections; BMI classification; enteral; parenteral; nutritional support; feeding; delay; hours; days; results; conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (2):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m all sections; BMI classification; enteral; pa ... ding; delay; hours; days; results; conclusion\n      \u001b[90mpmid:\u001b[0m 25080456\n\n  \u001b[1m\u001b[93m[2] fetch_paper_annotations\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 50\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mpmids:\u001b[0m ['25080456']\n\n=== PMID: 25080456 ===\n\nTitle: Initiation of nutritional support is delayed in critically ill obese patients: a multicenter cohort study.\n\nJournal/Date: The American journal of clinical nutrition (2014)\n\nMeSH Keywords: Aged, Body Mass Index, Cohort Studies, Critical Care, Critical Illness, Electronic Health Records, Enteral Nutrition, Female\n\n\n--- ABSTRACT ---\n[BACKGROUND]: A high catabolic rate characterizes the acute phase of critical illness. Guidelines recommend an early nutritional support, regardless of the previous nutritional status.\n[OBJECTIVE]: We aimed to assess whether the nutritional status of patients, which was defined by the body mass index (BMI) at admission in an intensive care unit (ICU), affected the time of nutritional support initiation.\n[DESIGN]: We conducted a cohort study that reported a retrospective analysis of a multicenter ICU database (OUTCOMEREA) by using data prospectively entered from January 1997 to October 2012. Patients who needed orotracheal intubation within the first 72 h and >3 d were included.\n[RESULTS]: Data from 3257 ICU stays were analyzed. The delay before feeding was different according to BMI groups (P = 0.035). The delay was longer in obese patients [BMI (in kg/m²) ≥30; n = 663] than in other patients with either low weight (BMI <20; n = 501), normal weight (BMI ≥20 and <25; n = 1135), or overweight (BMI ≥25 and <30; n = 958). The association between nutritional status and a delay in nutrition initiation was independent of potential confounding factors such as age, sex, and diabetes or other chronic diseases. In comparison with normal weight, the adjusted RR (95% CI) associated with a delayed nutrition initiation was 0.92 (0.86, 0.98) for patients with low weight, 1.00 (0.94, 1.05) for overweight patients, and 1.06 (1.00, 1.12) for obese patients (P = 0.004).\n[CONCLUSIONS]: The initiation of nutritional support was delayed in obese ICU patients. Randomized controlled trials that address consequences of early compared with delayed beginnings of nutritional support in critically ill obese patients are needed.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_annotations",
+    "tool_call_id": "call_yK84kEyyZoAhiUAWyPipznm0",
+    "parent_tool_call_id": "call_fOpr9wqHxFs6nFAwUv5Wtjbm",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "pmids": [
+        "25080456"
+      ]
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_fetch_paper_annotations\nimport json\nsearch_results = pubtator_api_fetch_paper_annotations(\n    pmids=['25080456'], batch_size=50, max_retries=3, max_requests_per_second=3\n)\nprint(json.dumps(search_results, indent=4))\n\n```\n\n### Output:\n```\nSuccessfully processed 1 publications from chunk\nTotal results: 1\n[\n    {\n        \"Disease\": [\n            \"Critical Illness\",\n            \"Obesity\"\n        ],\n        \"Species\": [\n            \"9606\"\n        ],\n        \"Relevant_Disease\": [\n            \"Chronic Disease\",\n            \"Critical Illness\",\n            \"Diabetes Mellitus\",\n            \"Obesity\",\n            \"Overweight\"\n        ],\n        \"Relevant_Species\": [\n            \"9606\"\n        ],\n        \"Relation_Mentions\": [],\n        \"PMID\": 25080456\n    }\n]\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_KmnQ2XzTHHwHKXAVUNtzpaNz",
+    "parent_tool_call_id": "call_yK84kEyyZoAhiUAWyPipznm0",
+    "round": 3,
+    "tool_input": {
+      "boolean_query_text": "25080456 feeding delay obese normal weight enteral parenteral hours ICU",
+      "task_name": "timing details",
+      "top_k": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='25080456 feeding delay obese normal weight enteral parenteral hours ICU',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='25080456 feeding delay obese normal weight enteral parenteral hours ICU',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/timing_details.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/timing_details.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] search_papers\u001b[0m\n      \u001b[90mboolean_query_text:\u001b[0m 25080456 feeding delay obese normal weight enteral parenteral hours ICU\n      \u001b[90mtask_name:\u001b[0m timing details\n      \u001b[90mtop_k:\u001b[0m 10\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/timing_details.csv'\nTotal results found: 1\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 27885969\nTitle: 36th International Symposium on Intensive Care and Emergency Medicine : Brussels, Belgium. 15-18 March 2016.\nSource: Critical care (London, England) (2016)\nAbstract: P001 - Sepsis impairs the capillary response within hypoxic capillaries and decreases erythrocyte oxygen-dependent ATP efflux R. M. Bateman, M. D. Sharpe, J. E. Jagger, C. G. Ellis P002 - Lower serum immunoglobulin G2 level does not predispose to severe flu. J. Solé-Violán, M. López-Rodríguez, E. Herrera-Ramos, J. Ruíz-Hernández, L. Borderías, J. Horcajada, N. González-Quevedo, O. Rajas, M. Briones, F. Rodríguez de Castro, C. Rodríguez Gallego P003 - Brain protective effects of intravenous immunoglobulin through inhibition of complement activation and apoptosis in a rat model of sepsis F. Esen, G. Orhun, P. Ergin Ozcan, E. Senturk, C. Ugur Yilmaz, N. Orhan, N. Arican, M. Kaya, M. Kucukerden, M. Giris, U. Akcan, S. Bilgic Gazioglu, E. Tuzun P004 - Adenosine a1 receptor dysfunction is associated with leukopenia: A possible mechanism for sepsis-induced leukopenia R. Riff, O. Naamani, A. Douvdevani P005 - Analysis of neutrophil by hyper spectral imaging - A preliminary report R. Takegawa, H. Yoshida, T. Hirose, N. Yamamoto, H. Hagiya, M. Ojima, Y. Akeda, O. Tasaki, K. Tomono, T. Shimazu P006 - Chemiluminescent intensity assessed by eaa predicts the incidence of postoperative infectious ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_0dkrHEtPkhtjm8nhjzuvvitm",
+    "parent_tool_call_id": "call_KmnQ2XzTHHwHKXAVUNtzpaNz",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The exact matching paper is PMID 25080456, titled “Initiation of nutritional support is delayed in critically ill obese patients: a multicenter cohort study,” published in The American Journal of Clinical Nutrition in 2014.",
+          "source_tools": [
+            {
+              "relevance": "Exact title, PMID, journal, and year",
+              "tool_call_id": "call_fOpr9wqHxFs6nFAwUv5Wtjbm"
+            },
+            {
+              "relevance": "Exact title and publication metadata",
+              "tool_call_id": "call_2gAHu1350M1M4RBxIWbUOgT2"
+            }
+          ]
+        },
+        {
+          "finding": "This was a retrospective analysis of the prospectively entered OUTCOMEREA multicenter ICU database, covering January 1997 through October 2012; inclusion required orotracheal intubation within the first 72 hours and ICU stay longer than 3 days. The analysis included 3,257 ICU stays.",
+          "source_tools": [
+            {
+              "relevance": "Study design, database, period, eligibility, and total sample size",
+              "tool_call_id": "call_2gAHu1350M1M4RBxIWbUOgT2"
+            }
+          ]
+        },
+        {
+          "finding": "Obesity was classified by admission BMI ≥30 kg/m² (n=663). Comparison groups were low weight BMI <20 (n=501), normal weight BMI 20–<25 (n=1,135), and overweight BMI 25–<30 (n=958).",
+          "source_tools": [
+            {
+              "relevance": "BMI definitions and group sizes",
+              "tool_call_id": "call_2gAHu1350M1M4RBxIWbUOgT2"
+            }
+          ]
+        },
+        {
+          "finding": "The delay before feeding differed across BMI groups (P=0.035) and was longer in obese patients. Compared with normal-weight patients, adjusted relative risk for delayed nutrition initiation was 1.06 (95% CI 1.00–1.12) in obese patients, versus 0.92 (0.86–0.98) in low-weight and 1.00 (0.94–1.05) in overweight patients; the overall adjusted analysis reported P=0.004 and was independent of age, sex, diabetes, and other chronic diseases.",
+          "source_tools": [
+            {
+              "relevance": "Direct obese versus non-obese/BMI-group comparison and statistics",
+              "tool_call_id": "call_2gAHu1350M1M4RBxIWbUOgT2"
+            }
+          ]
+        },
+        {
+          "finding": "The authors concluded explicitly that initiation of nutritional support was delayed in obese ICU patients and called for randomized trials comparing early versus delayed initiation in critically ill obese patients.",
+          "source_tools": [
+            {
+              "relevance": "Authors’ conclusion about delayed initiation",
+              "tool_call_id": "call_2gAHu1350M1M4RBxIWbUOgT2"
+            }
+          ]
+        },
+        {
+          "finding": "The accessible PubMed abstract does not report the actual elapsed time from ICU admission to enteral or parenteral support (hours/days), nor does it provide separate enteral-versus-parenteral timing estimates; those requested timing values cannot be verified from the retrieved record.",
+          "source_tools": [
+            {
+              "relevance": "Retrieved full available abstract explicitly contains only qualitative delay findings and reports that full text was unavailable",
+              "tool_call_id": "call_2gAHu1350M1M4RBxIWbUOgT2"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_tmsxEb61bRQsLtNlkSww3gZH",
+    "parent_tool_call_id": "call_0dkrHEtPkhtjm8nhjzuvvitm",
+    "round": 5,
+    "tool_input": {
+      "boolean_query_text": "\"Initiation of nutritional support is delayed in critically ill obese patients\" enteral days ICU admission",
+      "task_name": "paper timing search",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='\"Initiation of nutritional support is delayed in critically ill obese patients\" enteral days ICU admission',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='\"Initiation of nutritional support is delayed in critically ill obese patients\" enteral days ICU admission',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/paper_timing_search.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/paper_timing_search.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/paper_timing_search.csv'\nTotal results found: 1\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 26571286\nTitle: Feeding the critically ill obese patient: a systematic review protocol.\nSource: JBI database of systematic reviews and implementation reports (2015)\nAbstract: REVIEW QUESTION/OBJECTIVE: The objective of this review is to identify effective enteral nutritional regimens targeting protein and calorie delivery for the critically ill obese patient on morbidity and mortality.More specifically, the review question is:In the critically ill obese patient, what is the optimal enteral protein and calorie target that improves mortality and morbidity? BACKGROUND: The World Health Organization (WHO) defines obesity as abnormal or excessive fat accumulation that may impair health, or, empirically, as a body mass index (BMI) ≥ 30 kg/m. Twenty-eight percent of the Australian population is obese with the prevalence rising to 44% in rural areas, and there is evidence that rates of obesity are increasing. The prevalence of obese patients in intensive care largely mirrors that of the general population. There is concern, however, that this may also be rising. A recently published multi-center nutritional study of critically ill patients reported a mean BMI of 29 in their sample, suggesting that just under 50% of their intensive care population is obese. It is inevitable, therefore, that the intensivist will care for the critically ill obese patient.Managing  ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "get_paper_references",
+    "tool_call_id": "call_t2kv2t1iCfJ0rDeptau3HxHZ",
+    "parent_tool_call_id": "call_0dkrHEtPkhtjm8nhjzuvvitm",
+    "round": 5,
+    "tool_input": {
+      "batch_size": 10,
+      "max_workers": 2,
+      "mini_batch_size": 5,
+      "pmids": [
+        "25080456"
+      ],
+      "rate_limit": 3,
+      "task_name": "related paper search"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_get_paper_references\nimport pandas as pd\n\nsearch_results = pubmed_api_get_paper_references(\n    pmids=['25080456'], batch_size=10, mini_batch_size=5,\n    max_workers=2, rate_limit=3\n)\n\nsearch_results_df = pd.DataFrame(search_results)\nsearch_results_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/related_paper_search.csv', index=False)\nprint(\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/related_paper_search.csv'\")\nprint(search_results_df.head().to_markdown())\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/related_paper_search.csv'\n\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_LsILS0zpupJx4DnKU311Yz5D",
+    "parent_tool_call_id": "call_7yhtl9BoRuUD9mdFMn96bNMA",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25080456",
+          "observations": [
+            "2014 multicenter retrospective cohort analysis of prospectively entered OUTCOMEREA ICU data; 3,257 ICU stays from January 1997 to October 2012.",
+            "Included patients intubated within 72 hours and staying in ICU longer than 3 days."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Exact study identification and design",
+              "tool_call_id": "call_2gAHu1350M1M4RBxIWbUOgT2"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Delayed nutrition in obesity",
+          "observations": [
+            "Among 3,257 critically ill patients, nutrition initiation delay differed by BMI group (P=0.035) and was longer in obese patients (BMI ≥30 kg/m²; n=663).",
+            "Adjusted relative risk for delayed initiation versus normal weight was 1.06 (95% CI 1.00–1.12) in obese patients; overall adjusted analysis reported P=0.004, independent of age, sex, diabetes, and other chronic diseases.",
+            "Authors concluded that initiation of nutritional support was delayed in obese ICU patients."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary quantitative result and conclusion",
+              "tool_call_id": "call_2gAHu1350M1M4RBxIWbUOgT2"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:25080456",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Delayed nutrition in obesity"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 2, \"entities\": [{\"name\": \"PMID:25080456\", \"entityType\": \"PAPER\", \"observations\": [\"2014 multicenter retrospective cohort analysis of prospectively entered OUTCOMEREA ICU data; 3,257 ICU stays from January 1997 to October 2012.\", \"Included patients intubated within 72 hours and staying in ICU longer than 3 days.\"]}, {\"name\": \"Delayed nutrition in obesity\", \"entityType\": \"FINDING\", \"observations\": [\"Among 3,257 critically ill patients, nutrition initiation delay differed by BMI group (P=0.035) and was longer in obese patients (BMI \\u226530 kg/m\\u00b2; n=663).\", \"Adjusted relative risk for delayed initiation versus normal weight was 1.06 (95% CI 1.00\\u20131.12) in obese patients; overall adjusted analysis reported P=0.004, independent of age, sex, diabetes, and other chronic diseases.\", \"Authors concluded that initiation of nutritional support was delayed in obese ICU patients.\"]}]}, \"relations_created\": {\"count\": 1, \"relations\": [{\"from\": \"PMID:25080456\", \"to\": \"Delayed nutrition in obesity\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_LsILS0zpupJx4DnKU311Yz5D\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_7yhtl9BoRuUD9mdFMn96bNMA\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

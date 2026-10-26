@@ -10,7 +10,7 @@ and memory monitoring.
 from __future__ import annotations
 
 import logging
-from typing import Optional, Type
+from typing import Optional, Type, List
 
 from pydantic import BaseModel, Field
 from langchain.tools import BaseTool
@@ -33,6 +33,7 @@ class CodeExecutionInput(BaseModel):
             "values that are not printed will not appear in the output."
         )
     )
+
     language: str = Field(
         default="python",
         description="Language to execute: 'python' (default) or 'r'.",
@@ -161,7 +162,11 @@ class CodeExecutionTool(BaseTool):
     # Public interface
     # -------------------------------------------------------------- #
 
-    def _run(self, code: str, language: str = "python") -> str:
+    def _run(
+        self,
+        code: str,
+        language: str = "python",
+    ) -> str:
         """
         Execute the provided code.
 

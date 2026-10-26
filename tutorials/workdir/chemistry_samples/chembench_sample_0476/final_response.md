@@ -1,0 +1,1 @@
+{"answer": "[(2S)-1-(carbamoylamino)-1-oxopropan-2-yl] 3-hydroxynaphthalene-2-carboxylate"}

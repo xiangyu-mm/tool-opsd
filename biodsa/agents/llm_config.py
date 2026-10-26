@@ -53,6 +53,7 @@ OPENAI_MODELS = (
     "o3-mini",
     "o3-preview",
     "o4-mini",
+    "doubao-seed-evolving"
 )
 
 # Anthropic (https://docs.anthropic.com/en/docs/about-claude/models)
@@ -167,6 +168,7 @@ SupportedModelName = Literal[
     "o3-mini",
     "o3-preview",
     "o4-mini",
+    "doubao-seed-evolving",
     # Anthropic — Opus 4.6
     "claude-opus-4-6",
     "claude-opus-4-6-20260205",

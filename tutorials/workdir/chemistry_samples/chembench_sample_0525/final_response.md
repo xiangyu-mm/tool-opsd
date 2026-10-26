@@ -1,0 +1,1 @@
+{"answer": "(5R,8S,9R,10R,13R,14R,17R)-5-hydroxy-10,13-dimethyl-17-[(2S)-6-methylheptan-2-yl]-1,2,4,7,8,9,11,12,14,15,16,17-dodecahydrocyclopenta[a]phenanthrene-3,6-dione"}

@@ -1,0 +1,355 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_XgqXO6pYZ8BiBDYYPWixzmtj",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "drug"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether prophylactic gentamicin used for open-fracture antibiotic prophylaxis is associated with acute kidney injury or nephrotoxicity in human patients. Identify comparative cohort studies, case series, systematic reviews, and guidelines; extract AKI incidence, effect estimates, definitions, timing, dose/duration, comparator antibiotics, and major confounders. Focus on gentamicin given prophylactically for open fractures, not treatment of established infection, and distinguish direct evidence from extrapolation."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_uzkRRN2ZlxTHqWyX2t7hoQPh",
+    "parent_tool_call_id": "call_XgqXO6pYZ8BiBDYYPWixzmtj",
+    "round": 1,
+    "tool_input": {
+      "task_name": "gentamicin orthopedic prophylaxis AKI",
+      "boolean_query_text": "gentamicin orthopedic prophylaxis acute kidney injury fracture",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='gentamicin orthopedic prophylaxis acute kidney injury fracture',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='gentamicin orthopedic prophylaxis acute kidney injury fracture',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/gentamicin_orthopedic_prophylaxis_AKI.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/gentamicin_orthopedic_prophylaxis_AKI.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/gentamicin_orthopedic_prophylaxis_AKI.csv'\nTotal results found: 49\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 26854072\nTitle: Antibiotic related acute kidney injury in patients treated for open fractures.\nSource: Injury (2016)\nAbstract: OBJECTIVE: Antibiotic administration during the treatment of open fractures has been shown to reduce infection rates and is considered a critical step in the management of these injuries. The purpose of this study was to determine if aminoglycoside administration during the treatment of open fractures leads to acute kidney injury. METHODS: Patient records at a level I trauma centre were reviewed for adult patients who presented in 2014 with open fractures were screened for inclusion. Patients were excluded with fractures of the phalanges, metatarsals, and metacarpals, with isolated traumatic arthrotomies, or pre-existing renal dysfunction. Charts were reviewed for patient age, gender, race, past medical history, medication history, injury severity score, intravenous dye studies and fracture type. Patients were divided into those given cefazolin (Group A) and cefazolin with gentamicin (Group B). Laboratory values were used to determine which patients developed kidney dysfunction as measured using the RIFLE criteria. Wilcoxon-Mann-Whitney test and Chi-square were used to compare interval and categorical variables, respectively. Significance was set at P<0.05. RESULTS: One-hundred and ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 30086044\nTitle: Risk Factors for Kidney Dysfunction With the Use of Gentamicin in Open Fracture Antibiotic Treatment.\nSource: Journal of orthopaedic trauma (2018)\nAbstract: OBJECTIVES: To evaluate all patients who received gentamicin for open fracture treatment and determine the incidence of, and risk factors for, kidney injury in this population. DESIGN: Retrospective, case control. SETTING: Single institution; Level 1 trauma center. PATIENTS/PARTICIPANTS: A retrospective chart review identified patients who received gentamicin for open fracture antibiotic treatment from January 2008 to December 2012. Overall, 371 patients met the inclusion criteria and were categorized into 2 groups using risk, injury, failure, loss of kidney function, and end-stage kidney disease criteria: normal kidney function (74.9%) versus abnormal kidney function (25.1%). INTERVENTION: Use of gentamicin in open fracture antibiotic treatment. MAIN OUTCOME MEASUREMENTS: Kidney function; injury and treatment characteristics (eg, mechanism of injury; Gustilo-Anderson classification; number of surgical debridements, timing of definitive wound coverage, and type of wound coverage); and patient information (eg, age, height, weight, and body mass index, tobacco use, diabetes mellitus, human immunodeficiency virus, hepatitis, and current chemotherapy treatment). RESULTS: Those with abn ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 38079252\nTitle: Antibiotic Prophylaxis for Grade 3 Open Fractures: A Retrospective Comparison of Ceftriaxone Plus Vancomycin Versus Cefazolin Plus Gentamicin.\nSource: Surgical infections (2024)\nAbstract: Background: Because of the established path of bacterial entry and contamination-associated mechanisms, grade 3 open orthopedic fractures represent a substantial infection risk. The Eastern Association for the Surgery of Trauma (EAST) guidelines recommended covering Staphylococcus aureus and adding aminoglycoside gram-negative coverage. Local institutional guidelines rely on ceftriaxone for gram negative coverage and add methicillin-resistant Staphylococcus aureus coverage with vancomycin. Patients and Methods: The electronic health records of adults admitted for a grade 3 open fracture between January 1, 2016, and October 31, 2021, were retrospectively reviewed. Patients who received cefazolin and gentamicin (CZ+GM) or ceftriaxone and vancomycin (CRO+VA) as prophylaxis were included. We recorded the rate of a composite treatment failure outcome of receipt of antibiotic agents, infection-related hospitalization, or subsequent debridement for injury-site skin and soft tissue infection or osteomyelitis. The presence of acute kidney injury (AKI) was also evaluated. Results: There were 65 patients included in the CZ+GM group and 53 patients in the CRO+VA group. Patients in the CZ+GM gr ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 35090733\nTitle: Ampicillin/sulbactam versus cefazolin plus aminoglycosides for antimicrobial prophylaxis in management of Gustilo type IIIA open fractures: A retrospective cohort study.\nSource: Injury (2022)\nAbstract: BACKGROUND: The antibiotic regimens for prophylaxis in the management of open fractures remain controversial. Although the use of aminoglycosides is widely accepted for treatment of Gustilo type III open fractures, aminoglycosides are often avoided in patients with risk factors. This study aimed to compare efficacy and safety of two regimens, cephazolin plus aminoglycoside (amikacin or gentamicin) and ampicillin/sulbactam (ABPC/SBT), in patients with Gustilo type IIIA open fractures. METHODS: A total of 95 Gustilo type IIIA fractures in 90 patients were retrospectively reviewed in this study. The cohort was categorized into two groups that were treated in accordance with the institutional prescribed regimen in different periods: (1) cefazolin plus aminoglycoside (January 1, 2014-September 30, 2017) and (2) ABPC/SBT monotherapy (October 1, 2017-September 30, 2020). Cefazolin was used at 1-2 g every 8 h, aminoglycoside (amikacin or gentamicin) was used daily depending on body weight, and ABPC/SBT was used at 3 g every 8 h The antibiotic administration was continued within 3 days or until successful soft tissue coverage was achieved. The infection rate and the incidence of acute kidne ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 42775682\nTitle: Ceftriaxone versus cefazolin plus gentamicin for antibiotic prophylaxis in Gustilo-Anderson type III open lower extremity fractures.\nSource: Journal of orthopaedic trauma (2026)\nAbstract: OBJECTIVES: To compare fracture related infection (FRI) rates and outcomes between ceftriaxone (CTX) and cefazolin plus gentamicin (C+G) for antibiotic prophylaxis in Gustilo-Anderson (GA) type III open lower extremity fractures. METHODS: Design: Retrospective cohort study. SETTING: Single, academic level one trauma center. PATIENT SELECTION CRITERIA: Included were patients age 18-89 years with GA type III open lower extremity fractures (AO/OTA 32,33,41,42,43,4F3, 44) from 2013 to 2024 with at least 6 weeks follow-up. OUTCOME MEASUREMENTS AND COMPARISONS: The primary outcome was FRI. Secondary outcomes included acute kidney injury (AKI), nonunion, and other complications. Cox proportional hazards models and multivariable logistic regression adjusted for confounding variables. RESULTS: Of 3,334 lower extremity fractures reviewed, 307 met inclusion criteria: 229 C+G and 78 CTX. Mean age (40.4 [range 18-88] vs 41.2 [range 18-81] years, p=0.7) and sex (75.1% vs 64.1% male, p=0.084) were similar between the C+G and CTX cohorts. Mean follow-up was 23.8 months (C+G) and 14.0 months (CTX) (P=0.002). The C+G cohort had more tibial shaft fractures (34.1% vs 19.2%, P=0.014) and type IIIB inju ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 38079252\nTitle: Antibiotic Prophylaxis for Grade 3 Open Fractures: A Retrospective Comparison of Ceftriaxone Plus Vancomycin Versus Cefazolin Plus Gentamicin.\nSource: Surg Infect (Larchmt) (2023)\nAbstract: The presence of @DISEASE_Acute_Kidney_Injury @DISEASE_MESH:D058186 @@@<m>acute</m> <m>kidney</m> <m>injury</m>@@@ (@DISEASE_Acute_Kidney_Injury @DISEASE_MESH:D058186 @@@AKI@@@) was also evaluated.\n--------------------------------------------------------------------------------\nPMID: 39768868\nTitle: Antimicrobials in Orthopedic Infections: Overview of Clinical Perspective and Microbial Resistance\nSource: Medicina (Kaunas) (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38243311\nTitle: Broad-spectrum antibiotic prophylaxis in tumor and infected orthopedic surgery:the prospective-randomized, microbiologist-blinded, stratified, superiority trials: BAPTIST Trials\nSource: Trials (2024)\nAbstract: The BAPTIST Trial only concerns the perioperative antibiotic <m>prophylaxis</m> in selected <m>orthopedic</m> surgeries with a high risk of selection of <m>prophylaxis</m>-resistant @DISEASE_Surgical_Wound_Infection @DISEASE_MESH:D013530 @@@SSI@@@ pathogens or of other healthcare-associated @DISEASE_Infections @DISEASE_MESH:D007239 @@@infections@@@ in the immediate postsurgical period: these are @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@tumor@@@ surgery, surgery for dehiscent <m>wounds</m>, any <m>orthopedic</m> surgery under concomitant therapeutic antibiotics, open @DISEASE_Fractures_Bone @DISEASE_MESH:D050723 @@@<m>fractures</m>@@@, surgeries with skin colonization with multidrug-resistant bacteria, plus, as a control, <m>orthopedic</m> spine surgery in multimorbid @SPECIES_9606 @@@patients@@@.\n--------------------------------------------------------------------------------\nPMID: 36830197\nTitle: Antibiotic-Loaded Coatings to Reduce Fracture-Related Infections: Retrospective Case Series of Patients with Increased Infectious Risk\nSource: Antibiotics (Basel) (2023)\nAbstract: All @SPECIES_9606 @@@patients@@@ performed the same pre-, intra-, and postoperative protocols regarding @DISEASE_Pain @DISEASE_MESH:D010146 @@@pain@@@ control, anesthesia, surgical <m>wound</m> dressing, and antibiotic <m>prophylaxis</m>.\n--------------------------------------------------------------------------------\nPMID: 35410299\nTitle: A protocol for periprosthetic joint infections from the Northern Infection Network for Joint Arthroplasty (NINJA) in the Netherlands\nSource: Arthroplasty (2022)\nAbstract: ...* May present <m>acutely</m> with @DISEASE_Fever @DISEASE_MESH:D005334 @@@fever@@@, significant @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>wound</m> leakage@@@ and a persistent high C-reactive protein (@GENE_CRP @GENE_1401 @@@CRP@@@).\n--------------------------------------------------------------------------------\nPMID: 35317403\nTitle: Periprosthetic joint infections in femoral neck fracture patients treated with hemiarthroplasty - should we use antibiotic-loaded bone cement?\nSource: World J Orthop (2022)\nAbstract: While caution with high dose ALBC (exceeding concentrations of 3.6 g antibiotic per 40 g of cement - e.g., in spacers during staged @DISEASE_Arthritis_Infectious @DISEASE_MESH:D001170 @@@septic@@@ treatment) appears justified for @SPECIES_9606 @@@patients@@@ with pre-existing @DISEASE_Acute_Kidney_Injury @DISEASE_MESH:D058186 @@@<m>acute</m> <m>kidney</m> <m>injuries</m>@@@, there is no evidence for such concerns with low dose ALBC.\n--------------------------------------------------------------------------------\nPMID: 36267392\nTitle: Cefadroxil-Induced Clostridium difficile Infection Following Total Knee Arthroplasty\nSource: Arthroplast Today (2022)\nAbstract: Most surgeons and institutions have developed their own @DISEASE_Infections @DISEASE_MESH:D007239 @@@infection@@@ <m>prophylaxis</m> protocols based on operative environmental factors, host risk factors, and <m>wound</m> care.\n--------------------------------------------------------------------------------\nPMID: 33568230\nTitle: A study protocol for a Pilot Masked, Randomized Controlled Trial Evaluating Locally-applied Gentamicin versus Saline in Open Tibia Fractures (pGO-Tibia) in Dar es Salaam, Tanzania\nSource: Pilot Feasibility Stud (2021)\nAbstract: We hypothesize that the risk of @DISEASE_Fractures_Bone @DISEASE_MESH:D050723 @@@<m>fracture</m>@@@-related @DISEASE_Infections @DISEASE_MESH:D007239 @@@infection@@@ will be reduced by the intraoperative use of locally administered @CHEMICAL_Gentamicins @CHEMICAL_MESH:D005839 @@@<m>gentamicin</m>@@@ at the time of <m>wound</m> closure.\n--------------------------------------------------------------------------------\nPMID: 34940506\nTitle: Antibiotic-Coated Nail in Open Tibial Fracture: A Retrospective Case Series\nSource: J Funct Morphol Kinesiol (2021)\nAbstract: ...While <m>acute</m> treatment for @DISEASE_Disruptive_Impulse_Control_and_Conduct_Disorders @DISEASE_MESH:D007174 @@@DC@@@ in @SPECIES_9606 @@@patients@@@ with @DISEASE_Multiple_Trauma @DISEASE_MESH:D009104 @@@polytrauma@@@ and open @DISEASE_Fractures_Bone @DISEASE_MESH:D050723 @@@<m>fractures</m>@@@ is now standardized, with sterile irrigation, <m>wound</m> debridement, administration of systemic antibiotic <m>prophylaxis</m> and temporary stabilization of the @DISEASE_Fractures_Bone @DISEASE_MESH:D050723 @@@<m>fracture</m>@@@ within 6-8 h of arrival in the Emergency Room, more the timing for definitive @DISEASE_Fractures_Bone @DISEASE_MESH:D050723 @@@<m>fracture</m>@@@ treatment is controversial and less uniform in the literature.\n--------------------------------------------------------------------------------\nPMID: 37763149\nTitle: Bone Cement Implantation Syndrome: A Rare Disaster Following Cemented Hip Arthroplasties:Clinical Considerations Supported by Case Studies\nSource: J Pers Med (2023)\nAbstract: @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>Trauma</m>@@@ cases, especially @DISEASE_Hip_Fractures @DISEASE_MESH:D006620 @@@hip <m>fractures</m>@@@, are seen to have a higher incidence of developing this complication compared to <m>orthopedic</m> elective ones.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_o5BEcnwxcugCI6Se7UORzk7T",
+    "parent_tool_call_id": "call_uzkRRN2ZlxTHqWyX2t7hoQPh",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "AKI|acute kidney|RIFLE|gentamicin|dose|duration|cefazolin|odds ratio|incidence|risk factor|contrast",
+      "pmid": "27500970"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27500970')\noutput = format_paper_content_output(result, filter_keywords='AKI|acute kidney|RIFLE|gentamicin|dose|duration|cefazolin|odds ratio|incidence|risk factor|contrast')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (6):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m AKI|acute kidney|RIFLE|gentamicin|dose|duration|cefazolin|odds ratio|incidence|risk factor|contrast\n      \u001b[90mpmid:\u001b[0m 27500970\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m AKI|acute kidney|RIFLE|gentamicin|dose|duration|cefazolin|incidence|risk factor|contrast\n      \u001b[90mpmid:\u001b[0m 26854072\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m kidney|RIFLE|gentamicin|dose|duration|abnormal|risk factor|contrast\n      \u001b[90mpmid:\u001b[0m 30086044\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m acute kidney injury|AKI|gentamicin|cefazolin|ampicillin|dose|duration|incidence\n      \u001b[90mpmid:\u001b[0m 35090733\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m acute kidney injury|AKI|gentamicin|cefazolin|ceftriaxone|vancomycin|incidence|odds ratio\n      \u001b[90mpmid:\u001b[0m 38079252\n\n  \u001b[1m\u001b[93m[6] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m guideline|gentamicin|aminoglycoside|open fracture|duration|Grade III|cefazolin\n      \u001b[90mpmid:\u001b[0m 36385752\n\n=== PMID: 27500970 ===\n\nTitle: Prophylactic Gentamicin Is Not Associated with Acute Kidney Injury in Patients with Open Fractures.\n\nJournal/Date: Surgical infections (2016)\n\nMeSH Keywords: Acute Kidney Injury, Adult, Anti-Bacterial Agents, Antibiotic Prophylaxis, Female, Fractures, Open, Gentamicins, Humans\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Data on antimicrobial prophylaxis for open fractures is limited, with many protocols based on expert recommendations. These protocols include aminoglycosides (AGs) for fractures with significant soft tissue injury, but these drugs are associated with acute kidney injury (AKI) in other settings; this risk has not been defined for open fracture prophylaxis.\n[METHODS]: We performed a retrospective study from May 2012 to October 2014 at our Level 1 trauma center. Patients with open fractures were evaluated for demographics, location/type of fracture, injury severity, and receipt of an AG. Outcomes included rates of AKI, infection, and mortality.\n[RESULTS]: There were 167 patients with open fractures during the study period (119 males, mean age 42 ± 17 [standard deviation] years), with 80 (48%) receiving prophylactic gentamicin (AG+ group). The AG+ and AG- patients had similar fracture sites and Injury Severity Scores (ISSs) (12.6 ± 9.9 AG+ vs. 15.9 ± 13.2 AG-) but were more likely to have sustained blunt trauma (96% AG+ vs. 77%; p < 0.001) or received intravenous contrast medium ≤48 h from admission (75% AG+ vs. 56% AG-; p = 0.01). Gentamicin was not associated with AKI (odds ratio [OR] 0.22; 95% confidence interval [CI] 0.020-2.44; p = 0.22), whereas hypotension on admission (OR 10.7; 95% CI 1.42-80.93; p = 0.02) and ISS (OR 1.1; 95% CI 1.01-1.20; p = 0.02) were both associated with AKI. Only four fracture site infections were identified, three in the AG+ group and one in the AG- group (3.8% vs. 1.1%; p = 0.27). The mortality rate was greater in the AG- group (3.8% vs. 12.6%; p = 0.04).\n[CONCLUSIONS]: Prophylactic gentamicin is not associated with AKI, whereas hypotension on admission and higher ISS were. The use of nephrotoxic agents, including aminoglycosides, should be restricted in open fracture patients presenting with hypotension or a high ISS.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_6Zeg3FlYpYigUc3hiFej3lYH",
+    "parent_tool_call_id": "call_uzkRRN2ZlxTHqWyX2t7hoQPh",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "AKI|acute kidney|RIFLE|gentamicin|dose|duration|cefazolin|incidence|risk factor|contrast",
+      "pmid": "26854072"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('26854072')\noutput = format_paper_content_output(result, filter_keywords='AKI|acute kidney|RIFLE|gentamicin|dose|duration|cefazolin|incidence|risk factor|contrast')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 26854072 ===\n\nTitle: Antibiotic related acute kidney injury in patients treated for open fractures.\n\nJournal/Date: Injury (2016)\n\nMeSH Keywords: Acute Kidney Injury, Adolescent, Adult, Aged, Aged, 80 and over, Anti-Bacterial Agents, Cefazolin, Female\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: Antibiotic administration during the treatment of open fractures has been shown to reduce infection rates and is considered a critical step in the management of these injuries. The purpose of this study was to determine if aminoglycoside administration during the treatment of open fractures leads to acute kidney injury.\n[METHODS]: Patient records at a level I trauma centre were reviewed for adult patients who presented in 2014 with open fractures were screened for inclusion. Patients were excluded with fractures of the phalanges, metatarsals, and metacarpals, with isolated traumatic arthrotomies, or pre-existing renal dysfunction. Charts were reviewed for patient age, gender, race, past medical history, medication history, injury severity score, intravenous dye studies and fracture type. Patients were divided into those given cefazolin (Group A) and cefazolin with gentamicin (Group B). Laboratory values were used to determine which patients developed kidney dysfunction as measured using the RIFLE criteria. Wilcoxon-Mann-Whitney test and Chi-square were used to compare interval and categorical variables, respectively. Significance was set at P<0.05.\n[RESULTS]: One-hundred and fifty-nine patients met inclusion criteria. Forty-one (25%) patients were given cefazolin alone and 113 (68%) patients were given cefazolin with gentamicin. Ten (18%) patients with Gustilo-Anderson type III fractures were given cefazolin alone and 67 (67%) patients with types I or II fractures were given a cefazolin with gentamicin. Baseline characteristics and risk factors for renal dysfunction did not vary between groups. Two (4.8%) patients in Group A and 5 (4%) patients in Group B developed acute kidney injury (P=0.599).\n[CONCLUSIONS]: Gentamicin use during the treatment of open fractures does not lead to increased rates of renal dysfunction when used in patients with normal baseline renal function.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_hXLvcAu40Z2QKRdjaX7rmz8y",
+    "parent_tool_call_id": "call_uzkRRN2ZlxTHqWyX2t7hoQPh",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "kidney|RIFLE|gentamicin|dose|duration|abnormal|risk factor|contrast",
+      "pmid": "30086044"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('30086044')\noutput = format_paper_content_output(result, filter_keywords='kidney|RIFLE|gentamicin|dose|duration|abnormal|risk factor|contrast')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 30086044 ===\n\nTitle: Risk Factors for Kidney Dysfunction With the Use of Gentamicin in Open Fracture Antibiotic Treatment.\n\nJournal/Date: Journal of orthopaedic trauma (2018)\n\nMeSH Keywords: Acute Kidney Injury, Antibiotic Prophylaxis, Case-Control Studies, Databases, Factual, Female, Fractures, Open, Gentamicins, Humans\n\n\n--- ABSTRACT ---\n[OBJECTIVES]: To evaluate all patients who received gentamicin for open fracture treatment and determine the incidence of, and risk factors for, kidney injury in this population.\n[DESIGN]: Retrospective, case control.\n[SETTING]: Single institution; Level 1 trauma center.\n[PATIENTS/PARTICIPANTS]: A retrospective chart review identified patients who received gentamicin for open fracture antibiotic treatment from January 2008 to December 2012. Overall, 371 patients met the inclusion criteria and were categorized into 2 groups using risk, injury, failure, loss of kidney function, and end-stage kidney disease criteria: normal kidney function (74.9%) versus abnormal kidney function (25.1%).\n[INTERVENTION]: Use of gentamicin in open fracture antibiotic treatment.\n[MAIN OUTCOME MEASUREMENTS]: Kidney function; injury and treatment characteristics (eg, mechanism of injury; Gustilo-Anderson classification; number of surgical debridements, timing of definitive wound coverage, and type of wound coverage); and patient information (eg, age, height, weight, and body mass index, tobacco use, diabetes mellitus, human immunodeficiency virus, hepatitis, and current chemotherapy treatment).\n[RESULTS]: Those with abnormal kidney function had lower baseline creatinine (P < 0.001) and higher injury severity scores (16.5 vs. 11.8, P < 0.001) and were more likely to require intensive care unit admission (P < 0.001) than the normal group. Female sex (P = 0.015), and higher weight (P = 0.004), ICU admission (P < 0.001), and use of CT contrasted imaging (P < 0.001) were independently associated with abnormal kidney function. Abnormal kidney function incidence also sharply increased with age.\n[CONCLUSIONS]: Females and heavier individuals are at-risk of kidney injury while receiving gentamicin. ICU admission and concurent CT contrasted imaging are strongly associated with kidney injury in patients receiving gentamicin for open fracture treatment, and gentamicin should be avoided in those >60 years of age.\n[LEVEL OF EVIDENCE]: Therapeutic Level IV. See Instructions for Authors for a complete description of levels of evidence.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_aMuBHdD0g6obqYTEve3w8suQ",
+    "parent_tool_call_id": "call_uzkRRN2ZlxTHqWyX2t7hoQPh",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "acute kidney injury|AKI|gentamicin|cefazolin|ampicillin|dose|duration|incidence",
+      "pmid": "35090733"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('35090733')\noutput = format_paper_content_output(result, filter_keywords='acute kidney injury|AKI|gentamicin|cefazolin|ampicillin|dose|duration|incidence')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 35090733 ===\n\nTitle: Ampicillin/sulbactam versus cefazolin plus aminoglycosides for antimicrobial prophylaxis in management of Gustilo type IIIA open fractures: A retrospective cohort study.\n\nJournal/Date: Injury (2022)\n\nMeSH Keywords: Aminoglycosides, Ampicillin, Anti-Bacterial Agents, Anti-Infective Agents, Antibiotic Prophylaxis, Cefazolin, Drug Therapy, Combination, Fractures, Open\n\n\n--- ABSTRACT ---\n[BACKGROUND]: The antibiotic regimens for prophylaxis in the management of open fractures remain controversial. Although the use of aminoglycosides is widely accepted for treatment of Gustilo type III open fractures, aminoglycosides are often avoided in patients with risk factors. This study aimed to compare efficacy and safety of two regimens, cephazolin plus aminoglycoside (amikacin or gentamicin) and ampicillin/sulbactam (ABPC/SBT), in patients with Gustilo type IIIA open fractures.\n[METHODS]: A total of 95 Gustilo type IIIA fractures in 90 patients were retrospectively reviewed in this study. The cohort was categorized into two groups that were treated in accordance with the institutional prescribed regimen in different periods: (1) cefazolin plus aminoglycoside (January 1, 2014-September 30, 2017) and (2) ABPC/SBT monotherapy (October 1, 2017-September 30, 2020). Cefazolin was used at 1-2 g every 8 h, aminoglycoside (amikacin or gentamicin) was used daily depending on body weight, and ABPC/SBT was used at 3 g every 8 h The antibiotic administration was continued within 3 days or until successful soft tissue coverage was achieved. The infection rate and the incidence of acute kidney injury (AKI) in both groups were assessed.\n[RESULTS]: ABPC/SBT was used in 34 patients (36 fractures), and 56 patients (59 fractures) received cefazolin plus aminoglycoside for antibiotic prophylaxis. Infection developed in 2 of 36 fractures in ABPC/SBT group and 4 of 59 fractures in the cefazolin plus aminoglycoside group (p > 0.99). The average serum creatinine levels on admission, baseline, and peak during the hospital stay were not significantly different between the two groups. One case of AKI was identified in each group, indicating that incidence rate of AKI was not significantly different between the two groups.\n[CONCLUSION]: We demonstrated the non-inferiority of ABPC/SBT therapy over cefazolin plus aminoglycoside regimen for type IIIA open fractures. The ABPC/SBT regimen may be an alternative option for managing Gustilo type IIIA open fractures. Further prospective studies with larger samples are needed to verify these results.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_RDrzcFzwJ0mFGtrC0rxV4ErV",
+    "parent_tool_call_id": "call_uzkRRN2ZlxTHqWyX2t7hoQPh",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "guideline|gentamicin|aminoglycoside|open fracture|duration|Grade III|cefazolin",
+      "pmid": "36385752"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('36385752')\noutput = format_paper_content_output(result, filter_keywords='guideline|gentamicin|aminoglycoside|open fracture|duration|Grade III|cefazolin')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 36385752 ===\n\nTitle: Current Concept Review: Risk Factors for Infection Following Open Fractures.\n\nJournal/Date: Orthopedic research and reviews (2022)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nInfection following open fracture is a significant source of morbidity and mortality. Therefore, a central tenet of treatment is to minimize the risk of infection. The initial risk of infection is determined by wound characteristics, such as size, soft tissue coverage, vascular injury, and contamination. While no consensus exists on optimal antibiotic regimen, early administration of prophylactic antibiotics, within an hour of injury, when possible, has been shown definitively to decrease the risk of infection. Infection risk is further reduced by early irrigation with normal saline and aggressive debridement of devitalized tissue. Patient factors that increase risk of infection following open fracture include diabetes mellitus, smoking, male gender, and lower extremity fracture.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_dFsiNXtxMnDQUb07Ne6KX0iD",
+    "parent_tool_call_id": "call_RDrzcFzwJ0mFGtrC0rxV4ErV",
+    "round": 3,
+    "tool_input": {
+      "task_name": "open fracture guideline EAST",
+      "boolean_query_text": "open fracture antibiotic prophylaxis guideline EAST aminoglycoside duration cefazolin",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='open fracture antibiotic prophylaxis guideline EAST aminoglycoside duration cefazolin',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='open fracture antibiotic prophylaxis guideline EAST aminoglycoside duration cefazolin',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/open_fracture_guideline_EAST.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/open_fracture_guideline_EAST.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (4):\u001b[0m\n  \u001b[1m\u001b[93m[1] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m open fracture guideline EAST\n      \u001b[90mboolean_query_text:\u001b[0m open fracture antibiotic prophylaxis guideline EAST aminoglycoside duration cefazolin\n      \u001b[90mtop_k:\u001b[0m 30\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[2] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m open fracture antibiotic review\n      \u001b[90mboolean_query_text:\u001b[0m systematic review open fracture antibiotic prophylaxis aminoglycoside gentamicin nephrotoxicity\n      \u001b[90mtop_k:\u001b[0m 30\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m acute kidney injury|AKI|nephrotoxicity|gentamicin|tobramycin|piperacillin|cefazolin|dose|duration\n      \u001b[90mpmid:\u001b[0m 40995293\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m aminoglycoside|gentamicin|cefazolin|duration|24 hours|72 hours|Grade III|guideline|EAST\n      \u001b[90mpmid:\u001b[0m 36385752\n\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/open_fracture_guideline_EAST.csv'\nTotal results found: 7\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 37240904\nTitle: Bacterial Contamination of Open Fractures: Pathogens and Antibiotic Resistance Patterns in East China\nSource: J Pers Med (2023)\nAbstract: Bacterial Contamination of @DISEASE_Fractures_Open @DISEASE_MESH:D005597 @@@<m>Open</m> <m>Fractures</m>@@@: Pathogens and <m>Antibiotic</m> Resistance Patterns in <m>East</m> China\n--------------------------------------------------------------------------------\nPMID: 31620351\nTitle: Cefazolin and an aminoglycoside compared with cefazolin alone for the antimicrobial prophylaxis of type III open orthopedic fractures\nSource: Int J Crit Illn Inj Sci (2019)\nAbstract: @CHEMICAL_Cefazolin @CHEMICAL_MESH:D002437 @@@<m>Cefazolin</m>@@@ and an @CHEMICAL_Aminoglycosides @CHEMICAL_MESH:D000617 @@@<m>aminoglycoside</m>@@@ compared with @CHEMICAL_Cefazolin @CHEMICAL_MESH:D002437 @@@<m>cefazolin</m>@@@ alone for the antimicrobial <m>prophylaxis</m> of type III <m>open</m> @DISEASE_Musculoskeletal_Diseases @DISEASE_MESH:D009140 @@@orthopedic <m>fractures</m>@@@\n--------------------------------------------------------------------------------\nPMID: 22837892\nTitle: Compliance with the Eastern Association for the Surgery of Trauma guidelines for prophylactic antibiotics after open extremity fracture\nSource: Int J Crit Illn Inj Sci (2012)\nAbstract: ...Prophylactic <m>antibiotics</m> for @DISEASE_Fractures_Open @DISEASE_MESH:D005597 @@@<m>open</m> <m>fracture</m>@@@ frequently exceeded <m>guideline</m> recommendations in <m>duration</m> and spectrum of coverage, especially in more severe @DISEASE_Fractures_Bone @DISEASE_MESH:D050723 @@@<m>fracture</m>@@@ types.\n--------------------------------------------------------------------------------\nPMID: 27147846\nTitle: Antimicrobial prophylaxis in open lower extremity fractures\nSource: Open Access Emerg Med (2011)\nAbstract: Based on the grade of @DISEASE_Fractures_Open @DISEASE_MESH:D005597 @@@<m>open</m> <m>fracture</m>@@@, which <m>antibiotic</m> should be selected for antimicrobial <m>prophylaxis</m>, and what is the optimal timing and <m>duration</m> of administration?\n--------------------------------------------------------------------------------\nPMID: 25067972\nTitle: Controversies in the Management of Open Fractures\nSource: Open Orthop J (2014)\nAbstract: Ashford et al. (2004) [61] Retrospective review 48 <m>open</m> <m>fractures</m>, 45 patients Satisfactory results still possible with delay in treatment with appropriate adherence to <m>open</m> @DISEASE_Fractures_Bone @DISEASE_MESH:D050723 @@@<m>fracture</m>@@@ protocol of <m>antibiotics</m> and debridement.\n--------------------------------------------------------------------------------\nPMID: 16827814\nTitle: S8 - S47 and O50 - O440\nSource: Clin Microbiol Infect (2006)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 12051200\nTitle: ECC-4 Abstracts\nSource: Int J Antimicrob Agents (2002)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_RrE2xH9uhpt3GXjaOceCz0ko",
+    "parent_tool_call_id": "call_RDrzcFzwJ0mFGtrC0rxV4ErV",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "aminoglycoside|gentamicin|cefazolin|duration|24 hours|72 hours|Grade III|guideline|EAST",
+      "pmid": "36385752"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('36385752')\noutput = format_paper_content_output(result, filter_keywords='aminoglycoside|gentamicin|cefazolin|duration|24 hours|72 hours|Grade III|guideline|EAST')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 36385752 ===\n\nTitle: Current Concept Review: Risk Factors for Infection Following Open Fractures.\n\nJournal/Date: Orthopedic research and reviews (2022)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nInfection following open fracture is a significant source of morbidity and mortality. Therefore, a central tenet of treatment is to minimize the risk of infection. The initial risk of infection is determined by wound characteristics, such as size, soft tissue coverage, vascular injury, and contamination. While no consensus exists on optimal antibiotic regimen, early administration of prophylactic antibiotics, within an hour of injury, when possible, has been shown definitively to decrease the risk of infection. Infection risk is further reduced by early irrigation with normal saline and aggressive debridement of devitalized tissue. Patient factors that increase risk of infection following open fracture include diabetes mellitus, smoking, male gender, and lower extremity fracture.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 15,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_Hc3D5wSLVg8wvFRjkMietHjs",
+    "parent_tool_call_id": "call_RrE2xH9uhpt3GXjaOceCz0ko",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Direct comparative evidence is reassuring overall: in a 2016 retrospective cohort of 167 open-fracture patients, prophylactic gentamicin (80/167) was not associated with AKI (OR 0.22, 95% CI 0.020–2.44, p=0.22); hypotension on admission (OR 10.7, 95% CI 1.42–80.93) and higher ISS (OR 1.1 per point, 95% CI 1.01–1.20) were associated with AKI. Gentamicin recipients had more blunt trauma and recent IV contrast, important confounding by indication/exposure. The abstract does not provide dose, duration, or the AKI definition/timing beyond reporting AKI.",
+          "source_tools": [
+            {
+              "relevance": "Direct open-fracture prophylaxis cohort with adjusted effect estimate and confounders",
+              "tool_call_id": "call_o5BEcnwxcugCI6Se7UORzk7T"
+            }
+          ]
+        },
+        {
+          "finding": "A second comparative cohort of 159 open-fracture patients using RIFLE criteria found AKI in 5/113 (4.0%) receiving cefazolin plus gentamicin versus 2/41 (4.8%) receiving cefazolin alone (p=0.599), with no increase in renal dysfunction among patients with normal baseline renal function. The abstract does not report gentamicin dose/duration or AKI timing.",
+          "source_tools": [
+            {
+              "relevance": "Direct cefazolin-plus-gentamicin versus cefazolin-alone comparison; RIFLE-defined outcome",
+              "tool_call_id": "call_6Zeg3FlYpYigUc3hiFej3lYH"
+            }
+          ]
+        },
+        {
+          "finding": "A 2022 retrospective cohort of Gustilo IIIA fractures compared cefazolin plus a weight-based daily aminoglycoside (amikacin or gentamicin; n=59 fractures) with ampicillin/sulbactam 3 g q8h (n=36). Antibiotics continued up to 3 days or until soft-tissue coverage. AKI occurred in 1 patient in each group; creatinine measures were not significantly different. Because amikacin and gentamicin were pooled, this is supportive but not gentamicin-specific.",
+          "source_tools": [
+            {
+              "relevance": "Direct open-fracture prophylaxis comparative cohort with regimen, duration, and AKI counts",
+              "tool_call_id": "call_aMuBHdD0g6obqYTEve3w8suQ"
+            }
+          ]
+        },
+        {
+          "finding": "A 2018 case-control/chart-review series of 371 open-fracture patients who all received gentamicin found 25.1% met abnormal kidney-function/RIFLE criteria. Higher ISS, ICU admission, CT contrast, female sex, higher weight, and increasing age were associated; the abstract reports no untreated comparator, so it estimates risk among gentamicin-exposed trauma patients rather than the causal effect of prophylaxis. Gentamicin dose/duration and AKI timing are not reported in the abstract.",
+          "source_tools": [
+            {
+              "relevance": "Direct gentamicin-exposed open-fracture series identifying major confounders/risk factors",
+              "tool_call_id": "call_hXLvcAu40Z2QKRdjaX7rmz8y"
+            }
+          ]
+        },
+        {
+          "finding": "A 2024 retrospective comparison of cefazolin plus gentamicin (n=65) versus ceftriaxone plus vancomycin (n=53) in grade-3 open fractures evaluated AKI, but the abstract reports infection/failure outcomes and does not provide AKI event counts or effect estimates. The gentamicin group was younger, and residual confounding and limited power were acknowledged.",
+          "source_tools": [
+            {
+              "relevance": "Direct comparator study, but AKI results insufficiently reported in abstract",
+              "tool_call_id": "call_zCfDz5iWi83KYyzcdAAKGHH6"
+            }
+          ]
+        },
+        {
+          "finding": "Evidence located was predominantly retrospective cohorts/series; no qualifying human case series focused specifically on gentamicin prophylaxis-associated nephrotoxicity, and no systematic review was identified that directly pooled systemic gentamicin prophylaxis for open fractures. Reviews/guideline-oriented papers state that regimens and duration lack consensus; EAST-based practice commonly used cefazolin plus an aminoglycoside for severe/type III injuries, while contemporary reviews emphasize early prophylaxis and variable protocols rather than quantifying gentamicin AKI risk.",
+          "source_tools": [
+            {
+              "relevance": "Search identifying relevant review/guideline literature and lack of direct pooled evidence",
+              "tool_call_id": "call_dFsiNXtxMnDQUb07Ne6KX0iD"
+            },
+            {
+              "relevance": "Review noting no consensus on optimal open-fracture antibiotic regimen",
+              "tool_call_id": "call_RDrzcFzwJ0mFGtrC0rxV4ErV"
+            },
+            {
+              "relevance": "Search results showing review literature largely addresses prophylaxis efficacy/regimen rather than gentamicin nephrotoxicity",
+              "tool_call_id": "call_fCYqumTkykVR5figrjJxqYsC"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: in human open-fracture prophylaxis, available direct comparative data do not demonstrate an excess AKI signal from short-course systemic gentamicin, with observed AKI around 4% in one cefazolin comparison and 1 case versus 1 case against ampicillin/sulbactam. However, certainty is low because all key studies are retrospective, samples are small, AKI definitions/timing and gentamicin dose/duration are incompletely reported, and trauma-related hypotension, injury severity, ICU care, contrast exposure, age, weight, and baseline renal function strongly confound risk. Nephrotoxicity evidence from treatment of established infection, prolonged aminoglycoside use, topical/local gentamicin, or non-fracture surgery should be treated as extrapolation, not direct evidence for open-fracture prophylaxis.",
+          "source_tools": [
+            {
+              "relevance": "Synthesis supported by direct comparative cohorts and exposed series",
+              "tool_call_id": "call_o5BEcnwxcugCI6Se7UORzk7T"
+            },
+            {
+              "relevance": "Synthesis supported by RIFLE-defined comparative cohort",
+              "tool_call_id": "call_6Zeg3FlYpYigUc3hiFej3lYH"
+            },
+            {
+              "relevance": "Synthesis supported by contemporary prophylaxis cohort with duration and AKI counts",
+              "tool_call_id": "call_aMuBHdD0g6obqYTEve3w8suQ"
+            },
+            {
+              "relevance": "Synthesis supported by risk-factor series",
+              "tool_call_id": "call_hXLvcAu40Z2QKRdjaX7rmz8y"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_21xiP4BNAJqBP7NBrsx5i6eD",
+    "parent_tool_call_id": "call_XgqXO6pYZ8BiBDYYPWixzmtj",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DRUG",
+          "name": "Gentamicin",
+          "observations": [
+            "Short-course prophylactic gentamicin in open-fracture cohorts was not associated with an excess AKI signal in available comparative retrospective studies.",
+            "AKI risk among exposed trauma patients was associated with hypotension, higher injury severity, ICU admission, contrast exposure, age, and weight; causality from gentamicin was not established."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct comparative and exposed-cohort evidence",
+              "tool_call_id": "call_o5BEcnwxcugCI6Se7UORzk7T"
+            },
+            {
+              "relevance": "Direct comparative RIFLE-based evidence",
+              "tool_call_id": "call_6Zeg3FlYpYigUc3hiFej3lYH"
+            },
+            {
+              "relevance": "Pooled aminoglycoside comparative evidence",
+              "tool_call_id": "call_aMuBHdD0g6obqYTEve3w8suQ"
+            },
+            {
+              "relevance": "Gentamicin-exposed risk-factor series",
+              "tool_call_id": "call_hXLvcAu40Z2QKRdjaX7rmz8y"
+            }
+          ]
+        },
+        {
+          "entity_type": "DISEASE",
+          "name": "Acute kidney injury",
+          "observations": [
+            "In open-fracture prophylaxis cohorts, AKI was approximately 4% with cefazolin plus gentamicin versus 4.8% with cefazolin alone in one RIFLE-based retrospective study.",
+            "Another cohort found no association between prophylactic gentamicin and AKI: OR 0.22, 95% CI 0.020–2.44, p=0.22; admission hypotension and injury severity were associated with AKI.",
+            "A Gustilo IIIA cohort reported one AKI case in a pooled amikacin/gentamicin group and one in the ampicillin/sulbactam group."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Comparative cohort effect estimate",
+              "tool_call_id": "call_o5BEcnwxcugCI6Se7UORzk7T"
+            },
+            {
+              "relevance": "RIFLE-based comparative cohort",
+              "tool_call_id": "call_6Zeg3FlYpYigUc3hiFej3lYH"
+            },
+            {
+              "relevance": "Pooled aminoglycoside comparator cohort",
+              "tool_call_id": "call_aMuBHdD0g6obqYTEve3w8suQ"
+            }
+          ]
+        },
+        {
+          "entity_type": "DISEASE",
+          "name": "Open fractures",
+          "observations": [
+            "Evidence on gentamicin prophylaxis and AKI consists predominantly of small retrospective cohorts and chart-review series; no direct systematic review pooling this association was identified.",
+            "Gentamicin dose, duration, and AKI timing were incompletely reported, and trauma-related confounding limits causal inference."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Evidence base and limitations",
+              "tool_call_id": "call_dFsiNXtxMnDQUb07Ne6KX0iD"
+            },
+            {
+              "relevance": "Comparative evidence limitations",
+              "tool_call_id": "call_o5BEcnwxcugCI6Se7UORzk7T"
+            },
+            {
+              "relevance": "Comparative evidence limitations",
+              "tool_call_id": "call_6Zeg3FlYpYigUc3hiFej3lYH"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Gentamicin",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Acute kidney injury"
+        },
+        {
+          "from_entity": "Open fractures",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Acute kidney injury"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"Gentamicin\", \"entityType\": \"DRUG\", \"observations\": [\"Short-course prophylactic gentamicin in open-fracture cohorts was not associated with an excess AKI signal in available comparative retrospective studies.\", \"AKI risk among exposed trauma patients was associated with hypotension, higher injury severity, ICU admission, contrast exposure, age, and weight; causality from gentamicin was not established.\"]}, {\"name\": \"Acute kidney injury\", \"entityType\": \"DISEASE\", \"observations\": [\"In open-fracture prophylaxis cohorts, AKI was approximately 4% with cefazolin plus gentamicin versus 4.8% with cefazolin alone in one RIFLE-based retrospective study.\", \"Another cohort found no association between prophylactic gentamicin and AKI: OR 0.22, 95% CI 0.020\\u20132.44, p=0.22; admission hypotension and injury severity were associated with AKI.\", \"A Gustilo IIIA cohort reported one AKI case in a pooled amikacin/gentamicin group and one in the ampicillin/sulbactam group.\"]}, {\"name\": \"Open fractures\", \"entityType\": \"DISEASE\", \"observations\": [\"Evidence on gentamicin prophylaxis and AKI consists predominantly of small retrospective cohorts and chart-review series; no direct systematic review pooling this association was identified.\", \"Gentamicin dose, duration, and AKI timing were incompletely reported, and trauma-related confounding limits causal inference.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"Gentamicin\", \"to\": \"Acute kidney injury\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Open fractures\", \"to\": \"Acute kidney injury\", \"relationType\": \"ASSOCIATED_WITH\"}]}}, \"provenance\": {\"tool_call_id\": \"call_21xiP4BNAJqBP7NBrsx5i6eD\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_XgqXO6pYZ8BiBDYYPWixzmtj\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

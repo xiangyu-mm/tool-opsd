@@ -1,0 +1,1 @@
+{"answer":"(4E,5S)-5-(4-chlorophenyl)-4-[hydroxy-(4-propan-2-yloxyphenyl)methylidene]-1-(2-piperazin-1-ylethyl)pyrrolidine-2,3-dione"}

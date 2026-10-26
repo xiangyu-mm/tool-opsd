@@ -1,0 +1,1 @@
+The SELFIES string decodes to **`CCN1C(C)C1C(C)O`**. Its reported HOMO energy is **−0.2146 Hartree (Ha)**, based on an exact QM9 structure match. The source result did not specify the computational method. (Search result: `call_6ao7SKOPpAZm48uiSjhemIDS`.)

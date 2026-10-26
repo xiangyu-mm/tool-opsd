@@ -1,0 +1,5 @@
+The sequence is an **exact match** to the reviewed *Bradyrhizobium diazoefficiens* protein Q89K46, annotated as a **large-conductance mechanosensitive channel (MscL)**. Its MscL domain spans nearly the entire sequence (Pfam PF01741).
+
+MscL channels are reported to open in response to membrane stretch and may help bacteria manage osmotic pressure changes. The protein is annotated to the **inner membrane** and as a **multipass membrane protein**; its hydrophobic sequence is consistent with that localization.
+
+**Sequence-derived properties:** 138 amino acids; estimated mass 14.68 kDa; theoretical pI 9.00; GRAVY 0.66. These are computational estimates for the unmodified sequence. The annotation supports the channel-family function, but does not establish specific transport substrates or activity measurements for this particular sample.

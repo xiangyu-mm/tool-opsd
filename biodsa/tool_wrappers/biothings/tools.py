@@ -167,6 +167,7 @@ class SearchDiseasesTool(BaseTool):
         limit: int = 100,
         skip: int = 0,
         save_path: Optional[str] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to search diseases."""
         
@@ -327,6 +328,7 @@ class FetchDiseaseDetailsTool(BaseTool):
         self,
         disease_ids: List[str],
         save_path: Optional[str] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to fetch disease details."""
         
@@ -505,6 +507,7 @@ class SearchDrugsTool(BaseTool):
         limit: int = 100,
         skip: int = 0,
         save_path: Optional[str] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to search drugs."""
         
@@ -677,6 +680,7 @@ class FetchDrugDetailsTool(BaseTool):
         self,
         drug_ids: List[str],
         save_path: Optional[str] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to fetch drug details."""
         
@@ -871,6 +875,7 @@ class SearchGenesTool(BaseTool):
         limit: int = 100,
         skip: int = 0,
         save_path: Optional[str] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to search genes."""
         
@@ -1037,6 +1042,7 @@ class FetchGeneDetailsTool(BaseTool):
         self,
         gene_ids: List[str],
         save_path: Optional[str] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to fetch gene details."""
         
@@ -1240,6 +1246,7 @@ class SearchVariantsTool(BaseTool):
         limit: int = 100,
         skip: int = 0,
         save_path: Optional[str] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to search variants."""
         
@@ -1398,6 +1405,7 @@ class FetchVariantDetailsTool(BaseTool):
         self,
         variant_ids: List[str],
         save_path: Optional[str] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to fetch variant details."""
         

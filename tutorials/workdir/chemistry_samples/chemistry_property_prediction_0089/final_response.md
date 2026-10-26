@@ -1,0 +1,1 @@
+The molecule represented by the input is **CCOC(C=O)C1CO1**. Its reported LUMO energy is **−0.0336 Hartree (Ha)**, based on a QM9 InChIKey match. The available result does not specify the calculation method.

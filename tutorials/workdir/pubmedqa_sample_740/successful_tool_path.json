@@ -1,0 +1,240 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_E8OVpi8ZXBzpcUvSifNqgxw0",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether biologically variable pulsation (also called biologically variable ventilation/perfusion or variable pulsatile flow) improves jugular venous oxygen saturation (SjvO2) during rewarming, especially during cardiopulmonary bypass or hypothermic rewarming. Find direct comparative human or animal studies, report intervention/comparator, rewarming context, SjvO2 results and direction, and cite PMID or study details."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_NNtkZBS22g4VPukoEQTXAaZH",
+    "parent_tool_call_id": "call_E8OVpi8ZXBzpcUvSifNqgxw0",
+    "round": 1,
+    "tool_input": {
+      "task_name": "CPB SjvO2 rewarming",
+      "boolean_query_text": "cardiopulmonary bypass rewarming jugular venous oxygen saturation pulsatile flow",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='cardiopulmonary bypass rewarming jugular venous oxygen saturation pulsatile flow',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='cardiopulmonary bypass rewarming jugular venous oxygen saturation pulsatile flow',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/CPB_SjvO2_rewarming.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/CPB_SjvO2_rewarming.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/CPB_SjvO2_rewarming.csv'\nTotal results found: 28\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 9456096\nTitle: Computer-controlled cardiopulmonary bypass increases jugular venous oxygen saturation during rewarming.\nSource: The Annals of thoracic surgery (1998)\nAbstract: BACKGROUND: Conventional roller pump apulsatile cardiopulmonary bypass (CPB) was compared with computer-controlled pulsatile bypass, which was designed to recreate biological variability (return of beat-to-beat variability in rate and pressure with superimposed respiratory rhythms). The degree of jugular venous oxygen saturation (SjvO2) less than 50% during rewarming from hypothermic CPB was compared for the two bypass techniques. An SjvO2 less than 50% during rewarming from hypothermic CPB is correlated with cognitive dysfunction in humans. METHODS: Pigs were placed on CPB for 3 hours using a membrane oxygenator with alpha-stat acid-base management and arterial filtration. After baseline measurements and normothermic CPB, the animals were randomized to apulsatile CPB (n = 12) or computer-controlled pulsatile CPB (roller pump speed adjusted by an average of 2.9 voltage output modulations/s; n = 12). The animals were then cooled to a nasopharyngeal temperature of 28 degrees C. During rewarming to stable normothermic temperatures, SjvO2 was measured at 5-minute intervals. The mean and cumulative areas for an SjvO2 less than 50% were determined for all animals. RESULTS: No between-gro ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 8544290\nTitle: [The evaluation of cerebral oxygen balance during moderate hypothermic cardiopulmonary bypass].\nSource: Masui. The Japanese journal of anesthesiology (1995)\nAbstract: The aim of this study was to evaluate cerebral oxygen balance during moderate hypothermic cardiopulmonary bypass (CPB). We measured jugular bulb venous oxygen saturation (SjO2), oxygen extraction ratio (O2 ER), glucose extraction ratio (Glu ER), and lactate production ratio (Lac PR) in 20 adult patients undergoing cardiac surgery. Fentanyl and midazolam anesthesia, alpha-stat blood gas management, non-pulsatile flow of 2.0-2.4 l.min-1.m-2, and moderate hypothermia were used in all cases. During cooling (at 34 degrees C of nasopharyngeal temperature), jugular-arterial blood difference of carbon dioxide partial pressure and O2 ER decreased, and SjO2 increased significantly. On the other hand, O2 ER increased, and SjO2 decreased significantly during rewarming (at 34 degrees C). There were no significant changes in oxygen-glucose index, lactate-glucose index, lactate-oxygen index, lactate production ratio, and lactate-pyruvate ratio. Ten (50 %) of 20 patients who met reduced saturation criteria (defined as SjO2 < 55 %), showed significantly higher O2 ER and lower SjO2 than the non-reduced saturation group from postinduction to rewarming period. We conclude that cerebral venous reduced  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 10735686\nTitle: Biologically variable pulsation improves jugular venous oxygen saturation during rewarming.\nSource: The Annals of thoracic surgery (2000)\nAbstract: BACKGROUND: Conventional pulsatile (CP) roller pump cardiopulmonary bypass (CPB) was compared to computer controlled biologically variable pulsatile (BVP) bypass designed to return beat-to-beat variability in rate and pressure with superimposed respiratory rhythms. Jugular venous O2 saturation (SjvO2) below 50% during rewarming from hypothermia was compared for the two bypass techniques. A SjvO2 less than 50% during rewarming is correlated with cognitive dysfunction in humans. METHODS: Pigs were placed on CPB for 3 hours using a membrane oxygenator with alpha-stat acid base management and arterial filtration. After apulsatile normothermic CPB was initiated, animals were randomized to CP (n = 8) or BVP (roller pump speed adjusted by an average of 2.9 voltage output modulations/second; n = 8), then cooled to a nasopharyngeal temperature of 28 degrees C. During rewarming to stable normothermia, SjvO2 was measured at 5 minute intervals. The mean and cumulative area for SjvO2 less than 50% was determined. RESULTS: No between group difference in temperature existed during hypothermic CPB or during rewarming. Mean arterial pressure, arterial partial pressure O2, and arterial partial press ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 9513520\nTitle: [The effect of pump flow on cerebral oxygen metabolism during cardiopulmonary bypass].\nSource: The Japanese journal of thoracic and cardiovascular surgery : official publication of the Japanese Association for Thoracic Surgery = Nihon Kyobu Geka Gakkai zasshi (1998)\nAbstract: We evaluated effects of pump flow on cerebral metabolism using transcranial Doppler (TCD) during cardiopulmonary bypass (CPB) in 22 adult patients undergoing coronary artery bypass grafting. All the patients were anesthetized with high dose fentanyl. The pump flow was controlled with non-pulsatile roller pump at 2.2-2.5 L/min/m2 in group L and 2.7-3.0 L/min/m2 in group H under alpha-stat acid-base regulation. Pharyngeal temperature was kept at 31 degrees C in steady CPB state. Mean velocity of middle cerebral artery (MCAV) was monitored with TCD fixed on the temple continuously. Cerebral oxygen consumption was estimated by relating the difference in oxygen content between arterial and venous (jugular bulb) blood (AVDO2) to flow velocity. In group L, blood oxygen saturation of jugular bulb (SjO2) was stable during hypothermic period, but decreased significantly during rewarming period. In group H, SjO2 was significantly increased with cooling, but went down to preoperative level during rewarming period. Significant difference of SjO2 between two groups was noticed in rewarming period (52.9 +/- 10.0% in group L and 65.6 +/- 11.8% in group H, p = 0.0133). MCAV tended to decrease with  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 11562581\nTitle: Beneficial effect of balloon-induced pulsatility on brain oxygenation in hypothermic cardiopulmonary bypass.\nSource: The Journal of cardiovascular surgery (2001)\nAbstract: BACKGROUND: Sufficient O2 delivery to meet the demand is an important factor for protecting the brain during cardiopulmonary bypass (CPB). This study was designed to investigate the influences of temperature, pulsatility of blood flow (intra-aortic balloon pump-induced) and flow rate during CPB on the cerebral oxygenation. METHODS: Patients were divided into five groups. Normothermia (36 degrees C): pulsatile (n=8, 2.5 L/min/m2), nonpulsatile (n=12, 2.5 L), and nonpulsatile perfusion (n=12, 2.8 L); hypothermia (30 degrees C): pulsatile (n=9, 2.5 L) and nonpulsatile perfusion (n=11, 2.5 L). The oxygen saturation (SjVO2), lactate and CPK-BB levels in the jugular venous blood were measured. RESULTS: In all of the normothermic groups, the SjVO2 value decreased during the CPB (p<0.1-0.01). No remarkable change was observed in the hypothermic groups, with the exception during the rewarming period in the nonpulsatile group. A higher SjVO2 and a lower frequency of SjVO2 values <50% were observed in the hypothermic pulsatile group, as compared with those in the normothermic groups (p<0.05). The levels of CPK-BB were nearly the same, however the levels of lactate were higher in the normother ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 35431978\nTitle: Cooling to Hypothermic Circulatory Arrest by Immersion vs. Cardiopulmonary Bypass (CPB): Worse Outcome After Rewarming in Immersion Cooled Pigs\nSource: Front Physiol (2022)\nAbstract: (C) Internal <m>jugular</m> <m>venous</m> blood @CHEMICAL_Oxygen @CHEMICAL_MESH:D010100 @@@<m>oxygen</m>@@@ <m>saturation</m> (SvjO2).\n--------------------------------------------------------------------------------\nPMID: 36134333\nTitle: Functional recovery after accidental deep hypothermic cardiac arrest: Comparison of different cardiopulmonary bypass rewarming strategies\nSource: Front Physiol (2022)\nAbstract: As per protocol, circulatory function during CPB <m>rewarming</m> was determined as the pump <m>flow</m> necessary to maintain a MAP > 50 mmHg and a central <m>venous</m> @CHEMICAL_Oxygen @CHEMICAL_MESH:D010100 @@@O2@@@ <m>saturation</m> > 60%.\n--------------------------------------------------------------------------------\nPMID: 38570558\nTitle: Cerebral blood flow dynamics during cardiac surgery in infants\nSource: Pediatr Res (2024)\nAbstract: At the bottom of the figure, Doppler spectrograms show pre-CPB, CPB, and post-CPB <m>flow</m> patterns. BP blood pressure, CBFV cerebral blood <m>flow</m> velocity, CPB <m>cardiopulmonary</m> <m>bypass</m>, MAP mean arterial pressure, Mxa mean <m>flow</m> index, NIRS near-infrared spectroscopy, RI resistive index, SpO2 pulse oximetry @CHEMICAL_Oxygen @CHEMICAL_MESH:D010100 @@@<m>oxygen</m>@@@ <m>saturation</m>, TAV time averaged velocity, Temp temperature.\n--------------------------------------------------------------------------------\nPMID: 35072403\nTitle: Multimodal Neuromonitoring During Pediatric Cardiac Surgery\nSource: Braz J Cardiovasc Surg (2022)\nAbstract: The most frequently employed technique is the determination of regional @CHEMICAL_Oxygen @CHEMICAL_MESH:D010100 @@@<m>oxygen</m>@@@ <m>saturation</m> (rSO2) by NIRS and <m>jugular</m> <m>venous</m> @CHEMICAL_Oxygen @CHEMICAL_MESH:D010100 @@@<m>oxygen</m>@@@ <m>saturation</m> (or SjO2), representing regional and global (hemispheric) oxygenation.\n--------------------------------------------------------------------------------\nPMID: 36397348\nTitle: The anesthetic management of a patient undergoing simultaneous open abdominal aortic aneurysm repair and coronary artery bypass grafting: A case report\nSource: Medicine (Baltimore) (2022)\nAbstract: ...<m>cardiopulmonary</m> <m>bypass</m>\n--------------------------------------------------------------------------------\nPMID: 35428203\nTitle: Impact of the inspiratory oxygen fraction on the cardiac output during jugulo-femoral venoarterial extracorporeal membrane oxygenation in the rat\nSource: BMC Cardiovasc Disord (2022)\nAbstract: Time course of LDH and Central <m>venous</m> <m>saturation</m> during V-A ECMO. Animals were ventilated with inspiratory @CHEMICAL_Oxygen @CHEMICAL_MESH:D010100 @@@<m>oxygen</m>@@@ fraction of 0.5 (group A), 0.21 (group B) or 0 (group C).\n--------------------------------------------------------------------------------\nPMID: 39949326\nTitle: 2024 EACTS/EACTAIC/EBCP Guidelines on cardiopulmonary bypass in adult cardiac surgery\nSource: Eur J Cardiothorac Surg (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39949317\nTitle: 2024 EACTS/EACTAIC/EBCP Guidelines on cardiopulmonary bypass in adult cardiac surgery\nSource: Interdiscip Cardiovasc Thorac Surg (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39891577\nTitle: Anesthetic Management for Proximal Aortic Repair\nSource: Semin Cardiothorac Vasc Anesth (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34886474\nTitle: Contemporary Neuroprotection Strategies during Cardiac Surgery: State of the Art Review\nSource: Int J Environ Res Public Health (2021)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_k2lINlD96sZAy3QkSvRVbrqr",
+    "parent_tool_call_id": "call_NNtkZBS22g4VPukoEQTXAaZH",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|CONCLUSIONS|SjvO2|saturation|rewarming",
+      "pmid": "10735686"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('10735686')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|CONCLUSIONS|SjvO2|saturation|rewarming')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (4):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|CONCLUSIONS|SjvO2|saturation|rewarming\n      \u001b[90mpmid:\u001b[0m 10735686\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|CONCLUSIONS|SjvO2|saturation|rewarming\n      \u001b[90mpmid:\u001b[0m 9456096\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|CONCLUSIONS|SjVO2|saturation|rewarming\n      \u001b[90mpmid:\u001b[0m 11562581\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|CONCLUSIONS|SjvO2|saturation|rewarming\n      \u001b[90mpmid:\u001b[0m 9513520\n\n=== PMID: 10735686 ===\n\nTitle: Biologically variable pulsation improves jugular venous oxygen saturation during rewarming.\n\nJournal/Date: The Annals of thoracic surgery (2000)\n\nMeSH Keywords: Animals, Blood Gas Analysis, Brain, Cardiopulmonary Bypass, Hypoxia, Brain, Jugular Veins, Oxygen, Pulsatile Flow\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Conventional pulsatile (CP) roller pump cardiopulmonary bypass (CPB) was compared to computer controlled biologically variable pulsatile (BVP) bypass designed to return beat-to-beat variability in rate and pressure with superimposed respiratory rhythms. Jugular venous O2 saturation (SjvO2) below 50% during rewarming from hypothermia was compared for the two bypass techniques. A SjvO2 less than 50% during rewarming is correlated with cognitive dysfunction in humans.\n[METHODS]: Pigs were placed on CPB for 3 hours using a membrane oxygenator with alpha-stat acid base management and arterial filtration. After apulsatile normothermic CPB was initiated, animals were randomized to CP (n = 8) or BVP (roller pump speed adjusted by an average of 2.9 voltage output modulations/second; n = 8), then cooled to a nasopharyngeal temperature of 28 degrees C. During rewarming to stable normothermia, SjvO2 was measured at 5 minute intervals. The mean and cumulative area for SjvO2 less than 50% was determined.\n[RESULTS]: No between group difference in temperature existed during hypothermic CPB or during rewarming. Mean arterial pressure, arterial partial pressure O2, and arterial partial pressure CO2 did not differ between groups. The hemoglobin concentration was within 0.4 g/dL between groups at all time periods. The range of systolic pressure was greater with BVP (41 +/- 18 mm Hg) than with CP (12 +/- 4 mm Hg). A greater mean and cumulative area under the curve for SjvO2 less than 50% was seen with CP (82 +/- 96 versus 3.6% +/- 7.3% x min, p = 0.004; and 983 +/- 1158 versus 42% +/- 87% x min; p = 0.004, Wilcoxon 2-sample test).\n[CONCLUSIONS]: Computer-controlled BVP resulted in significantly greater SjvO2 during rewarming from hypothermic CPB. Both mean and cumulative area under the curve for SjvO2 less than 50% exceeded a ratio of 20 to 1 for CP versus BVP. Cerebral oxygenation is better preserved during rewarming from moderate hypothermia with bypass that returns biological variability to the flow pattern.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_lupDTHauHxbFxdmSfIySYwHz",
+    "parent_tool_call_id": "call_NNtkZBS22g4VPukoEQTXAaZH",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|CONCLUSIONS|SjvO2|saturation|rewarming",
+      "pmid": "9456096"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('9456096')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|CONCLUSIONS|SjvO2|saturation|rewarming')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 9456096 ===\n\nTitle: Computer-controlled cardiopulmonary bypass increases jugular venous oxygen saturation during rewarming.\n\nJournal/Date: The Annals of thoracic surgery (1998)\n\nMeSH Keywords: Animals, Blood Pressure, Cardiopulmonary Bypass, Jugular Veins, Oxygen, Partial Pressure, Pulsatile Flow, Rewarming\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Conventional roller pump apulsatile cardiopulmonary bypass (CPB) was compared with computer-controlled pulsatile bypass, which was designed to recreate biological variability (return of beat-to-beat variability in rate and pressure with superimposed respiratory rhythms). The degree of jugular venous oxygen saturation (SjvO2) less than 50% during rewarming from hypothermic CPB was compared for the two bypass techniques. An SjvO2 less than 50% during rewarming from hypothermic CPB is correlated with cognitive dysfunction in humans.\n[METHODS]: Pigs were placed on CPB for 3 hours using a membrane oxygenator with alpha-stat acid-base management and arterial filtration. After baseline measurements and normothermic CPB, the animals were randomized to apulsatile CPB (n = 12) or computer-controlled pulsatile CPB (roller pump speed adjusted by an average of 2.9 voltage output modulations/s; n = 12). The animals were then cooled to a nasopharyngeal temperature of 28 degrees C. During rewarming to stable normothermic temperatures, SjvO2 was measured at 5-minute intervals. The mean and cumulative areas for an SjvO2 less than 50% were determined for all animals.\n[RESULTS]: No between-group differences in temperature were noted during hypothermic CPB or during rewarming. The rate of rewarming was not different between groups. Mean arterial pressure, partial pressure of oxygen in arterial blood, and partial pressure of carbon dioxide in arterial blood also did not differ between groups. The hemoglobin concentration was within 0.4 g/dL between groups at all time periods. Mean pulse pressure was 10.0 +/- 4.8 mm Hg in the apulsatile CPB group and 20.7 +/- 5.2 mm Hg in the pulsatile CPB group (p = 0.0002; unpaired t test). Markedly greater mean and cumulative areas under the curve for SjvO2 less than 50% were seen with apulsatile CPB (164 +/- 209 versus 1.9 +/- 3.6% x min, p = 0.021; and 1,796 +/- 2,263 versus 23 +/- 45% x min, p = 0.020, respectively).\n[CONCLUSIONS]: Computer-controlled pulsatile CPB was associated with significantly greater SjvO2 during rewarming from hypothermic CPB. Both the mean and cumulative areas under the curve for SjvO2 less than 50% exceeded a ratio of 75:1 for apulsatile versus computer-controlled pulsatile CPB. These experiments suggest that cerebral oxygenation was better preserved during rewarming from moderate hypothermia with computer-controlled pulsatile CPB, which returned biologic variability to the flow pattern.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_ST1l7tFPSWoQt5LXgFpoNGUt",
+    "parent_tool_call_id": "call_NNtkZBS22g4VPukoEQTXAaZH",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|CONCLUSIONS|SjvO2|saturation|rewarming",
+      "pmid": "9513520"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('9513520')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|CONCLUSIONS|SjvO2|saturation|rewarming')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 9513520 ===\n\nTitle: [The effect of pump flow on cerebral oxygen metabolism during cardiopulmonary bypass].\n\nJournal/Date: The Japanese journal of thoracic and cardiovascular surgery : official publication of the Japanese Association for Thoracic Surgery = Nihon Kyobu Geka Gakkai zasshi (1998)\n\nMeSH Keywords: Aged, Brain, Cardiopulmonary Bypass, Cerebrovascular Circulation, Coronary Artery Bypass, Female, Humans, Male\n\n\n--- ABSTRACT ---\nWe evaluated effects of pump flow on cerebral metabolism using transcranial Doppler (TCD) during cardiopulmonary bypass (CPB) in 22 adult patients undergoing coronary artery bypass grafting. All the patients were anesthetized with high dose fentanyl. The pump flow was controlled with non-pulsatile roller pump at 2.2-2.5 L/min/m2 in group L and 2.7-3.0 L/min/m2 in group H under alpha-stat acid-base regulation. Pharyngeal temperature was kept at 31 degrees C in steady CPB state. Mean velocity of middle cerebral artery (MCAV) was monitored with TCD fixed on the temple continuously. Cerebral oxygen consumption was estimated by relating the difference in oxygen content between arterial and venous (jugular bulb) blood (AVDO2) to flow velocity. In group L, blood oxygen saturation of jugular bulb (SjO2) was stable during hypothermic period, but decreased significantly during rewarming period. In group H, SjO2 was significantly increased with cooling, but went down to preoperative level during rewarming period. Significant difference of SjO2 between two groups was noticed in rewarming period (52.9 +/- 10.0% in group L and 65.6 +/- 11.8% in group H, p = 0.0133). MCAV tended to decrease with cooling and increase with rewarming, but which was not significant change respectively. Relative cerebral metabolic rate for oxygen (rCMRO2) was defined as the percent change of the product AVDO2 and MCAV. In each group, rCMRO2 was decreased with cooling and increased with rewarming significantly. Especially, rCMRO2 right after CPB discontinued was increased 1.7 times in L group and 2.0 times in group H as much as that of steady state of CPB. It is suggested that cerebral metabolism should be decreased during cooling to 31 degrees C of pharyngeal temperature, 2.2-2.5 l/min/m2 of pump flow was adequate to keep SjO2 stable. On the other hand, it is necessary to increase pump flow to 2.7-3.0 l/min/m2 during rewarming period as cerebral oxygen metabolic demand becomes greater.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_R1zLIVRo2b9ZcPsMO8qKCmfb",
+    "parent_tool_call_id": "call_ST1l7tFPSWoQt5LXgFpoNGUt",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Direct animal evidence supports benefit: in pigs undergoing 3 h CPB, cooling to 28°C and rewarming to normothermia, computer-controlled biologically variable pulsatile bypass (beat-to-beat rate/pressure variability plus respiratory rhythms) versus conventional pulsatile roller-pump CPB (n=8/group) markedly reduced the mean area with SjvO2 <50% (3.6±7.3 vs 82±96 %·min, p=0.004) and cumulative area (42±87 vs 983±1158 %·min, p=0.004), indicating higher SjvO2 during rewarming. PMID 10735686.",
+          "source_tools": [
+            {
+              "relevance": "Full abstract with intervention, comparator, rewarming protocol, sample size, and SjvO2 outcomes",
+              "tool_call_id": "call_k2lINlD96sZAy3QkSvRVbrqr"
+            }
+          ]
+        },
+        {
+          "finding": "A related earlier pig study directly compared computer-controlled biologically variable pulsatile CPB with conventional apulsatile CPB after cooling to 28°C. During rewarming, the mean area with SjvO2 <50% was 1.9±3.6 versus 164±209 %·min (p=0.021), and cumulative area was 23±45 versus 1,796±2,263 %·min (p=0.020) for variable pulsatile versus apulsatile bypass, respectively; thus SjvO2 was substantially better preserved with biologic variability. PMID 9456096.",
+          "source_tools": [
+            {
+              "relevance": "Full abstract with direct comparator and quantitative SjvO2 results",
+              "tool_call_id": "call_lupDTHauHxbFxdmSfIySYwHz"
+            }
+          ]
+        },
+        {
+          "finding": "The direct evidence located is animal, not human: both biologically variable pulsation studies used pigs, with matched temperature, blood gases, hemoglobin, and (in the 1998 study) rewarming rate, supporting an intervention-related SjvO2 effect rather than a rewarming-confounder effect. No direct human study of biologically variable pulsation with SjvO2 during rewarming was identified in the retrieved evidence.",
+          "source_tools": [
+            {
+              "relevance": "1998 pig study methods/results",
+              "tool_call_id": "call_lupDTHauHxbFxdmSfIySYwHz"
+            },
+            {
+              "relevance": "2000 pig study methods/results",
+              "tool_call_id": "call_k2lINlD96sZAy3QkSvRVbrqr"
+            },
+            {
+              "relevance": "Search results identifying the direct studies",
+              "tool_call_id": "call_NNtkZBS22g4VPukoEQTXAaZH"
+            }
+          ]
+        },
+        {
+          "finding": "Less-specific human pulsatility evidence is directionally compatible but not equivalent to biologically variable ventilation/perfusion: in 20 patients during moderate hypothermic nonpulsatile CPB, SjO2 decreased during rewarming (PMID 8544290); in a five-group CPB study, intra-aortic-balloon-induced pulsatility during hypothermic CPB was associated with higher SjVO2 and fewer values <50% than normothermic comparator groups, with the abstract noting the notable change during rewarming occurred in the nonpulsatile hypothermic group (PMID 11562581). These studies do not directly test biologically variable pulsation against a matched comparator specifically during rewarming.",
+          "source_tools": [
+            {
+              "relevance": "Human rewarming physiology and SjO2 direction",
+              "tool_call_id": "call_74VGFphUiuy4RZQ4Mhll9ktz"
+            },
+            {
+              "relevance": "Human pulsatility comparison and SjVO2 findings",
+              "tool_call_id": "call_phDqK3Ij0aSXAsMuEpTIwiZp"
+            }
+          ]
+        },
+        {
+          "finding": "A human nonpulsatile-flow study suggests a practical mechanism/confounder: during rewarming after CPB, higher pump flow (2.7–3.0 vs 2.2–2.5 L/min/m²) produced higher jugular bulb saturation (65.6±11.8% vs 52.9±10.0%, p=0.0133), but this was a flow-rate comparison, not pulsatility or biologic variability (PMID 9513520).",
+          "source_tools": [
+            {
+              "relevance": "Human quantitative SjO2 rewarming comparison, explicitly nonpulsatile flow",
+              "tool_call_id": "call_ST1l7tFPSWoQt5LXgFpoNGUt"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_Ian6FgFe5PKsSyXvCIVbOibv",
+    "parent_tool_call_id": "call_E8OVpi8ZXBzpcUvSifNqgxw0",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:10735686",
+          "observations": [
+            "In pigs undergoing 3 hours of CPB, cooling to 28°C and rewarming to normothermia, biologically variable pulsatile CPB reduced mean SjvO2 <50% exposure versus conventional pulsatile CPB: 3.6±7.3 vs 82±96 %·min, p=0.004; cumulative exposure 42±87 vs 983±1158 %·min, p=0.004.",
+            "The intervention restored beat-to-beat rate/pressure variability and respiratory rhythms; groups had comparable temperature, MAP, blood gases, and hemoglobin."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct comparative evidence for improved jugular venous oxygen saturation during rewarming.",
+              "tool_call_id": "call_k2lINlD96sZAy3QkSvRVbrqr"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:9456096",
+          "observations": [
+            "In pigs cooled to 28°C and rewarmed during CPB, computer-controlled biologically variable pulsatile bypass reduced mean SjvO2 <50% exposure versus conventional apulsatile CPB: 1.9±3.6 vs 164±209 %·min, p=0.021; cumulative exposure 23±45 vs 1796±2263 %·min, p=0.020.",
+            "Temperature, rewarming rate, arterial gases, MAP, and hemoglobin were comparable between groups."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct comparative evidence for preserved jugular venous oxygen saturation during rewarming.",
+              "tool_call_id": "call_lupDTHauHxbFxdmSfIySYwHz"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Biovariable pulsation and SjvO2",
+          "observations": [
+            "Two direct pig CPB comparisons consistently found less severe and shorter SjvO2 decline below 50% during rewarming with biologically variable pulsation than with conventional pulsatile or apulsatile bypass.",
+            "Direct human evidence was not identified; human studies of conventional pulsatility or higher pump flow are indirect."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Overall evidence synthesis.",
+              "tool_call_id": "call_k2lINlD96sZAy3QkSvRVbrqr"
+            },
+            {
+              "relevance": "Overall evidence synthesis and human evidence limitation.",
+              "tool_call_id": "call_lupDTHauHxbFxdmSfIySYwHz"
+            },
+            {
+              "relevance": "Human evidence limitation.",
+              "tool_call_id": "call_NNtkZBS22g4VPukoEQTXAaZH"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:10735686",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Biovariable pulsation and SjvO2"
+        },
+        {
+          "from_entity": "PMID:9456096",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Biovariable pulsation and SjvO2"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"PMID:10735686\", \"entityType\": \"PAPER\", \"observations\": [\"In pigs undergoing 3 hours of CPB, cooling to 28\\u00b0C and rewarming to normothermia, biologically variable pulsatile CPB reduced mean SjvO2 <50% exposure versus conventional pulsatile CPB: 3.6\\u00b17.3 vs 82\\u00b196 %\\u00b7min, p=0.004; cumulative exposure 42\\u00b187 vs 983\\u00b11158 %\\u00b7min, p=0.004.\", \"The intervention restored beat-to-beat rate/pressure variability and respiratory rhythms; groups had comparable temperature, MAP, blood gases, and hemoglobin.\"]}, {\"name\": \"PMID:9456096\", \"entityType\": \"PAPER\", \"observations\": [\"In pigs cooled to 28\\u00b0C and rewarmed during CPB, computer-controlled biologically variable pulsatile bypass reduced mean SjvO2 <50% exposure versus conventional apulsatile CPB: 1.9\\u00b13.6 vs 164\\u00b1209 %\\u00b7min, p=0.021; cumulative exposure 23\\u00b145 vs 1796\\u00b12263 %\\u00b7min, p=0.020.\", \"Temperature, rewarming rate, arterial gases, MAP, and hemoglobin were comparable between groups.\"]}, {\"name\": \"Biovariable pulsation and SjvO2\", \"entityType\": \"FINDING\", \"observations\": [\"Two direct pig CPB comparisons consistently found less severe and shorter SjvO2 decline below 50% during rewarming with biologically variable pulsation than with conventional pulsatile or apulsatile bypass.\", \"Direct human evidence was not identified; human studies of conventional pulsatility or higher pump flow are indirect.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"PMID:10735686\", \"to\": \"Biovariable pulsation and SjvO2\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:9456096\", \"to\": \"Biovariable pulsation and SjvO2\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_Ian6FgFe5PKsSyXvCIVbOibv\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_E8OVpi8ZXBzpcUvSifNqgxw0\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

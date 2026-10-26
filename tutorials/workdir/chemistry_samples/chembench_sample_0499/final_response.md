@@ -1,0 +1,1 @@
+{"answer":"CON=C(C)c1cccc(C(F)(F)F)c1"}

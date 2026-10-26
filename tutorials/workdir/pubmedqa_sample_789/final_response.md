@@ -1,0 +1,3 @@
+Yes. In a human electrophysiology series of three patients with presumed single posteroseptal accessory pathways, initially unsuccessful RF applications shifted the earliest retrograde atrial activation from the coronary sinus ostium to the right atrial free wall in two patients and to the distal coronary sinus in one. Additional RF was needed to eliminate pathway conduction or tachycardia, indicating that the activation sequence could change before the pathway was eliminated. The evidence is limited by the small series and case-based corroboration.
+
+FINAL DECISION: YES

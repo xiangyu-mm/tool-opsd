@@ -1,0 +1,333 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_xsMiHmTrBEmGaAXzdzQm7IMK",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease",
+        "drug"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether soluble CD30 (sCD30, soluble interleukin-2 receptor family marker CD30) predicts late acute rejection after renal/kidney transplantation and whether it can identify patients who can safely taper or withdraw immunosuppression. Retrieve human clinical studies, especially prospective or longitudinal cohorts, including timing of sCD30 measurement, association with late acute rejection/graft outcomes, predictive performance, and any direct evidence supporting immunosuppression minimization."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_MYYMzIIC08DSRlvdHEOKk9ix",
+    "parent_tool_call_id": "call_xsMiHmTrBEmGaAXzdzQm7IMK",
+    "round": 1,
+    "tool_input": {
+      "task_name": "CD30 graft outcome",
+      "boolean_query_text": "sCD30 renal transplant graft survival rejection longitudinal",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='sCD30 renal transplant graft survival rejection longitudinal',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='sCD30 renal transplant graft survival rejection longitudinal',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/CD30_graft_outcome.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/CD30_graft_outcome.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/CD30_graft_outcome.csv'\nTotal results found: 8\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 39660122\nTitle: Current and emerging tools for simultaneous assessment of infection and rejection risk in transplantation\nSource: Front Immunol (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 26877913\nTitle: Immunologic monitoring in kidney transplant recipients\nSource: Kidney Res Clin Pract (2013)\nAbstract: Post-<m>transplant</m> measurement of <m>sCD30</m> to predict late outcomes has also been studied (Table 1): higher <m>sCD30</m> levels were associated with lower long-term <m>renal</m> allograft function and <m>survival</m>.\n--------------------------------------------------------------------------------\nPMID: 25478957\nTitle: Soluble Co-Signaling Molecules Predict Long-Term Graft Outcome in Kidney-Transplanted Patients\nSource: PLoS One (2014)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 32751357\nTitle: Recent Advances on Biomarkers of Early and Late Kidney Graft Dysfunction\nSource: Int J Mol Sci (2020)\nAbstract: New biomarkers of early and late <m>graft</m> @DISEASE_Heart_Diseases @DISEASE_MESH:D006331 @@@dysfunction@@@ are needed in <m>renal</m> <m>transplant</m> to improve management of complications and prolong <m>graft</m> <m>survival</m>.\n--------------------------------------------------------------------------------\nPMID: 28698834\nTitle: Biomarkers in renal transplantation: An updated review\nSource: World J Transplant (2017)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 27683628\nTitle: BK nephropathy in the native kidneys of patients with organ transplants: Clinical spectrum of BK infection\nSource: World J Transplant (2016)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 28480647\nTitle: Increased Circulating T Lymphocytes Expressing HLA-DR in Kidney Transplant Recipients with Microcirculation Inflammation\nSource: J Korean Med Sci (2017)\nAbstract: Despite the advances in post-operative @SPECIES_9606 @@@patient@@@ management and the availability of new immunosuppressive agents, overcoming and monitoring immune responses in kidney <m>transplant</m> recipients (KTRs) to ensure <m>renal</m> allograft <m>survival</m> remains a critical challenge for clinicians.\n--------------------------------------------------------------------------------\nPMID: 24174972\nTitle: Posttransplant Lymphoproliferative Disease after Pediatric Solid Organ Transplantation\nSource: Clin Dev Immunol (2013)\nAbstract: Balancing immune reconstitution versus the risk of <m>graft</m> <m>rejection</m> is therefore challenging and requires expert guidance and interdisciplinary cooperation of <m>transplant</m> physicians and oncologists.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_jmKgZTZJlQRoNCjWKeay0W0y",
+    "parent_tool_call_id": "call_MYYMzIIC08DSRlvdHEOKk9ix",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "BACKGROUND|METHODS|RESULTS|sCD30|rejection|tapering|withdrawal|survival|time point|ELISA",
+      "pmid": "25446808"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25446808')\noutput = format_paper_content_output(result, filter_keywords='BACKGROUND|METHODS|RESULTS|sCD30|rejection|tapering|withdrawal|survival|time point|ELISA')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (4):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m BACKGROUND|METHODS|RESULTS|sCD30|rejection|tapering|withdrawal|survival|time point|ELISA\n      \u001b[90mpmid:\u001b[0m 25446808\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m sCD30|soluble CD30|rejection|graft survival|prospective|cohort|time point|multivariate\n      \u001b[90mpmid:\u001b[0m 25478957\n\n  \u001b[1m\u001b[93m[3] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m sCD30 outcome studies\n      \u001b[90mboolean_query_text:\u001b[0m \"soluble CD30\" kidney transplantation graft survival acute rejection\n      \u001b[90mtop_k:\u001b[0m 50\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[4] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m CD30 withdrawal trial\n      \u001b[90mboolean_query_text:\u001b[0m CD30 renal transplantation tacrolimus discontinuation rejection\n      \u001b[90mtop_k:\u001b[0m 30\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n=== PMID: 25446808 ===\n\nTitle: Soluble CD30 does not predict late acute rejection or safe tapering of immunosuppression in renal transplantation.\n\nJournal/Date: Transplant immunology (2015)\n\nMeSH Keywords: Acute Disease, Adult, Antibodies, Monoclonal, Murine-Derived, Biomarkers, Cohort Studies, Female, Graft Rejection, Humans\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Previous reports revealed the potential value of the soluble CD30 level (sCD30) as biomarker for the risk of acute rejection and graft failure after renal transplantation, here we examined its use for the prediction of safe tapering of calcineurin inhibitors as well as late acute rejection.\n[METHODS]: In a cohort of renal transplant patients receiving triple immunosuppressive therapy we examined whether sCD30 can be used as a marker for safe (rejection-free) discontinuation of tacrolimus at six months after transplantation (TDS cohort: 24 rejectors and 44 non-rejecting controls). Also, in a second cohort of patients (n=22, rejectors n=11 and non-rejectors n=11), participating in a clinical trial of rituximab as induction therapy after renal transplantation (RITS cohort), we examined whether sCD30 could predict the occurrence of late (>3months post-transplant) acute rejection episodes. sCD30 was measured by ELISA in serum taken before and at several time points after transplantation.\n[RESULTS]: Overall, in the TDS cohort sCD30 decreased after transplantation. No difference in sCD30 was observed between rejectors and non-rejecting controls at any of the time points measured. In addition, in the RITS cohort, sCD30 measured at three months after transplantation were not indicative for the occurrence of late acute rejection.\n[CONCLUSION]: In two prospectively followed cohorts of renal transplant patients we found no association between sCD30 and the occurrence of either late acute rejection or acute rejection after reduction of immunosuppression.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_y9Z4HZD2nuiADfKk5wWZDSEc",
+    "parent_tool_call_id": "call_MYYMzIIC08DSRlvdHEOKk9ix",
+    "round": 2,
+    "tool_input": {
+      "task_name": "CD30 withdrawal trial",
+      "boolean_query_text": "CD30 renal transplantation tacrolimus discontinuation rejection",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='CD30 renal transplantation tacrolimus discontinuation rejection',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='CD30 renal transplantation tacrolimus discontinuation rejection',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/CD30_withdrawal_trial.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/CD30_withdrawal_trial.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/CD30_withdrawal_trial.csv'\nTotal results found: 31\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 25446808\nTitle: Soluble CD30 does not predict late acute rejection or safe tapering of immunosuppression in renal transplantation.\nSource: Transplant immunology (2015)\nAbstract: BACKGROUND: Previous reports revealed the potential value of the soluble CD30 level (sCD30) as biomarker for the risk of acute rejection and graft failure after renal transplantation, here we examined its use for the prediction of safe tapering of calcineurin inhibitors as well as late acute rejection. METHODS: In a cohort of renal transplant patients receiving triple immunosuppressive therapy we examined whether sCD30 can be used as a marker for safe (rejection-free) discontinuation of tacrolimus at six months after transplantation (TDS cohort: 24 rejectors and 44 non-rejecting controls). Also, in a second cohort of patients (n=22, rejectors n=11 and non-rejectors n=11), participating in a clinical trial of rituximab as induction therapy after renal transplantation (RITS cohort), we examined whether sCD30 could predict the occurrence of late (>3months post-transplant) acute rejection episodes. sCD30 was measured by ELISA in serum taken before and at several time points after transplantation. RESULTS: Overall, in the TDS cohort sCD30 decreased after transplantation. No difference in sCD30 was observed between rejectors and non-rejecting controls at any of the time points measured.  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 35185868\nTitle: Utilization of Treg Cells in Solid Organ Transplantation\nSource: Front Immunol (2022)\nAbstract: @SPECIES_9606 @@@Patients@@@ were studied for sixty weeks and then followed up at three years after <m>transplantation</m> for immune monitoring, assessment with biopsies to monitor for <m>rejection</m>, as well as clinical analysis of <m>renal</m> function.\n--------------------------------------------------------------------------------\nPMID: 38247992\nTitle: Cutaneous T-Cell Lymphoma (CTCL) Arising Post Kidney Transplant: A Review of Clinical Variants in the Literature\nSource: Hematol Rep (2023)\nAbstract: @CHEMICAL_Cyclosporine @CHEMICAL_MESH:D016572 @@@Cyclosporine@@@ 100 mg twice daily and @CHEMICAL_Prednisone @CHEMICAL_MESH:D011241 @@@prednisone@@@ 5 mg daily were continued to prevent <m>graft</m> <m>rejection</m>. @CHEMICAL_Mycophenolic_Acid @CHEMICAL_MESH:D009173 @@@Mycophenolate@@@ was <m>discontinued</m>.\n--------------------------------------------------------------------------------\nPMID: 39660122\nTitle: Current and emerging tools for simultaneous assessment of infection and rejection risk in transplantation\nSource: Front Immunol (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38576757\nTitle: Immunology demystified: A guide for transplant hepatologists\nSource: World J Transplant (2024)\nAbstract: ...Chronic <m>rejection</m> of liver <m>grafts</m> can result in <m>graft</m> failure, potentially necessitating retransplantation.\n--------------------------------------------------------------------------------\nPMID: 36106288\nTitle: Acute Lymphoblastic Leukemia in an Adult After Renal Transplantation\nSource: Cureus (2022)\nAbstract: @DISEASE_Precursor_Cell_Lymphoblastic_Leukemia_Lymphoma @DISEASE_MESH:D054198 @@@Acute Lymphoblastic Leukemia@@@ in an Adult After <m>Renal</m> <m>Transplantation</m>\n--------------------------------------------------------------------------------\nPMID: 40999663\nTitle: Diagnostic Challenges in Diffuse Large B-Cell Lymphoma in a Young Liver Transplant Patient with Ulcerative Colitis: A Case Report\nSource: Am J Case Rep (2025)\nAbstract: @CHEMICAL_Mycophenolic_Acid @CHEMICAL_MESH:D009173 @@@Mycophenolate mofetil@@@ was the second immunosuppressive drug beyond @CHEMICAL_Tacrolimus @CHEMICAL_MESH:D016559 @@@<m>tacrolimus</m>@@@ added after liver <m>transplantation</m>. It was completely <m>discontinued</m>, and the dose of @CHEMICAL_Tacrolimus @CHEMICAL_MESH:D016559 @@@<m>tacrolimus</m>@@@ was reduced.\n--------------------------------------------------------------------------------\nPMID: 41652342\nTitle: Allograft-localized post-transplant lymphoproliferative disorder in a pediatric kidney transplant recipient: a case report and focused review\nSource: BMC Pediatr (2026)\nAbstract: In the North American Pediatric <m>Renal</m> Trials and Collaborative Studies (NAPRTCS) registry, @SPECIES_9606 @@@patient@@@ survival now exceeds 85% at five years, with <m>graft</m> survival above 65%, particularly in those diagnosed more recently.\n--------------------------------------------------------------------------------\nPMID: 37623466\nTitle: Contemporary Biomarkers for Renal Transplantation: A Narrative Overview\nSource: J Pers Med (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38223030\nTitle: A case of early multifocal posttransplant lymphoproliferative disease in an adult after liver transplantation and literature analysis\nSource: Quant Imaging Med Surg (2024)\nAbstract: In 1968, Doak et al. were first to propose the existence of @DISEASE_Lymphoproliferative_Disorders @DISEASE_MESH:D008232 @@@PTLD@@@ when it developed in @SPECIES_9606 @@@patients@@@ with <m>renal</m> <m>transplantation</m> it. The etiology and pathogenesis of @DISEASE_Lymphoproliferative_Disorders @DISEASE_MESH:D008232 @@@PTLD@@@ remain unclear.\n--------------------------------------------------------------------------------\nPMID: 34578460\nTitle: The Immunology of SARS-CoV-2 Infection and Vaccines in Solid Organ Transplant Recipients\nSource: Viruses (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40881759\nTitle: Incidence, screening, and management of de novo malignancies in liver transplant patients: A review\nSource: World J Transplant (2025)\nAbstract: Close collaboration with the <m>transplant</m> team is vital as numerous factors, including <m>transplant</m> timing and previous <m>rejection</m> episodes, play a role in deciding the treatment modality.\n--------------------------------------------------------------------------------\nPMID: 36497432\nTitle: Recent Advances in Adult Post-Transplant Lymphoproliferative Disorder\nSource: Cancers (Basel) (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34037866\nTitle: Central Nervous System Infections in Immunocompromised Patients\nSource: Curr Neurol Neurosci Rep (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33553416\nTitle: Infectious complications during immunochemotherapy of post-transplantation lymphoproliferative disease-can we decrease the risk? Two case reports and review of literature\nSource: World J Clin Cases (2021)\nAbstract: In both reported cases the reduction of immunosuppression regiment was ineffective, however safe, and was not followed by acute <m>rejection</m> or progressive deterioration in <m>graft</m> function. Currently, the standard of care in case of this type of @DISEASE_Lymphoma @DISEASE_MESH:D008223 @@@lymphomas@@@ is the initial administration of @CHEMICAL_Rituximab @CHEMICAL_MESH:D000069283 @@@rituximab@@@ as monotherapy and depending on the response to treatment, its continuation or the implementation of CHOP chemotherapy.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_1eY3QYqVBLEU7piQKMSXDSo2",
+    "parent_tool_call_id": "call_y9Z4HZD2nuiADfKk5wWZDSEc",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "BACKGROUND|METHODS|RESULTS|sCD30|late acute rejection|6 months|2 years|5 years|survival|predict",
+      "pmid": "28694560"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('28694560')\noutput = format_paper_content_output(result, filter_keywords='BACKGROUND|METHODS|RESULTS|sCD30|late acute rejection|6 months|2 years|5 years|survival|predict')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m BACKGROUND|METHODS|RESULTS|sCD30|late acute rejection|6 months|2 years|5 years|survival|predict\n      \u001b[90mpmid:\u001b[0m 28694560\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m meta-analysis|post-transplant|late|acute rejection|timing|predictive|sCD30\n      \u001b[90mpmid:\u001b[0m 32256486\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m sCD30|3 months|graft loss|eGFR|proteinuria|cohort|long-term\n      \u001b[90mpmid:\u001b[0m 25478957\n\n=== PMID: 28694560 ===\n\nTitle: Peritransplant Soluble CD30 as a Risk Factor for Slow Kidney Allograft Function, Early Acute Rejection, Worse Long-Term Allograft Function, and Patients' Survival.\n\nJournal/Date: Disease markers (2017)\n\nMeSH Keywords: Adult, Biomarkers, Cadaver, Delayed Graft Function, Female, Graft Rejection, Graft Survival, Humans\n\n\n--- ABSTRACT ---\n[BACKGROUND]: We aimed to determine whether serum soluble CD30 (sCD30) could identify recipients at high risk for unfavorable early and late kidney transplant outcomes.\n[METHODS]: Serum sCD30 was measured on the day of kidney transplantation and on the 4th day posttransplant. We assessed the value of these measurements in predicting delayed graft function, slow graft function (SGF), acute rejection (AR), pyelonephritis, decline of allograft function after 6 months, and graft and patient survival during 5 years of follow-up in 45 recipients.\n[RESULTS]: We found the association between low pretransplant serum levels of sCD30 and SGF. The absence of significant decrease of sCD30 on the 4th day posttransplant was characteristic for SGF, early AR (the 8th day-6 months), late AR (>6 months), and early pyelonephritis (the 8th day-2 months). Lower pretransplant and posttransplant sCD30 predicted worse allograft function at 6 months and 2 years, respectively. Higher pretransplant sCD30 was associated with higher frequency of early AR, and worse patients' survival, but only in the recipients of deceased-donor graft. Pretransplant sCD30 also allowed to differentiate patients with early pyelonephritis and early AR.\n[CONCLUSIONS]: Peritransplant sCD30 is useful in identifying patients at risk for unfavorable early and late transplant outcomes.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\n3. Results\n\n3.1. Baseline Characteristics of Patients\n\nPatients' baseline characteristics are depicted in Table 1. The majority of the patients received the first kidney graft from a heart-beating deceased donor. Eighty percent of the patients received anti-CD25 antibodies for induction immunosuppression. Some patients had previous kidney transplants, transfusions, or pregnancies (Table 1).\n\n3.2. sCD30 Levels and Their Correlation with Clinical Variables at Baseline\n\nTable 2 outlines pre- and posttransplant levels of sCD30 in different subsets of patients. Pretransplant serum sCD30 levels ranged from 9.1 to 169.6 U/mL with a median value of 49.5 U/mL, and they were higher in younger patients (r = −0.373, P = 0.012) as well as in the recipients of living-donor graft (rho = −0.312, P = 0.037...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_X7IXf8CMzUZR8bj6CuOwA2bn",
+    "parent_tool_call_id": "call_y9Z4HZD2nuiADfKk5wWZDSEc",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "meta-analysis|post-transplant|late|acute rejection|timing|predictive|sCD30",
+      "pmid": "32256486"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('32256486')\noutput = format_paper_content_output(result, filter_keywords='meta-analysis|post-transplant|late|acute rejection|timing|predictive|sCD30')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 32256486 ===\n\nTitle: Soluble CD30, the Immune Response, and Acute Rejection in Human Kidney Transplantation: A Systematic Review and Meta-Analysis.\n\nJournal/Date: Frontiers in immunology (2020)\n\nMeSH Keywords: Acute Disease, Biomarkers, Graft Rejection, Graft Survival, Humans, Immunity, Ki-1 Antigen, Kidney Transplantation\n\n\n--- ABSTRACT ---\nSoluble CD30 (sCD30) is considered to be a marker for the activated immune system in which T cells can damage the allograft. Some studies reported that post-transplant sCD30 can predict early acute rejection and can thereby be used as a biomarker to detect acute rejection. However, several other studies found no relation between post-transplant sCD30 and acute rejection. This meta-analysis study aims to answer this main question of whether sCD30 can help clinicians to monitor transplant recipients. The electronic databases, including PubMed, Web of Science, ProQuest, Embase, Scopus, Google Scholar, the gray literature, and the key journals, were searched for observational studies from 1 January 1990 up to 30 April 2018. Eighteen studies, with a total of 1,453 patients, were included in this paper. With regard to the different measurement times, post-transplant sCD30 was separately analyzed and divided into five groups (i.e., 1, 2, 3, 4 week, and 1 month post-transplant sCD30). All groups indicated a strong association between sCD30 and the acute rejection. The standardized mean difference (SMD) is 1.22 in 1 week, 0.77 in 2 week, 1.11 in 3 week, 1.27 in 4 week, and 0.71 in 1 month groups. The association between sCD30 and acute rejection was consistent across all the subgroup analyses. We found that post-transplant sCD30 had a strong association with acute kidney rejection. We also found that the deceased donors had more association with the high amount of sCD30 than living donors in patients with acute rejection. Finally, we realized that donor type was an important factor leading to the heterogeneous results in the primary studies.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nA total of 5,875 records were identified via an electronic search, and 16 additional records were added from the gray literature search. Figure 1 displays the PRISMA flow chart that shows the literature search procedure. Based on the title and abstract, after screening the 5,891 records, 551 records remained. Then, after removing duplicated records, 198 records remained. Next, after reviewing the full text, 175 records were excluded, and, finally, the studies, which had the relevant data, remained for meta-analysis. Therefore, 18 studies and a total of 1,453 patients were included in the final meta-analysis.\n\nStudy Characteristics\n\nThe studies were included from 2005 to 2018 and had a cohort study design. The main data for meta-analysis were post-transplant sCD30 levels in patient...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_zP9ZrlmEN68ONy77acTmQwCF",
+    "parent_tool_call_id": "call_y9Z4HZD2nuiADfKk5wWZDSEc",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "sCD30|3 months|graft loss|eGFR|proteinuria|cohort|long-term",
+      "pmid": "25478957"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25478957')\noutput = format_paper_content_output(result, filter_keywords='sCD30|3 months|graft loss|eGFR|proteinuria|cohort|long-term')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 25478957 ===\n\nTitle: Soluble co-signaling molecules predict long-term graft outcome in kidney-transplanted patients.\n\nJournal/Date: PloS one (2014)\n\nMeSH Keywords: Adolescent, Adult, Aged, Aged, 80 and over, Antigens, CD, Biomarkers, Female, Glomerular Filtration Rate\n\n\n--- ABSTRACT ---\nCo-signaling molecules are responsible for full T-cell activation after solid organ transplantation. Their increased expression can lead to the release of a soluble form that can modulate the immune response post-transplantation. We analyzed the presence of co-signaling molecules (sCD30, sCD40, sCD137, sCTLA-4, sCD80, sCD28, sCD40L, sPD-1, and sPD-L1) in serum from kidney-transplanted patients (n = 59) obtained at different times (before transplantation, and 15 days, 3 months and 1 year post-transplantation) and their contribution to graft outcome was evaluated using principal component analysis. Before transplantation, high levels of soluble co-signaling molecules (mainly sCD30, sCD137 and sCD40) were detected in all patients. These molecules were modulated soon after receiving an allograft but never attained similar levels to those of healthy controls. A signature based on the determination of six soluble co-stimulatory (sCD30, sCD40, sCD137 and sCD40L) and co-inhibitory (sPD-1 and sPD-L1) molecules at 3 months post-transplantation allowed a group of patients to be identified (27.12%) with a worse long-term graft outcome. Patients with high levels of soluble molecules showed a progressive and gradual deterioration of kidney function (increased creatinine and proteinuria levels and decreased estimated glomerular filtration rate) over time and a higher risk of graft loss at 6 years post-transplantation than patients with low levels of these molecules (62.55% versus 5.14%, p<0.001). Thus, our data show an aberrant expression of soluble co-signaling molecules in kidney-transplanted patients whose quantification at 3 months post-transplantation might be a useful biomarker of immune status and help to predict long-term graft evolution.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nSoluble Co-signaling Molecule Kinetics during Kidney Transplantation\n\nWe analyzed the presence of several soluble co-signaling molecules in serum from healthy controls (n = 25) and kidney-transplanted patients (n = 59) obtained just before transplantation surgery and at different post-transplantation times. Before receiving a kidney transplant, all patients showed aberrant levels of the T-cell activation-associated sCD30, sCD40, and sCD137 molecules ( Fig. 1  and Table S1). Low levels of sCD30, sCD40 and sCD137 were found in the serum of healthy controls, whilst we observed 4.5-, 14.8- and 142-fold increases, respectively, in pre-transplantation sera. By contrast, the level of sCD40L was higher in the control group (8.41±2.67 ng/ml) than in pre-transplantation samples (4.26±3.01 n...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_Bn8ntxMtNNFX9OteXSWVkfau",
+    "parent_tool_call_id": "call_zP9ZrlmEN68ONy77acTmQwCF",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The strongest direct evidence is a 2015 study of two prospectively followed renal-transplant cohorts (TDS: 68 patients, 24 rejectors/44 controls; RITS: 22 patients, 11 rejectors/11 non-rejectors). sCD30 was measured by ELISA before transplantation and at several post-transplant time points. In the TDS cohort, sCD30 fell after transplantation but did not differ between patients who later rejected after tacrolimus discontinuation at 6 months and non-rejecting controls at any measured time point; in the RITS cohort, the 3-month sCD30 level did not predict late acute rejection (>3 months).",
+          "source_tools": [
+            {
+              "relevance": "Direct prospective evidence on late rejection and tacrolimus discontinuation",
+              "tool_call_id": "call_jmKgZTZJlQRoNCjWKeay0W0y"
+            }
+          ]
+        },
+        {
+          "finding": "The same prospective study directly argues against using sCD30 to select patients for immunosuppression minimization: it found no association with acute rejection after reduction/discontinuation of immunosuppression, so sCD30 cannot identify patients in whom tacrolimus can be safely tapered or withdrawn.",
+          "source_tools": [
+            {
+              "relevance": "Direct immunosuppression-tapering/withdrawal endpoint",
+              "tool_call_id": "call_jmKgZTZJlQRoNCjWKeay0W0y"
+            }
+          ]
+        },
+        {
+          "finding": "A small longitudinal cohort (n=45) measured sCD30 on the transplant day and day 4, with 5-year follow-up. Failure of a significant day-4 decline was characteristic of both early acute rejection (days 8 to 6 months) and late acute rejection (>6 months), and lower peri-transplant values were associated with worse later allograft function. However, the abstract does not provide discrimination metrics, adjusted effect estimates, or validation, and the sample is too small to establish clinical predictive utility.",
+          "source_tools": [
+            {
+              "relevance": "Longitudinal human cohort including late acute rejection",
+              "tool_call_id": "call_1eY3QYqVBLEU7piQKMSXDSo2"
+            }
+          ]
+        },
+        {
+          "finding": "A 59-patient longitudinal study measured soluble co-signaling molecules before transplant and at 15 days, 3 months, and 1 year. A multianalyte signature including sCD30 plus five other soluble molecules at 3 months identified 27.12% of patients with worse long-term graft outcome; high-signature patients had 6-year graft loss of 62.55% versus 5.14% in low-signature patients (p<0.001). This supports prognostic association for a composite immune signature, not sCD30 alone, and it did not test immunosuppression tapering or withdrawal.",
+          "source_tools": [
+            {
+              "relevance": "Timing and long-term graft-outcome association",
+              "tool_call_id": "call_zP9ZrlmEN68ONy77acTmQwCF"
+            }
+          ]
+        },
+        {
+          "finding": "The 2020 systematic review/meta-analysis included 18 observational cohort studies (1,453 patients) and found strong associations between post-transplant sCD30 and acute rejection when measured at 1–4 weeks or 1 month (SMD approximately 0.71–1.27). This evidence primarily concerns early acute rejection and does not establish prediction of late acute rejection or safe immunosuppression reduction; the review itself notes conflicting primary studies and heterogeneity by donor type.",
+          "source_tools": [
+            {
+              "relevance": "Evidence synthesis and timing-specific association",
+              "tool_call_id": "call_X7IXf8CMzUZR8bj6CuOwA2bn"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: sCD30 may reflect immune activation and has inconsistent associations with early rejection and later graft dysfunction, but direct prospective evidence does not support it as a reliable predictor of late acute rejection or as a biomarker for safely tapering/withdrawing immunosuppression. No retrieved human study demonstrated sCD30-guided successful immunosuppression minimization.",
+          "source_tools": [
+            {
+              "relevance": "Direct negative prospective study",
+              "tool_call_id": "call_jmKgZTZJlQRoNCjWKeay0W0y"
+            },
+            {
+              "relevance": "Longitudinal late-outcome cohort",
+              "tool_call_id": "call_1eY3QYqVBLEU7piQKMSXDSo2"
+            },
+            {
+              "relevance": "Meta-analysis of timing-specific rejection associations",
+              "tool_call_id": "call_X7IXf8CMzUZR8bj6CuOwA2bn"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_yURql6FsKKZSGecDFClCaUHP",
+    "parent_tool_call_id": "call_xsMiHmTrBEmGaAXzdzQm7IMK",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25446808",
+          "observations": [
+            "Two prospective renal-transplant cohorts tested sCD30 before and after transplantation; sCD30 did not distinguish patients with late acute rejection after tacrolimus discontinuation from non-rejectors, and 3-month sCD30 did not predict late rejection.",
+            "The study found no association between sCD30 and rejection after immunosuppression reduction or discontinuation; it did not support sCD30-guided safe tacrolimus tapering or withdrawal."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct prospective evidence for late rejection prediction and immunosuppression discontinuation",
+              "tool_call_id": "call_jmKgZTZJlQRoNCjWKeay0W0y"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:28694560",
+          "observations": [
+            "In a small longitudinal cohort of 45 kidney recipients, failure of sCD30 to decline by post-transplant day 4 was associated with early and late acute rejection during 5-year follow-up.",
+            "The study did not report validated discrimination metrics or establish clinical utility for guiding immunosuppression reduction."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Small longitudinal study suggesting an unvalidated association with late rejection",
+              "tool_call_id": "call_1eY3QYqVBLEU7piQKMSXDSo2"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25478957",
+          "observations": [
+            "A 59-patient study found that a six-molecule soluble co-signaling signature including sCD30 was associated with long-term graft outcome; this was not evidence for sCD30 alone predicting late rejection or guiding tapering."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Multianalyte prognostic evidence that does not validate sCD30 alone",
+              "tool_call_id": "call_zP9ZrlmEN68ONy77acTmQwCF"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:32256486",
+          "observations": [
+            "A systematic review and meta-analysis of 18 observational studies involving 1,453 patients found associations between post-transplant sCD30 and mainly early acute rejection, with heterogeneous evidence and no proof of safe immunosuppression reduction."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Aggregated evidence mainly concerning early rejection and heterogeneity",
+              "tool_call_id": "call_X7IXf8CMzUZR8bj6CuOwA2bn"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "sCD30 late rejection",
+          "observations": [
+            "Direct prospective evidence found that 3-month sCD30 did not predict late acute rejection after renal transplantation.",
+            "A small unvalidated cohort associated failure of day-4 decline with late rejection, so findings are inconsistent and insufficient for clinical prediction."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Overall evidence synthesis on late rejection prediction",
+              "tool_call_id": "call_jmKgZTZJlQRoNCjWKeay0W0y"
+            },
+            {
+              "relevance": "Contrasting small cohort finding",
+              "tool_call_id": "call_1eY3QYqVBLEU7piQKMSXDSo2"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "sCD30 tapering safety",
+          "observations": [
+            "No retrieved human study demonstrated successful sCD30-guided immunosuppression minimization.",
+            "The directly relevant prospective study found sCD30 could not identify patients who could safely discontinue tacrolimus at 6 months."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct evidence against using sCD30 to guide tapering or withdrawal",
+              "tool_call_id": "call_jmKgZTZJlQRoNCjWKeay0W0y"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:25446808",
+          "relation_type": "SUPPORTS",
+          "to_entity": "sCD30 late rejection"
+        },
+        {
+          "from_entity": "PMID:25446808",
+          "relation_type": "SUPPORTS",
+          "to_entity": "sCD30 tapering safety"
+        },
+        {
+          "from_entity": "PMID:28694560",
+          "relation_type": "SUPPORTS",
+          "to_entity": "sCD30 late rejection"
+        },
+        {
+          "from_entity": "PMID:25478957",
+          "relation_type": "SUPPORTS",
+          "to_entity": "sCD30 late rejection"
+        },
+        {
+          "from_entity": "PMID:32256486",
+          "relation_type": "SUPPORTS",
+          "to_entity": "sCD30 late rejection"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 6, \"entities\": [{\"name\": \"PMID:25446808\", \"entityType\": \"PAPER\", \"observations\": [\"Two prospective renal-transplant cohorts tested sCD30 before and after transplantation; sCD30 did not distinguish patients with late acute rejection after tacrolimus discontinuation from non-rejectors, and 3-month sCD30 did not predict late rejection.\", \"The study found no association between sCD30 and rejection after immunosuppression reduction or discontinuation; it did not support sCD30-guided safe tacrolimus tapering or withdrawal.\"]}, {\"name\": \"PMID:28694560\", \"entityType\": \"PAPER\", \"observations\": [\"In a small longitudinal cohort of 45 kidney recipients, failure of sCD30 to decline by post-transplant day 4 was associated with early and late acute rejection during 5-year follow-up.\", \"The study did not report validated discrimination metrics or establish clinical utility for guiding immunosuppression reduction.\"]}, {\"name\": \"PMID:25478957\", \"entityType\": \"PAPER\", \"observations\": [\"A 59-patient study found that a six-molecule soluble co-signaling signature including sCD30 was associated with long-term graft outcome; this was not evidence for sCD30 alone predicting late rejection or guiding tapering.\"]}, {\"name\": \"PMID:32256486\", \"entityType\": \"PAPER\", \"observations\": [\"A systematic review and meta-analysis of 18 observational studies involving 1,453 patients found associations between post-transplant sCD30 and mainly early acute rejection, with heterogeneous evidence and no proof of safe immunosuppression reduction.\"]}, {\"name\": \"sCD30 late rejection\", \"entityType\": \"FINDING\", \"observations\": [\"Direct prospective evidence found that 3-month sCD30 did not predict late acute rejection after renal transplantation.\", \"A small unvalidated cohort associated failure of day-4 decline with late rejection, so findings are inconsistent and insufficient for clinical prediction.\"]}, {\"name\": \"sCD30 tapering safety\", \"entityType\": \"FINDING\", \"observations\": [\"No retrieved human study demonstrated successful sCD30-guided immunosuppression minimization.\", \"The directly relevant prospective study found sCD30 could not identify patients who could safely discontinue tacrolimus at 6 months.\"]}]}, \"relations_created\": {\"count\": 5, \"relations\": [{\"from\": \"PMID:25446808\", \"to\": \"sCD30 late rejection\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:25446808\", \"to\": \"sCD30 tapering safety\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:28694560\", \"to\": \"sCD30 late rejection\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:25478957\", \"to\": \"sCD30 late rejection\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:32256486\", \"to\": \"sCD30 late rejection\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_yURql6FsKKZSGecDFClCaUHP\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_xsMiHmTrBEmGaAXzdzQm7IMK\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

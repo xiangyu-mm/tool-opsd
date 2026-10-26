@@ -1,0 +1,270 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_dQFF7ndl3Yj4EDRiboRmBrnC",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether the Noble–Collip drum trauma model induces disseminated intravascular coagulation (DIC), acute coagulopathy of trauma-shock (ACoTS/trauma-induced coagulopathy), both, or neither. Find direct studies using the Noble–Collip drum model and extract evidence on systemic coagulation activation, consumption of platelets/coagulation factors, fibrinolysis, hypocoagulation, shock, and timing. Compare findings with recognized diagnostic/mechanistic features of DIC versus ACoTS, prioritizing primary experimental papers and authoritative reviews."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_Dae5yO70z7wT8LrUkohkO9Z7",
+    "parent_tool_call_id": "call_dQFF7ndl3Yj4EDRiboRmBrnC",
+    "round": 1,
+    "tool_input": {
+      "task_name": "trauma coagulopathy review",
+      "boolean_query_text": "trauma-induced coagulopathy acute coagulopathy of trauma shock review DIC",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='trauma-induced coagulopathy acute coagulopathy of trauma shock review DIC',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='trauma-induced coagulopathy acute coagulopathy of trauma shock review DIC',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/trauma_coagulopathy_review.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/trauma_coagulopathy_review.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/trauma_coagulopathy_review.csv'\nTotal results found: 23\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 26716498\nTitle: Pathophysiology of Trauma-Induced Coagulopathy and Management of Critical Bleeding Requiring Massive Transfusion.\nSource: Seminars in thrombosis and hemostasis (2016)\nAbstract: Trauma-induced coagulopathy is caused by multiple factors, such as anemia, hemodilution, hypothermia, acidosis, shock, and serious trauma itself, which affects patient outcomes due to critical bleeding requiring massive transfusion. Disseminated intravascular coagulation (DIC) with the fibrinolytic phenotype directly caused by trauma and/or traumatic shock has been considered to be the primary pathophysiology of trauma-induced coagulopathy. The key to controlling DIC is vigorous treatment of the underlying disorder, that is, trauma itself and hemorrhagic shock. Damage control resuscitation, consisting of damage control surgery, permissive hypotension, and hemostatic resuscitation, aims to control severe trauma and critical bleeding, which is equivalent to managing the underlying disorder of DIC. At present, however, evidence-based practices for damage control resuscitation are lacking. A robust prospective outcome study for damage control resuscitation that considers DIC with the fibrinolytic phenotype as the main pathological condition of trauma-induced coagulopathy affecting patient outcome is essential for improving therapeutic strategies.\n--------------------------------------------------------------------------------\nPMID: 27885969\nTitle: 36th International Symposium on Intensive Care and Emergency Medicine : Brussels, Belgium. 15-18 March 2016.\nSource: Critical care (London, England) (2016)\nAbstract: P001 - Sepsis impairs the capillary response within hypoxic capillaries and decreases erythrocyte oxygen-dependent ATP efflux R. M. Bateman, M. D. Sharpe, J. E. Jagger, C. G. Ellis P002 - Lower serum immunoglobulin G2 level does not predispose to severe flu. J. Solé-Violán, M. López-Rodríguez, E. Herrera-Ramos, J. Ruíz-Hernández, L. Borderías, J. Horcajada, N. González-Quevedo, O. Rajas, M. Briones, F. Rodríguez de Castro, C. Rodríguez Gallego P003 - Brain protective effects of intravenous immunoglobulin through inhibition of complement activation and apoptosis in a rat model of sepsis F. Esen, G. Orhun, P. Ergin Ozcan, E. Senturk, C. Ugur Yilmaz, N. Orhan, N. Arican, M. Kaya, M. Kucukerden, M. Giris, U. Akcan, S. Bilgic Gazioglu, E. Tuzun P004 - Adenosine a1 receptor dysfunction is associated with leukopenia: A possible mechanism for sepsis-induced leukopenia R. Riff, O. Naamani, A. Douvdevani P005 - Analysis of neutrophil by hyper spectral imaging - A preliminary report R. Takegawa, H. Yoshida, T. Hirose, N. Yamamoto, H. Hagiya, M. Ojima, Y. Akeda, O. Tasaki, K. Tomono, T. Shimazu P006 - Chemiluminescent intensity assessed by eaa predicts the incidence of postoperative infectious ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 25886801\nTitle: Local hemostasis, immunothrombosis, and systemic disseminated intravascular coagulation in trauma and traumatic shock.\nSource: Critical care (London, England) (2015)\nAbstract: Knowing the pathophysiology of trauma-induced coagulopathy is important for the management of severely injured trauma patients. The aims of this review are to provide a summary of the recent advances in our understanding of thrombosis and hemostasis following trauma and to discuss the pathogenesis of disseminated intravascular coagulation (DIC) at an early stage of trauma. Local hemostasis and thrombosis respectively act to induce physiological wound healing of injuries and innate immune responses to damaged-self following trauma. However, if overwhelmed by systemic inflammation caused by extensive tissue damage and tissue hypoperfusion, both of these processes foster systemic DIC associated with pathological fibrin(ogen)olysis. This is called DIC with the fibrinolytic phenotype, which is characterized by the activation of coagulation, consumption coagulopathy, insufficient control of coagulation, and increased fibrin(ogen)olysis. Irrespective of microvascular thrombosis, the condition shows systemic thrombin generation as well as its activation in the circulation and extensive damage to the microvasculature endothelium. DIC with the fibrinolytic phenotype gives rise to oozing-type ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 35806918\nTitle: Incidence, Outcome, and Risk Factors of Cardiovascular Surgery-Associated Disseminated Intravascular Coagulation: A Single-Center Retrospective Study\nSource: J Clin Med (2022)\nAbstract: The mechanism of @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@-<m>induced</m> @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>coagulopathy</m>@@@ may be partly applicable to surgery-<m>induced</m> @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>coagulopathy</m>@@@ and @DISEASE_Disseminated_Intravascular_Coagulation @DISEASE_MESH:D004211 @@@<m>DIC</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 34190146\nTitle: Diagnostic complexity of rifampicin-induced coagulopathy in a patient with spontaneous muscle bleeding\nSource: Medicine (Baltimore) (2021)\nAbstract: A <m>review</m> of available databases has so far reported a small (sporadic) number of cases of @CHEMICAL_Rifampin @CHEMICAL_MESH:D012293 @@@rifampicin@@@-<m>induced</m> @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>coagulopathy</m>@@@ and never with spontaneous @DISEASE_Muscle_Neoplasms @DISEASE_MESH:D019042 @@@muscle bleeding@@@.\n--------------------------------------------------------------------------------\nPMID: 37108280\nTitle: Severe Trauma-Induced Coagulopathy: Molecular Mechanisms Underlying Critical Illness\nSource: Int J Mol Sci (2023)\nAbstract: In the @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@ setting, several terms are used in the literature to refer to this condition, including @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>trauma</m>-<m>induced</m> <m>coagulopathy</m>@@@ (@DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@TIC@@@), @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>acute</m> traumatic <m>coagulopathy</m>@@@ (@DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@ATC@@@), @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@early-<m>trauma</m> <m>coagulopathy</m>@@@ (@DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@ECT@@@), and @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>acute</m> <m>coagulopathy</m> of <m>trauma</m> <m>shock</m>@@@(ACoTS).\n--------------------------------------------------------------------------------\nPMID: 36673595\nTitle: Management Strategies in Septic Coagulopathy: A Review of the Current Literature\nSource: Healthcare (Basel) (2023)\nAbstract: Management Strategies in @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@Septic <m>Coagulopathy</m>@@@: A <m>Review</m> of the Current Literature\n--------------------------------------------------------------------------------\nPMID: 37445421\nTitle: Circulating Syndecan-1 Levels Are Associated with Chronological Coagulofibrinolytic Responses and the Development of Disseminated Intravascular Coagulation (DIC) after Trauma: A Retrospective Observational Study\nSource: J Clin Med (2023)\nAbstract: Endotheliopathy represented by @GENE_SDC1 @GENE_6382 @@@SDC-1@@@ elevation was associated with @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@ <m>induced</m> @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>coagulopathy</m>@@@, which can lead to the development of @DISEASE_Disseminated_Intravascular_Coagulation @DISEASE_MESH:D004211 @@@<m>DIC</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 37605466\nTitle: Potential Biomarkers for Early Diagnosis, Evaluation, and Prognosis of  Sepsis-Induced Coagulopathy\nSource: Clin Appl Thromb Hemost (2023)\nAbstract: Most @SPECIES_9606 @@@patients@@@ developed @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>coagulopathy</m>@@@ which was closely linked to endothelial @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>injury</m>@@@ in the initial phase of @DISEASE_Sepsis @DISEASE_MESH:D018805 @@@sepsis@@@, which was demonstrated by abnormalities in endothelial biomarkers sTM and their strong association with poor 60-day prognosis and development of @DISEASE_Shock_Septic @DISEASE_MESH:D012772 @@@septic <m>shock</m>@@@ and @DISEASE_Sepsis @DISEASE_MESH:D018805 @@@sepsis@@@-<m>induced</m> @DISEASE_Disseminated_Intravascular_Coagulation @DISEASE_MESH:D004211 @@@<m>DIC</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 37431370\nTitle: Efficacy of Serum Antithrombin III Test in Patients With Severe Traumatic Brain Injury\nSource: Korean J Neurotrauma (2023)\nAbstract: @DISEASE_Brain_Injuries_Traumatic @DISEASE_MESH:D000070642 @@@Traumatic brain <m>injury</m>@@@ (@DISEASE_Brain_Injuries_Traumatic @DISEASE_MESH:D000070642 @@@TBI@@@) <m>induces</m> an innate immune reaction, which causes problems in the brain and @DISEASE_Multiple_Organ_Failure @DISEASE_MESH:D009102 @@@multiple organ dysfunction@@@, including @DISEASE_Acute_Kidney_Injury @DISEASE_MESH:D058186 @@@<m>acute</m> kidney <m>injury</m>@@@, @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>coagulopathy</m>@@@, @DISEASE_Respiratory_Distress_Syndrome @DISEASE_MESH:D012128 @@@<m>acute</m> respiratory distress syndrome@@@ (@DISEASE_Respiratory_Distress_Syndrome @DISEASE_MESH:D012128 @@@ARDS@@@), and @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@gastrointestinal bleeding@@@.\n--------------------------------------------------------------------------------\nPMID: 41466933\nTitle: Purpura Fulminans Due to Escherichia coli Septicemia in Relapsed Acute Myeloid Leukemia: An Unusual Case of Protein C Deficiency and Disseminated Intravascular Coagulation\nSource: Cureus (2025)\nAbstract: A diagnosis of @DISEASE_Shock_Septic @DISEASE_MESH:D012772 @@@septic <m>shock</m>@@@ due to @SPECIES_562 @@@E. coli@@@ @DISEASE_Bacteremia @DISEASE_MESH:D016470 @@@bacteremia@@@ with @DISEASE_Acute_Kidney_Injury @DISEASE_MESH:D058186 @@@<m>acute</m> kidney <m>injury</m>@@@ and @DISEASE_Pneumonia @DISEASE_MESH:D011014 @@@pneumonia@@@ was made.\n--------------------------------------------------------------------------------\nPMID: 39609563\nTitle: Association of endotheliopathy with coagulofibrinolytic reactions and disseminated intravascular coagulation after trauma: a retrospective observational study\nSource: Sci Rep (2024)\nAbstract: @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@-<m>induced</m> @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>coagulopathy</m>@@@\n--------------------------------------------------------------------------------\nPMID: 35128366\nTitle: Heatstroke-induced coagulopathy: Biomarkers, mechanistic insights, and patient management\nSource: EClinicalMedicine (2022)\nAbstract: This type of dynamic change is commonly seen in @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@-<m>induced</m> @DISEASE_Blood_Coagulation_Disorders @DISEASE_MESH:D001778 @@@<m>coagulopathy</m>@@@ and is understood as the universal result of @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>injury</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 33430431\nTitle: Proposal of the Definition for COVID-19-Associated Coagulopathy\nSource: J Clin Med (2021)\nAbstract: Of note, @DISEASE_Myocardial_Ischemia @DISEASE_MESH:D017202 @@@ischemic limb <m>injury</m>@@@ in septic @DISEASE_Shock @DISEASE_MESH:D012769 @@@<m>shock</m>@@@ is explained by concurrent @DISEASE_Disseminated_Intravascular_Coagulation @DISEASE_MESH:D004211 @@@<m>DIC</m>@@@ and depletion of natural anticoagulant factors (@GENE_PROC @GENE_5624 @@@protein C@@@, @GENE_SERPINC1 @GENE_462 @@@antithrombin@@@) often as a result of concomitant <m>acute</m> @DISEASE_Hepatic_Infarction @DISEASE_MESH:D000081011 @@@ischemic hepatitis@@@ (@DISEASE_Liver_Failure @DISEASE_MESH:D017093 @@@<m>shock</m> liver@@@).\n--------------------------------------------------------------------------------\nPMID: 34428280\nTitle: Disseminated intravascular coagulation and its immune mechanisms\nSource: Blood (2022)\nAbstract: @DISEASE_Inflammation @DISEASE_MESH:D007249 @@@Inflammation@@@-<m>induced</m> amplification of @DISEASE_Disseminated_Intravascular_Coagulation @DISEASE_MESH:D004211 @@@<m>DIC</m>@@@\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_gA6LcMSnaTXYM9vL9HH3MPlo",
+    "parent_tool_call_id": "call_Dae5yO70z7wT8LrUkohkO9Z7",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|platelets|fibrinogen|antithrombin|protein C|D-dimer|fibrinolysis|shock|CONCLUSION",
+      "pmid": "25423126"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25423126')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|platelets|fibrinogen|antithrombin|protein C|D-dimer|fibrinolysis|shock|CONCLUSION')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (5):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|platelets|fibrinogen|antithrombin|protein C|D-dimer|fibrinolysis|shock|CONCLUSION\n      \u001b[90mpmid:\u001b[0m 25423126\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|tPA|PAI-1|fibrinolysis|coagulation|platelet|shock\n      \u001b[90mpmid:\u001b[0m 34645889\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Noble-Collip|DIC|ACoTS|platelets|coagulation factors|antithrombin|fibrinolysis\n      \u001b[90mpmid:\u001b[0m 37446351\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m DIC with the fibrinolytic phenotype|activatio ... on coagulopathy|ACoTS|hypoperfusion|protein C\n      \u001b[90mpmid:\u001b[0m 25886801\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m acute coagulopathy of trauma shock|ACoTS|DIC|mechanism|hypoperfusion|protein C|fibrinolysis\n      \u001b[90mpmid:\u001b[0m 26716498\n\n=== PMID: 25423126 ===\n\nTitle: Noble-Collip Drum Trauma Induces Disseminated Intravascular Coagulation But Not Acute Coagulopathy of Trauma-Shock.\n\nJournal/Date: Shock (Augusta, Ga.) (2015)\n\nMeSH Keywords: Animals, Blood Coagulation Disorders, Disease Models, Animal, Disseminated Intravascular Coagulation, Fibrin Fibrinogen Degradation Products, Fibrinolysis, Male, Phenotype\n\n\n--- ABSTRACT ---\n[BACKGROUND]: There are two opposing possibilities for the main pathogenesis of trauma-induced coagulopathy: an acute coagulopathy of trauma shock and disseminated intravascular coagulation with the fibrinolytic phenotype.\n[OBJECTIVE]: The objective of this study was to clarify the main pathogenesis of trauma-induced coagulopathy using a rat model of Noble-Collip drum trauma.\n[METHODS]: Eighteen rats were divided into the control, trauma 0, and trauma 30 groups. The trauma 0 and 30 groups were exposed to Noble-Collip drum trauma. Blood samples were drawn without, immediately after, and 30 min after Noble-Collip drum trauma in the control, trauma 0, and trauma 30 groups, respectively. Coagulation and fibrinolysis markers were measured. Thrombin generation was assessed according to a calibrated automated thrombogram.\n[RESULTS]: Spontaneous thrombin bursts resulting from circulating procoagulants were observed in the nonstimulated thrombin generation assay immediately after trauma. Soluble fibrin levels (a marker of thrombin generation in the systemic circulation) were 50-fold greater in the trauma groups than in the control group. The resultant coagulation activation consumed platelets, coagulation factors, and antithrombin. Endogenous thrombin potential and factor II ratio were significantly negatively correlated with antithrombin levels, suggesting insufficient control of thrombin generation by antithrombin. High levels of active tissue-type plasminogen activator induced hyperfibrin(ogen)olysis. Soluble thrombomodulin increased significantly. However, activated protein C levels did not change.\n[CONCLUSIONS]: The systemic thrombin generation accelerated by insufficient antithrombin control leads to the consumption of platelets and coagulation factors associated with hyperfibrin(ogen)olysis. These changes are collectively termed disseminated intravascular coagulation with the fibrinolytic phenotype.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_MRpk3TX5LOicK1QaYQhp7PaT",
+    "parent_tool_call_id": "call_Dae5yO70z7wT8LrUkohkO9Z7",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|tPA|PAI-1|fibrinolysis|coagulation|platelet|shock",
+      "pmid": "34645889"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('34645889')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|tPA|PAI-1|fibrinolysis|coagulation|platelet|shock')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 34645889 ===\n\nTitle: Fibrinolytic system activation immediately following trauma was quickly and intensely suppressed in a rat model of severe blunt trauma.\n\nJournal/Date: Scientific reports (2021)\n\nMeSH Keywords: Animals, Blood Gas Analysis, Blood Transfusion, Fibrinolysis, Head Injuries, Closed, Male, Plasma, Plasminogen Activator Inhibitor 1\n\n\n--- ABSTRACT ---\nIn severe trauma, excessive fibrinolytic activation is associated with an increase in the transfusion volume and mortality rate. However, in the first several hours after a blunt trauma, changes in fibrinolytic activation, suppression, and activation-suppression balance have not yet been elucidated, which the present study aimed to clarify. Anesthetized 9-week-old male Wistar S/T rats experienced severe blunt trauma while being placed inside the Noble-Collip drum. Rats were randomly divided into four groups of seven. The no-trauma group was not exposed to any trauma; the remaining groups were analysed 0, 60, and 180 min after trauma. Immediately following trauma, total tissue-plasminogen activator (tPA) levels significantly increased in the plasma, and the balance of active tPA and active plasminogen activator inhibitor-1 (PAI-1) significantly tipped toward fibrinolytic activation. After trauma, both tPA and PAI-1 levels increased gradually in various organs and active and total PAI-1 levels increased exponentially in the plasma. Total plasma tPA levels 60 min after trauma returned quickly to levels comparable to those in the no-trauma group. In conclusion, fibrinolytic activation was observed only immediately following trauma. Therefore, immediately after trauma, the fibrinolytic system was activated; however, its activation was quickly and intensely suppressed.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nThe general characteristics and coagulation activation of each group are shown in Table 2. Immediately following the severe blunt trauma, a decrease in arterial blood pressure, lactic acidosis, and haemoconcentration, which would result from vascular permeability induced by massive tissue damage, were observed. Over time, the lactic acidosis improved. Although infusion of Ringer’s lactate solution was needed to maintain the mean arterial pressure, haemodilution was not observed even 180 min after trauma induction. Soluble fibrin levels, indicating coagulation activation, gradually increased after trauma (P < 0.001, one-way ANOVA). The soluble fibrin level 180 min after trauma was higher than that in the no-trauma group (P < 0.001).\n\ntPA and PAI-1 levels in the plasma\n\nChanges in t...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_nu3aJk1j9p1ylIdm3GGzvHe2",
+    "parent_tool_call_id": "call_Dae5yO70z7wT8LrUkohkO9Z7",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Noble-Collip|DIC|ACoTS|platelets|coagulation factors|antithrombin|fibrinolysis",
+      "pmid": "37446351"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('37446351')\noutput = format_paper_content_output(result, filter_keywords='Noble-Collip|DIC|ACoTS|platelets|coagulation factors|antithrombin|fibrinolysis')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 37446351 ===\n\nTitle: Experimental Models of Traumatic Injuries: Do They Capture the Coagulopathy and Underlying Endotheliopathy Induced by Human Trauma?\n\nJournal/Date: International journal of molecular sciences (2023)\n\nMeSH Keywords: Humans, Blood Coagulation Disorders, Hemorrhage, Hemostasis, Blood Coagulation Tests, Models, Theoretical, Wounds and Injuries\n\n\n--- ABSTRACT ---\nTrauma-induced coagulopathy (TIC) is a major cause of morbidity and mortality in patients with traumatic injury. It describes the spectrum of coagulation abnormalities that occur because of the trauma itself and the body's response to the trauma. These coagulation abnormalities range from hypocoagulability and hyperfibrinolysis, resulting in potentially fatal bleeding, in the early stages of trauma to hypercoagulability, leading to widespread clot formation, in the later stages. Pathological changes in the vascular endothelium and its regulation of haemostasis, a phenomenon known as the endotheliopathy of trauma (EoT), are thought to underlie TIC. Our understanding of EoT and its contribution to TIC remains in its infancy largely due to the scarcity of experimental research. This review discusses the mechanisms employed by the vascular endothelium to regulate haemostasis and their dysregulation following traumatic injury before providing an overview of the available experimental in vitro and in vivo models of trauma and their applicability for the study of the EoT and its contribution to TIC.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_T8U7eHPrmTUpk65HJ7fExoCT",
+    "parent_tool_call_id": "call_Dae5yO70z7wT8LrUkohkO9Z7",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "DIC with the fibrinolytic phenotype|activation of coagulation|consumption coagulopathy|ACoTS|hypoperfusion|protein C",
+      "pmid": "25886801"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25886801')\noutput = format_paper_content_output(result, filter_keywords='DIC with the fibrinolytic phenotype|activation of coagulation|consumption coagulopathy|ACoTS|hypoperfusion|protein C')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 25886801 ===\n\nTitle: Local hemostasis, immunothrombosis, and systemic disseminated intravascular coagulation in trauma and traumatic shock.\n\nJournal/Date: Critical care (London, England) (2015)\n\nMeSH Keywords: Animals, Antithrombins, DNA, Mitochondrial, Disseminated Intravascular Coagulation, Fibrinolysis, HMGB1 Protein, Hemostasis, Histones\n\n\n--- ABSTRACT ---\nKnowing the pathophysiology of trauma-induced coagulopathy is important for the management of severely injured trauma patients. The aims of this review are to provide a summary of the recent advances in our understanding of thrombosis and hemostasis following trauma and to discuss the pathogenesis of disseminated intravascular coagulation (DIC) at an early stage of trauma. Local hemostasis and thrombosis respectively act to induce physiological wound healing of injuries and innate immune responses to damaged-self following trauma. However, if overwhelmed by systemic inflammation caused by extensive tissue damage and tissue hypoperfusion, both of these processes foster systemic DIC associated with pathological fibrin(ogen)olysis. This is called DIC with the fibrinolytic phenotype, which is characterized by the activation of coagulation, consumption coagulopathy, insufficient control of coagulation, and increased fibrin(ogen)olysis. Irrespective of microvascular thrombosis, the condition shows systemic thrombin generation as well as its activation in the circulation and extensive damage to the microvasculature endothelium. DIC with the fibrinolytic phenotype gives rise to oozing-type non-surgical bleeding and greatly affects the prognosis of trauma patients. The coexistences of hypothermia, acidosis, and dilution aggravate DIC and lead to so-called trauma-induced coagulopathy. He that would know what shall be must consider what has been. The Analects of Confucius.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_FeaCacsvMdEB2Znolr1dIqtQ",
+    "parent_tool_call_id": "call_Dae5yO70z7wT8LrUkohkO9Z7",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "acute coagulopathy of trauma shock|ACoTS|DIC|mechanism|hypoperfusion|protein C|fibrinolysis",
+      "pmid": "26716498"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('26716498')\noutput = format_paper_content_output(result, filter_keywords='acute coagulopathy of trauma shock|ACoTS|DIC|mechanism|hypoperfusion|protein C|fibrinolysis')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 26716498 ===\n\nTitle: Pathophysiology of Trauma-Induced Coagulopathy and Management of Critical Bleeding Requiring Massive Transfusion.\n\nJournal/Date: Seminars in thrombosis and hemostasis (2016)\n\nMeSH Keywords: Disseminated Intravascular Coagulation, Hemorrhage, Humans, Wounds and Injuries\n\n\n--- ABSTRACT ---\nTrauma-induced coagulopathy is caused by multiple factors, such as anemia, hemodilution, hypothermia, acidosis, shock, and serious trauma itself, which affects patient outcomes due to critical bleeding requiring massive transfusion. Disseminated intravascular coagulation (DIC) with the fibrinolytic phenotype directly caused by trauma and/or traumatic shock has been considered to be the primary pathophysiology of trauma-induced coagulopathy. The key to controlling DIC is vigorous treatment of the underlying disorder, that is, trauma itself and hemorrhagic shock. Damage control resuscitation, consisting of damage control surgery, permissive hypotension, and hemostatic resuscitation, aims to control severe trauma and critical bleeding, which is equivalent to managing the underlying disorder of DIC. At present, however, evidence-based practices for damage control resuscitation are lacking. A robust prospective outcome study for damage control resuscitation that considers DIC with the fibrinolytic phenotype as the main pathological condition of trauma-induced coagulopathy affecting patient outcome is essential for improving therapeutic strategies.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_eS8Zv6E7X1Z0id7hSo4E33tG",
+    "parent_tool_call_id": "call_FeaCacsvMdEB2Znolr1dIqtQ",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The direct primary study of the rat Noble–Collip drum model (PMID 25423126; 18 rats, samples immediately and 30 min after trauma) concluded that the model induces DIC with a fibrinolytic phenotype, not ACoTS. Immediately after trauma it showed spontaneous thrombin bursts from circulating procoagulants and approximately 50-fold higher soluble fibrin, indicating intense systemic thrombin generation. Coagulation activation consumed platelets, coagulation factors, and antithrombin; endogenous thrombin potential/factor II were inversely related to antithrombin, indicating inadequate thrombin control. Active tPA was high and caused hyperfibrin(ogen)olysis, while activated protein C did not change. These findings directly support systemic coagulation activation plus consumption and fibrinolysis, i.e. DIC rather than isolated ACoTS.",
+          "source_tools": [
+            {
+              "relevance": "Primary Noble–Collip experiment with direct coagulation, consumption, antithrombin, fibrinolysis, and timing results",
+              "tool_call_id": "call_gA6LcMSnaTXYM9vL9HH3MPlo"
+            }
+          ]
+        },
+        {
+          "finding": "A separate primary Noble–Collip blunt-trauma study confirms an immediate shock/coagulofibrinolytic response: immediately after trauma rats had decreased arterial pressure, lactic acidosis, hemoconcentration, increased soluble fibrin, increased plasma tPA, and a transient shift toward fibrinolytic activation; tPA returned toward baseline by 60 minutes while PAI-1 rose strongly, indicating rapid suppression of fibrinolysis. Thus shock is present, but the documented laboratory pattern is systemic thrombin generation with dynamic fibrinolysis—not evidence that ACoTS is the dominant mechanism.",
+          "source_tools": [
+            {
+              "relevance": "Primary Noble–Collip time-course study of shock, soluble fibrin, tPA/PAI-1, and fibrinolysis",
+              "tool_call_id": "call_MRpk3TX5LOicK1QaYQhp7PaT"
+            }
+          ]
+        },
+        {
+          "finding": "Authoritative trauma reviews describe trauma-associated DIC with a fibrinolytic phenotype as systemic thrombin generation, consumption coagulopathy, insufficient anticoagulant control, endothelial injury, and increased fibrin(ogen)olysis; hypoperfusion/systemic inflammation can drive this process. These criteria closely match the Noble–Collip primary findings. Reviews describe TIC/ACoTS as a broader clinical spectrum influenced by shock, hypothermia, acidosis, anemia, and dilution, whereas the direct Noble–Collip study specifically found no change in activated protein C and concluded 'not ACoTS.'",
+          "source_tools": [
+            {
+              "relevance": "Mechanistic/phenotypic criteria for trauma-associated DIC",
+              "tool_call_id": "call_T8U7eHPrmTUpk65HJ7fExoCT"
+            },
+            {
+              "relevance": "Review contrasting trauma-induced coagulopathy contributors and DIC phenotype",
+              "tool_call_id": "call_FeaCacsvMdEB2Znolr1dIqtQ"
+            },
+            {
+              "relevance": "Review framing TIC as a spectrum that can include early hypocoagulability/hyperfibrinolysis",
+              "tool_call_id": "call_nu3aJk1j9p1ylIdm3GGzvHe2"
+            }
+          ]
+        },
+        {
+          "finding": "Overall classification: both trauma/shock and coagulopathy occur, but if forced to choose among DIC, ACoTS, both, or neither, the Noble–Collip drum model is best classified as DIC (specifically trauma-associated DIC with a fibrinolytic phenotype), not ACoTS. 'Both' would overstate the direct evidence: shock and transient hypocoagulation/fibrinolysis are documented, but the defining ACoTS mechanism was not demonstrated and the primary study explicitly reported no ACoTS.",
+          "source_tools": [
+            {
+              "relevance": "Direct primary conclusion and mechanistic data",
+              "tool_call_id": "call_gA6LcMSnaTXYM9vL9HH3MPlo"
+            },
+            {
+              "relevance": "Independent primary shock/fibrinolysis time-course",
+              "tool_call_id": "call_MRpk3TX5LOicK1QaYQhp7PaT"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_lazRXYmZuJzyBEKwujBpM0vN",
+    "parent_tool_call_id": "call_dQFF7ndl3Yj4EDRiboRmBrnC",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25423126",
+          "observations": [
+            "In the rat Noble–Collip drum trauma model, immediate and 30-minute samples showed spontaneous thrombin bursts, approximately 50-fold higher soluble fibrin, consumption of platelets/coagulation factors/antithrombin, hyperfibrin(ogen)olysis, and no change in activated protein C; authors concluded fibrinolytic DIC, not ACoTS."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct primary study of the Noble–Collip model",
+              "tool_call_id": "call_gA6LcMSnaTXYM9vL9HH3MPlo"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:34645889",
+          "observations": [
+            "In a separate rat Noble–Collip blunt-trauma study, immediate hypotension, lactic acidosis, hemoconcentration, increased soluble fibrin, and increased tPA were followed by rapid PAI-1-mediated suppression of fibrinolysis; the model produces shock and dynamic coagulofibrinolysis."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary time-course study of shock and fibrinolysis",
+              "tool_call_id": "call_MRpk3TX5LOicK1QaYQhp7PaT"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Noble–Collip DIC phenotype",
+          "observations": [
+            "The model is best classified as trauma-associated DIC with a fibrinolytic phenotype: systemic thrombin generation, consumptive loss of platelets/factors/antithrombin, endothelial injury markers, and fibrin(ogen)olysis are documented.",
+            "The principal direct study found no activated-protein-C increase and explicitly concluded that the model did not induce ACoTS."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Synthesis of direct experimental evidence",
+              "tool_call_id": "call_gA6LcMSnaTXYM9vL9HH3MPlo"
+            },
+            {
+              "relevance": "Shock and fibrinolysis context",
+              "tool_call_id": "call_MRpk3TX5LOicK1QaYQhp7PaT"
+            },
+            {
+              "relevance": "DIC versus ACoTS framework",
+              "tool_call_id": "call_T8U7eHPrmTUpk65HJ7fExoCT"
+            },
+            {
+              "relevance": "TIC/ACoTS framework",
+              "tool_call_id": "call_FeaCacsvMdEB2Znolr1dIqtQ"
+            },
+            {
+              "relevance": "TIC/ACoTS framework",
+              "tool_call_id": "call_nu3aJk1j9p1ylIdm3GGzvHe2"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:25423126",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Noble–Collip DIC phenotype"
+        },
+        {
+          "from_entity": "PMID:34645889",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Noble–Collip DIC phenotype"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"PMID:25423126\", \"entityType\": \"PAPER\", \"observations\": [\"In the rat Noble\\u2013Collip drum trauma model, immediate and 30-minute samples showed spontaneous thrombin bursts, approximately 50-fold higher soluble fibrin, consumption of platelets/coagulation factors/antithrombin, hyperfibrin(ogen)olysis, and no change in activated protein C; authors concluded fibrinolytic DIC, not ACoTS.\"]}, {\"name\": \"PMID:34645889\", \"entityType\": \"PAPER\", \"observations\": [\"In a separate rat Noble\\u2013Collip blunt-trauma study, immediate hypotension, lactic acidosis, hemoconcentration, increased soluble fibrin, and increased tPA were followed by rapid PAI-1-mediated suppression of fibrinolysis; the model produces shock and dynamic coagulofibrinolysis.\"]}, {\"name\": \"Noble\\u2013Collip DIC phenotype\", \"entityType\": \"FINDING\", \"observations\": [\"The model is best classified as trauma-associated DIC with a fibrinolytic phenotype: systemic thrombin generation, consumptive loss of platelets/factors/antithrombin, endothelial injury markers, and fibrin(ogen)olysis are documented.\", \"The principal direct study found no activated-protein-C increase and explicitly concluded that the model did not induce ACoTS.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"PMID:25423126\", \"to\": \"Noble\\u2013Collip DIC phenotype\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:34645889\", \"to\": \"Noble\\u2013Collip DIC phenotype\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_lazRXYmZuJzyBEKwujBpM0vN\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_dQFF7ndl3Yj4EDRiboRmBrnC\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

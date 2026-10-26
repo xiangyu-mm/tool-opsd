@@ -1,0 +1,240 @@
+[
+  {
+    "step": 7,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_dzjVbn03H0sSrVF45mV2C5li",
+    "parent_tool_call_id": null,
+    "round": 2,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine whether adalimumab significantly reduces acute anterior uveitis recurrence in ankylosing spondylitis; prioritize clinical cohorts/trials and pooled meta-analysis with recurrence rates, comparator, and statistical significance."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_nQM8EOvfg6jchoSkUAJSJ5fM",
+    "parent_tool_call_id": "call_dzjVbn03H0sSrVF45mV2C5li",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "adalimumab ankylosing spondylitis acute anterior uveitis randomized trial recurrence",
+      "task_name": "uveitis trial",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='adalimumab ankylosing spondylitis acute anterior uveitis randomized trial recurrence',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='adalimumab ankylosing spondylitis acute anterior uveitis randomized trial recurrence',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/uveitis_trial.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/uveitis_trial.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/uveitis_trial.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 36451402\nTitle: Onset of spondyloarthritis in a patient treated with adalimumab for relapsing anterior uveitis - efficacy of secukinumab on the joint domain and on ocular inflammatory relapses: A case report\nSource: Medicine (Baltimore) (2022)\nAbstract: Therefore, given the selective inhibition of @GENE_IL17A @GENE_3605 @@@IL-17A@@@, @CHEMICAL_secukinumab @CHEMICAL_MESH:C555450 @@@secukinumab@@@ has a potential role in the prevention of <m>relapse</m> of @DISEASE_Uveitis_Anterior @DISEASE_MESH:D014606 @@@<m>acute</m> <m>anterior</m> <m>uveitis</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 37223599\nTitle: Ocular Manifestations of Spondyloarthritis\nSource: Mediterr J Rheumatol (2023)\nAbstract: Lee et al., 2017 Retrospective, interventional case series AS/91 Men preponderance (70%), average onset in the fourth decade, and unilateral manifestation (87.9%) was observed Bouzid et al. 2020 Retrospective study SpA/101 First-line sulfasalazine reduced <m>uveitis</m> <m>relapses</m> van Denderen et al., 2014 <m>Randomized</m> controlled <m>trial</m> AS/77 <m>Adalimumab</m> treatment. significantly reduced the number of @DISEASE_Uveitis @DISEASE_MESH:D014605 @@@<m>acute</m> <m>uveitis</m>@@@ attacks, and the number of attacks per patient Rudwaleit et al., 2016 <m>Randomized</m>, double-blind and placebo-controlled RAPID-axSpA (NCT01087762) axial SpA/218 Certolizumab Pegol reduced <m>uveitis</m> flares Calvo-Rio et al., 2016 Multi-center <m>randomized</m> <m>trial</m> SpA/15 Golimumab is predicted to be useful therapeutic option in refractory SpA-related <m>uveitis</m>\n--------------------------------------------------------------------------------\nPMID: 33681703\nTitle: Recent advances in the treatment of juvenile idiopathic arthritis-associated uveitis\nSource: Ther Adv Ophthalmol (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33854572\nTitle: Reduction of anterior uveitis flares in patients with axial spondyloarthritis on certolizumab pegol treatment: final 2-year results from the multicenter phase IV C-VIEW study\nSource: Ther Adv Musculoskelet Dis (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34271991\nTitle: Incidence of anterior uveitis in patients with axial spondyloarthritis treated with anti-TNF or anti-IL17A: a systematic review, a pairwise and network meta-analysis of randomized controlled trials\nSource: Arthritis Res Ther (2021)\nAbstract: Study selection process (flowchart). RCT, <m>randomized</m> controlled <m>trial</m>; @DISEASE_Uveitis_Anterior @DISEASE_MESH:D014606 @@@AU@@@, @DISEASE_Uveitis_Anterior @DISEASE_MESH:D014606 @@@<m>anterior</m> <m>uveitis</m>@@@\n--------------------------------------------------------------------------------\nPMID: 35663189\nTitle: Management Strategies of Juvenile Idiopathic Arthritis-Associated Chronic Anterior Uveitis: Current Perspectives\nSource: Clin Ophthalmol (2022)\nAbstract: According to the SHARE guidelines, @CHEMICAL_Adalimumab @CHEMICAL_MESH:D000068879 @@@<m>adalimumab</m>@@@ is recommended over @CHEMICAL_Infliximab @CHEMICAL_MESH:D000069285 @@@infliximab@@@ as the first-line biologic DMARD (bDMARD), although <m>randomized</m> controlled clinical <m>trials</m> were performed only for @CHEMICAL_Adalimumab @CHEMICAL_MESH:D000068879 @@@<m>adalimumab</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 39624020\nTitle: Development of Extramusculoskeletal Manifestations in Upadacitinib-Treated Patients With Psoriatic Arthritis or Axial Spondyloarthritis\nSource: Arthritis Rheumatol (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37553722\nTitle: Potential gastrointestinal Behcet's disease flare after treatment with anti-interleukin 17a therapy\nSource: BMC Rheumatol (2023)\nAbstract: @DISEASE_Spondylitis_Ankylosing @DISEASE_MESH:D013167 @@@<m>Ankylosing</m> <m>spondylitis</m>@@@\n--------------------------------------------------------------------------------\nPMID: 39407875\nTitle: Monoclonal Antibodies for the Treatment of Ocular Diseases\nSource: J Clin Med (2024)\nAbstract: The impact of @CHEMICAL_Adalimumab @CHEMICAL_MESH:D000068879 @@@<m>adalimumab</m>@@@ on the frequency of @DISEASE_Uveitis_Anterior @DISEASE_MESH:D014606 @@@<m>anterior</m> <m>uveitis</m>@@@ flare-ups in @SPECIES_9606 @@@patients@@@ with active @DISEASE_Spondylitis_Ankylosing @DISEASE_MESH:D013167 @@@<m>ankylosing</m> <m>spondylitis</m>@@@ (@DISEASE_Spondylitis_Ankylosing @DISEASE_MESH:D013167 @@@AS@@@) was assessed.\n--------------------------------------------------------------------------------\nPMID: 34431877\nTitle: Treatment of noninfectious uveitis\nSource: Arq Bras Oftalmol (2021)\nAbstract: It was evaluated in a small cohort of @SPECIES_9606 @@@patients@@@ with @DISEASE_Spondylitis_Ankylosing @DISEASE_MESH:D013167 @@@<m>ankylosing</m> <m>spondylitis</m>@@@-associated @DISEASE_Uveitis_Anterior @DISEASE_MESH:D014606 @@@<m>anterior</m> <m>uveitis</m>@@@, and the results indicated fewer @DISEASE_Uveitis @DISEASE_MESH:D014605 @@@<m>uveitis</m>@@@ <m>recurrences</m> after @CHEMICAL_Sulfasalazine @CHEMICAL_MESH:D012460 @@@sulfasalazine@@@ therapy, although the grading system used to categorize @DISEASE_Uveitis @DISEASE_MESH:D014605 @@@<m>uveitis</m>@@@ activity is no longer used.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_Y42TggDKJrYwe5CAyVp3AYsq",
+    "parent_tool_call_id": "call_nQM8EOvfg6jchoSkUAJSJ5fM",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "recurrence rate adalimumab hazard ratio confidence interval recurrent uveitis",
+      "pmid": "38243710"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('38243710')\noutput = format_paper_content_output(result, filter_keywords='recurrence rate adalimumab hazard ratio confidence interval recurrent uveitis')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 38243710 ===\n\nTitle: Comparative risk of incident and recurrent acute anterior uveitis across different biological agents in patients with ankylosing spondylitis.\n\nJournal/Date: Rheumatology (Oxford, England) (2025)\n\nMeSH Keywords: Humans, Uveitis, Anterior, Spondylitis, Ankylosing, Female, Male, Retrospective Studies, Middle Aged, Recurrence\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: To evaluate the comparative risk of incident and recurrent acute anterior uveitis (AAU) across different biological DMARDs (bDMARDs) in patients with AS.\n[METHODS]: A retrospective nationwide cohort study was conducted on 34 621 patients with AS without a previous history of AAU using a national claims database. Patients were followed-up from 2010 to 2021. The comparative risk of incident and recurrent AAU across different bDMARDs was examined using multivariable time-dependent Cox models and counting process (Anderson-Gill) models, respectively.\n[RESULTS]: The adjusted hazard ratios (aHRs) and 95% CIs for incident AAU (bDMARDs non-exposure as reference) were: adalimumab 0.674 (0.581-0.891), etanercept 1.760 (1.540-2.012), golimumab 0.771 (0.620-0.959), infliximab 0.891 (0.741-1.071) and secukinumab 1.324 (0.794-2.209). Compared with adalimumab exposure, etanercept [aHR 2.553 (2.114-3.083)], infliximab [aHR 1.303 (1.039-1.634)] and secukinumab [aHR 2.173 (1.273-3.710)] exposures showed a higher risk of incident AAU. The aHRs and 95% CIs for recurrent AAU (bDMARDs non-exposure as reference) were: adalimumab 0.798 (0.659-0.968), etanercept 1.416 (1.185-1.693), golimumab 0.874 (0.645-1.185), infliximab 0.926 (0.729-1.177) and secukinumab 1.257 (0.670-2.359). Compared with adalimumab exposure, etanercept exposure [aHR 1.793 (1.403-2.292)] was associated with a higher risk of recurrent AAU.\n[CONCLUSION]: Our data suggest preference for bDMARDs in the following order: adalimumab/golimumab > infliximab > secukinumab > etanercept (for incident AAU prevention) and adalimumab > golimumab/infliximab/secukinumab > etanercept (for recurrent AAU prevention).\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_RxNje2jQgjPd2dGIlSs75yFz",
+    "parent_tool_call_id": "call_nQM8EOvfg6jchoSkUAJSJ5fM",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "adalimumab recurrent anterior uveitis rate previous uveitis hazard ratio",
+      "pmid": "35160082"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('35160082')\noutput = format_paper_content_output(result, filter_keywords='adalimumab recurrent anterior uveitis rate previous uveitis hazard ratio')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 35160082 ===\n\nTitle: Risk of Acute Anterior Uveitis in Ankylosing Spondylitis According to the Type of Tumor Necrosis Factor-Alpha Inhibitor and History of Uveitis: A Nationwide Population-Based Study.\n\nJournal/Date: Journal of clinical medicine (2022)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[BACKGROUND]: We evaluated the risk of acute anterior uveitis (AAU) in patients with ankylosing spondylitis (AS) during treatment with tumor necrosis factor-alpha inhibitors (TNFis).\n[METHODS]: This study was performed on AS patients using the Korean National Health Insurance claims database. We analyzed the first and total occurrence of AAU during the first 2 years of TNFis use according to the type of TNFis. Additionally, the occurrence of AAU was assessed in subgroups with or without prior AAU before TNFis initiation.\n[RESULTS]: In total, 5938 AS patients initiated TNFis use between 2009 and 2017 and used them for more than 2 years. Among them, 1488 (25.1%) patients had a history of AAU before starting TNFis treatment. Compared to adalimumab, the use of etanercept (hazard ratio [HR] 1.77) increased the risk of AAU. The incidence rate ratio (IRR) of AAU with etanercept was significantly higher than that of adalimumab (IRR 1.78). The IRR of AAU was also higher for etanercept than adalimumab use in patients with (IRR 1.86) and without (IRR 2.92) a history of AAU.\n[CONCLUSION]: These data suggest that compared to anti-TNF-alpha monoclonal antibodies, etanercept has a higher incidence of AAU regardless of a history of AAU.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\n3. Results\n\n3.1. Study Population\n\nWe identified 88,904 individuals with the AS diagnostic code in the Korean NHI claim database between 2009 and 2019. Among them, we excluded 17,540 individuals who were previously diagnosed with AS between 2007 and 2008. An additional 9998 individuals with other rheumatic diseases (systemic lupus erythematosus, rheumatoid arthritis, Behcet’s disease, psoriatic arthritis, Crohn’s disease, and ulcerative colitis) diagnosed before a diagnosis of AS were also excluded. Another 53,392 patients who had never used TNFis and 2036 patients who used TNFis for less than 2 years prior to the study were excluded. The final cohort comprised 5938 patients with newly diagnosed AS who maintained TNFis treatment for more than 2 years (Figure 1).\n\nAs shown in Table 1, the m...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_Vy1tYQwN9IvcmnzOtqoFjdXx",
+    "parent_tool_call_id": "call_nQM8EOvfg6jchoSkUAJSJ5fM",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "meta-analysis adalimumab incidence anterior uveitis relative risk odds ratio",
+      "pmid": "34271991"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('34271991')\noutput = format_paper_content_output(result, filter_keywords='meta-analysis adalimumab incidence anterior uveitis relative risk odds ratio')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 34271991 ===\n\nTitle: Incidence of anterior uveitis in patients with axial spondyloarthritis treated with anti-TNF or anti-IL17A: a systematic review, a pairwise and network meta-analysis of randomized controlled trials.\n\nJournal/Date: Arthritis research & therapy (2021)\n\nMeSH Keywords: Humans, Incidence, Randomized Controlled Trials as Topic, Spondylarthritis, Tumor Necrosis Factor-alpha, Uveitis, Anterior\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Anterior uveitis (AU) is the most frequent extra-articular feature of axial spondyloarthritis (axSpA). We aimed to assess and compare the incidence of AU in axSpA patients treated with anti-TNF or anti-IL17A.\n[METHODS]: We systematically reviewed PubMed, EMBase, and Cochrane from inception to May 3, 2020, and searched for placebo-controlled and head-to-head randomized controlled trials (RCTs) assessing anti-TNF monoclonal antibodies (mAb) or soluble receptor fusion protein or anti-IL17A in patients with axSpA according to ASAS criteria and reporting safety data on AU. Data were extracted following a predefined protocol. We did pairwise and network meta-analyses for the primary outcome of AU flares (relapse or de novo) incidence and estimated summary odds ratios (ORs). We assessed the quality of evidence using the Cochrane risk-of-bias 2.0 tool. We ranked treatments according to their effectiveness in preventing AU flare using the P-score.\n[RESULTS]: We identified 752 citations and included 33 RCTs, comprising 4544 treated patients (anti-TNF mAb 2101, etanercept [ETN] 699, anti-IL17A 1744) and 2497 placebo-receiving patients. Incidence of uveitis was lower with anti-TNF mAb versus placebo (OR = 0.46; CI 95% [0.24; 0.90]) and versus anti-IL17A (OR = 0.34; CI 95% [0.12; 0.92]. According to the P-score, the ranking from the most to the least preventive treatment of uveitis flare was as follows: anti-TNF mAb, ETN, placebo, and anti-IL17A.\n[CONCLUSION]: In RCTs assessing anti-TNF and anti-IL17A in axSpA, incident uveitis are rare events. However, this network meta-analysis demonstrates that anti-TNF mAb are associated with a lower incidence of uveitis compared to placebo and anti-IL17A.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nEligible studies\n\nWe identified 751 citations after search in the 3 databases plus one more after search in the congress abstract databases (Fig. 1). After reading titles and abstracts, we excluded 713 abstracts, mainly because of duplicates or off topic studies. After the complete reading, we excluded 6 articles: 4 because AU were not described during the controlled period and 2 for an unrepresentative population. Finally, we included 33 RCTs (Figs. 1 and 2), allowing 35 comparisons, comprising 4544 patients with axSpA treated with a biologic treatment and 2497 treated with placebo.\n\nStudy characteristics\n\nThe Additional file 1 provides detailed characteristics of the 33 RCTs included in the analyses. A comparison of a biologic treatment versus placebo was performed in 32 placebo...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 15,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_RHKM1NvFYV9dQKklXVALIbSx",
+    "parent_tool_call_id": "call_nQM8EOvfg6jchoSkUAJSJ5fM",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "adalimumab attacks per patient year baseline follow-up recurrence",
+      "pmid": "21784730"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('21784730')\noutput = format_paper_content_output(result, filter_keywords='adalimumab attacks per patient year baseline follow-up recurrence')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 21784730 ===\n\nTitle: Risk of septic arthritis in patients with rheumatoid arthritis and the effect of anti-TNF therapy: results from the British Society for Rheumatology Biologics Register.\n\nJournal/Date: Annals of the rheumatic diseases (2011)\n\nMeSH Keywords: Adult, Aged, Antirheumatic Agents, Arthritis, Infectious, Arthritis, Rheumatoid, Epidemiologic Methods, Female, Humans\n\n\n--- ABSTRACT ---\n[OBJECTIVES]: To evaluate the risk of septic arthritis (SA) in patients with rheumatoid arthritis (RA) treated with anti-tumour necrosis factor (TNF) therapy.\n[METHODS]: Using data from the British Society for Rheumatology Biologics Register, a prospective observational study, the authors compared the risk of SA between 11 881 anti-TNF-treated and 3673 non-biological disease-modifying antirheumatic drug (nbDMARD)-treated patients.\n[RESULTS]: 199 patients had at least one episode of SA (anti-TNF: 179, nbDMARD: 20). Incidence rates were: anti-TNF 4.2/1000 patient years (pyrs) follow-up (95% CI 3.6 to 4.8), nbDMARD 1.8/1000 pyrs (95% CI 1.1 to 2.7). The adjusted HR for SA in the anti-TNF cohort was 2.3 (95% CI 1.2 to 4.4). The risk did not differ significantly between the three agents: adalimumab, etanercept and infliximab. The risk was highest in the early months of therapy. The patterns of reported organisms differed in the anti-TNF cohort. Prior joint replacement surgery was a risk factor for SA in all patients. The rate of postoperative joint infection (within 90 days of surgery) was 0.7%. This risk was not significantly influenced by anti-TNF therapy.\n[CONCLUSIONS]: Anti-TNF therapy use in RA is associated with a doubling in the risk of SA. Physicians and surgeons assessing the RA patient should be aware of this potentially life-threatening complication.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nThe baseline characteristics of the 15 554 patients included in the analysis are shown in table 1. Although both anti-TNF and nbDMARD groups had active RA, there were significant differences at baseline. The patients receiving anti-TNF therapy were younger and proportionally more were women. The anti-TNF group had significantly longer disease duration as well as higher disease activity. History of joint replacement was higher in the anti-TNF cohort (24% vs 14% (p<0.001)).\n\nIncident SA was reported in 199 patients during the follow-up period (179 anti-TNF; 20 nbDMARD). In univariate analysis, increasing age, longer disease duration, higher HAQ, higher DAS28 score, baseline steroid exposure, prior orthopaedic surgery and diabetes were associated with SA irrespective of anti-TNF expo...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_smtz75xWHgKVTdLxDJi4SMuX",
+    "parent_tool_call_id": "call_RHKM1NvFYV9dQKklXVALIbSx",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "In a 2025 nationwide AS cohort, adalimumab was associated with lower recurrent AAU risk than no bDMARD exposure (aHR 0.798, 95% CI 0.659–0.968, statistically significant). Etanercept carried greater recurrence risk than adalimumab (aHR 1.793, 95% CI 1.403–2.292). Absolute recurrence rates were not reported in the available abstract; notably, this 34,621-patient cohort was described as having no prior AAU in its methods despite also reporting recurrent AAU outcomes, so interpret recurrence-specific population details cautiously.",
+          "source_tools": [
+            {
+              "relevance": "Primary cohort abstract gives adjusted recurrence HRs, references, and comparator",
+              "tool_call_id": "call_Y42TggDKJrYwe5CAyVp3AYsq"
+            }
+          ]
+        },
+        {
+          "finding": "A Korean claims cohort of 5,938 AS patients treated with TNF inhibitors for over two years found higher AAU occurrence with etanercept than adalimumab (overall IRR 1.78; among prior-AAU patients IRR 1.86); the association was reported as significant. The abstract does not provide absolute recurrence rates or a direct adalimumab-versus-no-treatment comparison.",
+          "source_tools": [
+            {
+              "relevance": "Nationwide cohort comparing inhibitor type, including subgroup with previous AAU",
+              "tool_call_id": "call_RxNje2jQgjPd2dGIlSs75yFz"
+            }
+          ]
+        },
+        {
+          "finding": "An RCT network meta-analysis of 33 axSpA trials (4,544 biologic-treated and 2,497 placebo-treated participants) found lower AU flare incidence for the pooled anti-TNF monoclonal-antibody class versus placebo (OR 0.46, 95% CI 0.24–0.90) and versus anti-IL-17A (OR 0.34, 95% CI 0.12–0.92). This supports a significant class-level preventive association, but does not isolate adalimumab or specifically quantify recurrence versus new-onset events.",
+          "source_tools": [
+            {
+              "relevance": "Pooled RCT meta-analysis effect estimates and event definition",
+              "tool_call_id": "call_Vy1tYQwN9IvcmnzOtqoFjdXx"
+            }
+          ]
+        },
+        {
+          "finding": "The retrieved evidence supports reduced AAU risk with adalimumab relative to non-exposure in the nationwide cohort and relative to etanercept in comparative cohorts; the pooled RCT evidence is for anti-TNF monoclonal antibodies as a class. The available sources do not establish adalimumab-specific absolute recurrence rates, and the retrieved meta-analysis is not a recurrence-only adalimumab analysis.",
+          "source_tools": [
+            {
+              "relevance": "Adalimumab recurrence-specific cohort estimate",
+              "tool_call_id": "call_Y42TggDKJrYwe5CAyVp3AYsq"
+            },
+            {
+              "relevance": "Comparator cohort with prior-AAU subgroup",
+              "tool_call_id": "call_RxNje2jQgjPd2dGIlSs75yFz"
+            },
+            {
+              "relevance": "Class-level pooled RCT meta-analysis",
+              "tool_call_id": "call_Vy1tYQwN9IvcmnzOtqoFjdXx"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 17,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_gssjOAzkn8jvnq5jVME93Ui5",
+    "parent_tool_call_id": "call_dzjVbn03H0sSrVF45mV2C5li",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DRUG",
+          "name": "Adalimumab",
+          "observations": [
+            "In a 2025 nationwide ankylosing spondylitis cohort, adalimumab was associated with lower recurrent acute anterior uveitis risk versus no bDMARD exposure (adjusted HR 0.798, 95% CI 0.659–0.968).",
+            "In a Korean TNF-inhibitor cohort, acute anterior uveitis occurrence was lower with adalimumab than etanercept; etanercept versus adalimumab IRR was 1.78 overall and 1.86 among patients with prior uveitis.",
+            "Available evidence does not establish adalimumab-specific absolute recurrence rates or a recurrence-only randomized trial effect."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Adalimumab versus nonexposure and recurrence risk",
+              "tool_call_id": "call_Y42TggDKJrYwe5CAyVp3AYsq"
+            },
+            {
+              "relevance": "Adalimumab versus etanercept",
+              "tool_call_id": "call_RxNje2jQgjPd2dGIlSs75yFz"
+            }
+          ]
+        },
+        {
+          "entity_type": "DISEASE",
+          "name": "Ankylosing spondylitis",
+          "observations": [
+            "Adalimumab-associated reduction in acute anterior uveitis recurrence/risk is supported by nationwide observational evidence and comparative TNF-inhibitor data."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Disease-treatment outcome evidence",
+              "tool_call_id": "call_Y42TggDKJrYwe5CAyVp3AYsq"
+            },
+            {
+              "relevance": "Comparative cohort evidence",
+              "tool_call_id": "call_RxNje2jQgjPd2dGIlSs75yFz"
+            }
+          ]
+        },
+        {
+          "entity_type": "PHENOTYPE",
+          "name": "Acute anterior uveitis",
+          "observations": [
+            "Pooled randomized-trial evidence found fewer anterior uveitis flares with anti-TNF monoclonal antibodies versus placebo (OR 0.46, 95% CI 0.24–0.90), but this class-level result does not isolate adalimumab."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Pooled randomized evidence",
+              "tool_call_id": "call_Vy1tYQwN9IvcmnzOtqoFjdXx"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Adalimumab",
+          "relation_type": "INHIBITS",
+          "to_entity": "Acute anterior uveitis"
+        },
+        {
+          "from_entity": "Adalimumab",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Ankylosing spondylitis"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"Adalimumab\", \"entityType\": \"DRUG\", \"observations\": [\"In a 2025 nationwide ankylosing spondylitis cohort, adalimumab was associated with lower recurrent acute anterior uveitis risk versus no bDMARD exposure (adjusted HR 0.798, 95% CI 0.659\\u20130.968).\", \"In a Korean TNF-inhibitor cohort, acute anterior uveitis occurrence was lower with adalimumab than etanercept; etanercept versus adalimumab IRR was 1.78 overall and 1.86 among patients with prior uveitis.\", \"Available evidence does not establish adalimumab-specific absolute recurrence rates or a recurrence-only randomized trial effect.\"]}, {\"name\": \"Ankylosing spondylitis\", \"entityType\": \"DISEASE\", \"observations\": [\"Adalimumab-associated reduction in acute anterior uveitis recurrence/risk is supported by nationwide observational evidence and comparative TNF-inhibitor data.\"]}, {\"name\": \"Acute anterior uveitis\", \"entityType\": \"PHENOTYPE\", \"observations\": [\"Pooled randomized-trial evidence found fewer anterior uveitis flares with anti-TNF monoclonal antibodies versus placebo (OR 0.46, 95% CI 0.24\\u20130.90), but this class-level result does not isolate adalimumab.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"Adalimumab\", \"to\": \"Acute anterior uveitis\", \"relationType\": \"INHIBITS\"}, {\"from\": \"Adalimumab\", \"to\": \"Ankylosing spondylitis\", \"relationType\": \"ASSOCIATED_WITH\"}]}}, \"provenance\": {\"tool_call_id\": \"call_gssjOAzkn8jvnq5jVME93Ui5\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_dzjVbn03H0sSrVF45mV2C5li\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

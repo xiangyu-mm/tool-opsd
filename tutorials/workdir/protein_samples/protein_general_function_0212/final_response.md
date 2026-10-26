@@ -1,0 +1,6 @@
+## Brief protein assessment
+
+- **Length and predicted properties:** 768 amino acids; estimated molecular mass **84.2 kDa** and theoretical pI **6.34**.
+- **Architecture:** The N-terminal region is strongly hydrophobic and contains a **tRNA_synt_2_TM domain** (residues 31–253), consistent with multiple membrane-spanning segments. Pfam also detects an **LPG_synthase_C domain** (271–569) and a C-terminal **tRNA_anti-codon domain** (697–767).
+- **Likely function:** This combination suggests an **MprF-like lysyl-phosphatidylglycerol synthase**, a membrane-associated enzyme family that uses lysyl-tRNA to modify phosphatidylglycerol. This assignment is an inference from domain architecture and sequence similarity—not a direct curated annotation for this sequence.
+- **Evidence and caveats:** Similarity searches found hits with about **40–44% identity** and high query coverage, but none met the tool’s annotation-transfer filters. Membrane localization and topology are suggested by the sequence; exact topology, activity, and substrate specificity remain unconfirmed.

@@ -1,0 +1,1 @@
+{"answer": "[O][C][=C][Branch2][Ring1][Ring2][C][=N][C][=N][C][=C][C][=C][C][=C][C][=C][C][Ring1][=Branch1][=C][Ring1][#Branch2][O][C][=C][C][=C][C][=C][C][=C][Ring2][Ring1][=Branch2][Ring1][=Branch1]"}

@@ -1,0 +1,443 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_UOxSaxBcYMOfhZHnFwOtC49t",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease",
+        "drug"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether stemness/cancer-stem-cell properties are derived from thyroid cancer cells. Investigate human thyroid cancer, papillary/medullary/anaplastic thyroid carcinoma, thyroid cancer stem-like cells, tumor initiation, self-renewal, pluripotency/stemness markers (such as NANOG, OCT4/POU5F1, SOX2, ALDH, CD44, CD133), epithelial-mesenchymal transition, and evidence for cellular origin versus phenotypic acquisition. Report representative primary studies/reviews, the direction and strength of evidence, and important caveats."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_0AdftsyTofzR6Yi0a5QrZY1h",
+    "parent_tool_call_id": "call_UOxSaxBcYMOfhZHnFwOtC49t",
+    "round": 1,
+    "tool_input": {
+      "task_name": "thyroid CSC origin",
+      "boolean_query_text": "thyroid cancer stem cell origin cellular origin phenotypic acquisition epithelial mesenchymal transition",
+      "top_k": 25,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='thyroid cancer stem cell origin cellular origin phenotypic acquisition epithelial mesenchymal transition',\n        top_k=25,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='thyroid cancer stem cell origin cellular origin phenotypic acquisition epithelial mesenchymal transition',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_CSC_origin.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_CSC_origin.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_CSC_origin.csv'\nTotal results found: 30\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 35213254\nTitle: Epigenetic Inheritance From Normal Origin Cells Can Determine the Aggressive Biology of Tumor-Initiating Cells and Tumor Heterogeneity\nSource: Cancer Control (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38372877\nTitle: Phenotypic Transitions the Processes Involved in Regulation of Growth and Proangiogenic Properties of Stem Cells, Cancer Stem Cells and Circulating Tumor Cells\nSource: Stem Cell Rev Rep (2024)\nAbstract: <m>Phenotypic</m> <m>Transitions</m> the Processes Involved in Regulation of Growth and Proangiogenic Properties of <m>Stem</m> <m>Cells</m>, @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>Cancer</m>@@@ <m>Stem</m> <m>Cells</m> and Circulating @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>Tumor</m>@@@ <m>Cells</m>\n--------------------------------------------------------------------------------\nPMID: 34067395\nTitle: Epithelial to Mesenchymal Transition History: From Embryonic Development to Cancers\nSource: Biomolecules (2021)\nAbstract: ...<m>Epithelial</m> to <m>mesenchymal</m> <m>transition</m> (EMT) is a complicated <m>cellular</m> phenomenon that consists in the <m>acquisition</m>, for a <m>cell</m>, of <m>mesenchymal</m> features in place of <m>epithelial</m> ones.\n--------------------------------------------------------------------------------\nPMID: 35267444\nTitle: Quantifying the Epithelial-to-Mesenchymal Transition (EMT) from Bench to Bedside\nSource: Cancers (Basel) (2022)\nAbstract: During the progression of many @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@solid <m>tumors</m>@@@, <m>cells</m> at the primary @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ site undergo <m>phenotypic</m> changes in response to extracellular stimuli, one among these being an <m>epithelial</m>-to-<m>mesenchymal</m> <m>transition</m> (EMT).\n--------------------------------------------------------------------------------\nPMID: 35205716\nTitle: Intrinsic and Extrinsic Factors Impacting Cancer Stemness and Tumor Progression\nSource: Cancers (Basel) (2022)\nAbstract: The <m>origin</m> of CSCs remains unclear, as well as whether they originate from normal <m>stem</m> <m>cells</m> or non-<m>stem</m> <m>cells</m> through re-<m>acquisition</m> of <m>stem</m> <m>cell</m> traits (<m>stemness</m>) through a change in differentiation (Figure 1).\n--------------------------------------------------------------------------------\nPMID: 36535192\nTitle: The roles of Linc-ROR in the regulation of cancer stem cells\nSource: Transl Oncol (2023)\nAbstract: Scholars have successively carried out researchs on solid @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ <m>stem</m> <m>cells</m>. It's verited by mounting studies that CSCs are derived from normal @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ <m>cells</m> differentiated from progenitor <m>cells</m> or normal <m>stem</m> <m>cells</m>, or from <m>stem</m> <m>cells</m> obtained through the <m>epithelial</m>-<m>mesenchymal</m> <m>transition</m> (EMT) process.\n--------------------------------------------------------------------------------\nPMID: 39592661\nTitle: The neuroepithelial origin of ovarian carcinomas explained through an epithelial-mesenchymal-ectodermal transition enhanced by cisplatin\nSource: Sci Rep (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35350566\nTitle: The Role of Tumor Stem Cell Exosomes in Cancer Invasion and Metastasis\nSource: Front Oncol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34073413\nTitle: The Role of Snail-1 in Thyroid Cancer:What We Know So Far\nSource: J Clin Med (2021)\nAbstract: It has been described that the invasiveness of many types of @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@, including @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@<m>thyroid</m> <m>cancer</m>@@@, is associated with multiphase processes, such as the <m>epithelial</m>-<m>mesenchymal</m> <m>transition</m> (EMT).\n--------------------------------------------------------------------------------\nPMID: 38933820\nTitle: Exosomal noncoding RNAs: decoding their role in thyroid cancer progression\nSource: Front Endocrinol (Lausanne) (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35740987\nTitle: Mesenchymal Stem Cells in Embryo-Maternal Communication under Healthy Conditions or Viral Infections: Lessons from a Bovine Model\nSource: Cells (2022)\nAbstract: The <m>phenotypic</m> plasticity showed by both endometrial <m>mesenchymal</m> <m>stem</m> <m>cells</m> (eMSC) and embryonic trophoblast through <m>mesenchymal</m> to <m>epithelial</m> <m>transition</m> and <m>epithelial</m> to <m>mesenchymal</m> <m>transition</m>, respectively, is essential for embryo implantation.\n--------------------------------------------------------------------------------\nPMID: 34209658\nTitle: Functional Implications of the Dynamic Regulation of EpCAM during Epithelial-to-Mesenchymal Transition\nSource: Biomolecules (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34150761\nTitle: Markers and Reporters to Reveal the Hierarchy in Heterogeneous Cancer Stem Cells\nSource: Front Cell Dev Biol (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33845354\nTitle: Transcriptional signatures underlying dynamic phenotypic switching and novel disease biomarkers in a linear cellular model of melanoma progression\nSource: Neoplasia (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34299287\nTitle: The Use of Stem Cell-Derived Organoids in Disease Modeling: An Update\nSource: Int J Mol Sci (2021)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_cBLMfDJetofoOjVpIHzcHoah",
+    "parent_tool_call_id": "call_UOxSaxBcYMOfhZHnFwOtC49t",
+    "round": 1,
+    "tool_input": {
+      "task_name": "thyroid histotypes stemness",
+      "boolean_query_text": "papillary medullary anaplastic thyroid carcinoma cancer stem-like cells self renewal",
+      "top_k": 25,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='papillary medullary anaplastic thyroid carcinoma cancer stem-like cells self renewal',\n        top_k=25,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='papillary medullary anaplastic thyroid carcinoma cancer stem-like cells self renewal',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_histotypes_stemness.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_histotypes_stemness.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_histotypes_stemness.csv'\nTotal results found: 31\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 23528862\nTitle: Thyroid cancer stem-like cells and epithelial-mesenchymal transition in thyroid cancers.\nSource: Human pathology (2013)\nAbstract: Cancer stem-like cells are a subpopulation of self-renewing stem cells in cancers that are more resistant to chemotherapy and radiation therapy. Evidence supporting the existence of cancer stem-like cells in thyroid and in many other solid tissue cancers is rapidly accumulating. These cells have been studied using specific biomarkers such as CD133, CD44, and aldehyde dehydrogenase enzymes. Putative cancer stem-like cells can be studied in vitro using serum-free media supplemented with basic fibroblast growth factor and epidermal growth factor grown in nonadherent culture (ultra-low attachment plates) or in extracellular matrix leading to cell spheres formation in vitro. Cancer stem-like cells can also be separated by fluorescent cell sorting and used for in vitro or in vivo studies. Injection of enriched populations of cancer stem-like cells (also referred to as tumor initiating cells) into immunodeficient mice often results in rapid growth of xenografts, which express cancer stem-like cell biomarkers. Human cancer stem-like cells have been identified in thyroid cancer cell lines including papillary, follicular, medullary, and anaplastic carcinoma cell lines. They have also been id ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 34680488\nTitle: Osteopontin Expression in Thyroid Cancer: Deciphering EMT-Related Molecular Mechanisms\nSource: Biomedicines (2021)\nAbstract: For @DISEASE_Thyroid_cancer_medullary @DISEASE_MESH:C536914 @@@<m>medullary</m> <m>thyroid</m> <m>cancer</m>@@@ and, especially, @DISEASE_Thyroid_Carcinoma_Anaplastic @DISEASE_MESH:D065646 @@@<m>anaplastic</m> <m>thyroid</m> <m>cancer</m>@@@, @GENE_SPP1 @GENE_20750 @@@OPN@@@ protein levels were enhanced in comparison to @DISEASE_Thyroid_Cancer_Papillary @DISEASE_MESH:D000077273 @@@<m>papillary</m> <m>thyroid</m> <m>cancer</m>@@@ tissues, which were increased in <m>medullary</m> and <m>anaplastic</m> metastatic samples.\n--------------------------------------------------------------------------------\nPMID: 38757036\nTitle: The prognostic value of cancer stem cell markers in thyroid cancer: a systematic review\nSource: Arch Med Sci (2024)\nAbstract: The prognostic value of @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ <m>stem</m> <m>cell</m> markers in @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@<m>thyroid</m> <m>cancer</m>@@@: a systematic review\n--------------------------------------------------------------------------------\nPMID: 41751352\nTitle: Cancer Stemness and Dedifferentiation in Anaplastic Thyroid Carcinoma: Insights into a Multigenic, Microenvironmental Network and the Role of CD44\nSource: Biomedicines (2026)\nAbstract: @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>Cancer</m>@@@ <m>Stemness</m> and Dedifferentiation in @DISEASE_Thyroid_Carcinoma_Anaplastic @DISEASE_MESH:D065646 @@@<m>Anaplastic</m> <m>Thyroid</m> <m>Carcinoma</m>@@@: Insights into a Multigenic, Microenvironmental Network and the Role of @GENE_100126860 @GENE_100126860 @@@CD44@@@\n--------------------------------------------------------------------------------\nPMID: 33499351\nTitle: Targeting the Sonic Hedgehog Pathway to Suppress the Expression of the Cancer Stem Cell (CSC):Related Transcription Factors and CSC-Driven Thyroid Tumor Growth\nSource: Cancers (Basel) (2021)\nAbstract: This study focuses on how the @GENE_SHH @GENE_6469 @@@sonic hedgehog@@@ (@GENE_SHH @GENE_6469 @@@Shh@@@) pathway maintains @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@<m>thyroid</m> <m>cancer</m>@@@ <m>stem</m> <m>cell</m> <m>self</m>-<m>renewal</m> and whether it can be targeted for anticancer therapy.\n--------------------------------------------------------------------------------\nPMID: 33669363\nTitle: Thyroid Carcinoma: Phenotypic Features, Underlying Biology and Potential Relevance for Targeting Therapy\nSource: Int J Mol Sci (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38928426\nTitle: Biomarkers in Thyroid Cancer: Emerging Opportunities from Non-Coding RNAs and Mitochondrial Space\nSource: Int J Mol Sci (2024)\nAbstract: In this regard, @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ <m>stem</m> <m>cells</m>, which are associated with the promotion of @DISEASE_Neoplasm_Metastasis @DISEASE_MESH:D009362 @@@metastasis@@@, therapy resistance, and @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ dormancy, make the most of mitophagy to sustain their <m>self</m>-<m>renewal</m> properties.\n--------------------------------------------------------------------------------\nPMID: 35371349\nTitle: Stem Cell Therapy for Thyroid Diseases: Progress and Challenges\nSource: Curr Ther Res Clin Exp (2022)\nAbstract: Molecular markers express on <m>thyroid</m> mature <m>cells</m>, <m>thyroid</m> precursor/<m>stem</m> <m>cells</m>, and @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@<m>thyroid</m> <m>cancer</m>@@@ <m>stem</m> <m>cells</m>.\n--------------------------------------------------------------------------------\nPMID: 34447696\nTitle: The Emerging Landscapes of Long Noncoding RNA in Thyroid Carcinoma: Biological Functions and Clinical Significance\nSource: Front Oncol (2021)\nAbstract: @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@TC@@@ includes multiple histological types, such as @GENE_RET @GENE_5979 @@@PTC@@@, @DISEASE_Adenocarcinoma_Follicular @DISEASE_MESH:D018263 @@@follicular <m>thyroid</m> <m>carcinoma</m>@@@ (@DISEASE_Adenocarcinoma_Follicular @DISEASE_MESH:D018263 @@@FTC@@@), @DISEASE_Thyroid_cancer_Hurthle_cell @DISEASE_MESH:C536913 @@@Hurthle <m>cell</m> <m>carcinoma</m>@@@, @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@poorly differentiated <m>thyroid</m> <m>carcinoma</m>@@@, @DISEASE_Thyroid_Carcinoma_Anaplastic @DISEASE_MESH:D065646 @@@<m>anaplastic</m> <m>thyroid</m> <m>carcinoma</m>@@@, @DISEASE_Carcinoma_Squamous_Cell @DISEASE_MESH:D002294 @@@squamous <m>cell</m> <m>carcinoma</m>@@@, and @DISEASE_Thyroid_cancer_medullary @DISEASE_MESH:C536914 @@@<m>medullary</m> <m>thyroid</m> <m>carcinoma</m>@@@ (Figure 1).\n--------------------------------------------------------------------------------\nPMID: 35631627\nTitle: The Role of the Kinase Inhibitors in Thyroid Cancers\nSource: Pharmaceutics (2022)\nAbstract: @DISEASE_Thyroid_cancer_medullary @DISEASE_MESH:C536914 @@@<m>Medullary</m> <m>thyroid</m> <m>cancer</m>@@@ (@DISEASE_Thyroid_cancer_medullary @DISEASE_MESH:C536914 @@@MTC@@@) arises from parafollicular or C <m>Cells</m> of the <m>thyroid</m> and accounts for 5% of all @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@<m>thyroid</m> <m>cancers</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 34073413\nTitle: The Role of Snail-1 in Thyroid Cancer:What We Know So Far\nSource: J Clin Med (2021)\nAbstract: The remaining cases include: @DISEASE_Adenocarcinoma_Follicular @DISEASE_MESH:D018263 @@@follicular <m>thyroid</m> <m>carcinoma</m>@@@ (@DISEASE_Adenocarcinoma_Follicular @DISEASE_MESH:D018263 @@@FTC@@@), @DISEASE_Thyroid_cancer_Hurthle_cell @DISEASE_MESH:C536913 @@@Hurthle <m>cell</m> <m>carcinoma</m>@@@, @DISEASE_Thyroid_cancer_medullary @DISEASE_MESH:C536914 @@@<m>medullary</m> <m>thyroid</m> <m>carcinoma</m>@@@ originating from the parafollicular C <m>cell</m> of the gland and, rarely, @DISEASE_Thyroid_Carcinoma_Anaplastic @DISEASE_MESH:D065646 @@@<m>anaplastic</m> <m>thyroid</m> <m>carcinoma</m>@@@ (@DISEASE_Thyroid_Carcinoma_Anaplastic @DISEASE_MESH:D065646 @@@ATC@@@):the @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@undifferentiated <m>cancer</m>@@@ that derives from <m>thyroid</m> follicular <m>cell</m>.\n--------------------------------------------------------------------------------\nPMID: 37859990\nTitle: Case Report: Papillary thyroid carcinoma in Goltz-Gorlin syndrome\nSource: Front Endocrinol (Lausanne) (2023)\nAbstract: Discussion The @GENE_PORCN @GENE_64840 @@@PORCN@@@ gene is involved in the secretion and signaling of Wnt proteins, which contribute to tissue homeostasis by controlling proliferation, <m>stem</m> <m>cell</m> activation, and <m>self</m>-<m>renewal</m>. Wnt proteins are implicated in @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ growth in Wnt-dependent tissues, including the <m>thyroid</m> gland.\n--------------------------------------------------------------------------------\nPMID: 34550096\nTitle: High prevalence of thyroid carcinoma in patients with insulin resistance: a meta-analysis of case-control studies\nSource: Aging (Albany NY) (2021)\nAbstract: And @CHEMICAL_Metformin @CHEMICAL_MESH:D008687 @@@metformin@@@ can also inhibit the growth and migration of @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@<m>thyroid</m> <m>cancer</m>@@@ <m>cells</m>, inhibit the <m>self</m>-<m>renewal</m> of @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ <m>stem</m> <m>cells</m>, and enhance the effect of chemotherapeutic drugs.\n--------------------------------------------------------------------------------\nPMID: 35283407\nTitle: RET receptor signaling: Function in development, metabolic disease, and cancer\nSource: Proc Jpn Acad Ser B Phys Biol Sci (2022)\nAbstract: In addition, although not discussed in this review, the roles of @GENE_RET @GENE_5979 @@@RET@@@ in <m>self</m>-<m>renewal</m> and/or survival of spermatogonial <m>stem</m> <m>cells</m>) and hematopoietic <m>stem</m> <m>cells</m>,) in intestinal immunity,) and in @DISEASE_Neuralgia @DISEASE_MESH:D009437 @@@neuropathic pain@@@) are also being actively studied.\n--------------------------------------------------------------------------------\nPMID: 35147200\nTitle: Expression of SOX2OT, DANCR and TINCR long non-coding RNAs in papillary thyroid cancer and its effects on clinicopathological features\nSource: Mol Med Rep (2022)\nAbstract: According to histological features, @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@<m>thyroid</m> <m>cancer</m>@@@ can be divided into four subgroups: <m>Papillary</m>, follicular, <m>anaplastic</m> and <m>medullary</m>.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "unified_disease_search",
+    "tool_call_id": "call_8lZSYapZ90xXpY9s8gZNE5pA",
+    "parent_tool_call_id": "call_UOxSaxBcYMOfhZHnFwOtC49t",
+    "round": 1,
+    "tool_input": {
+      "context_tool_call_ids": [],
+      "limit_per_source": 5,
+      "search_term": "thyroid cancer",
+      "sources": [
+        "biothings",
+        "kegg",
+        "opentargets"
+      ],
+      "task_name": "thyroid cancer"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.diseases import search_diseases_unified\n\n# Perform unified disease search across multiple sources\nresults, output = search_diseases_unified(\n    search_term='thyroid cancer',\n    limit_per_source=5,\n    sources=['biothings', 'kegg', 'opentargets'],\n    save_path='/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_cancer.json',\n)\n\n# Display formatted output\nprint(output)\n\n```\n\n### Output:\n# Unified Disease Search Results\n\n## Search Term: 'thyroid cancer'\n\n**Total results:** 12 across 3 sources\n\n### Results by Source:\n- **BioThings (MyDisease.info):** Found 5 diseases (showing 5 of 17 total) in 2ms\n- **KEGG Disease:** Found 2 diseases\n- **Open Targets:** Found 5 diseases\n\n================================================================================\n\n\n## BIOTHINGS Results\n\nFound 5 diseases from BioThings (MyDisease.info):\n\n**1. thyroid cancer, nonmedullary, 4**\n  - Disease ID: MONDO:0014681\n  - MONDO ID: MONDO:0014681\n  - Definition: Any thyroid cancer, nonmedullary in which the cause of the disease is a mutation in the FOXE1 gene. [MONDO:patterns/disease_series_by_gene]...\n  - Synonyms: FOXE1 thyroid cancer, nonmedullary, thyroid cancer, nonmedullary caused by mutation in FOXE1, thyroi...\n\n**2. thyroid cancer, nonmedullary, 5**\n  - Disease ID: MONDO:0014682\n  - MONDO ID: MONDO:0014682\n  - Definition: Any thyroid cancer, nonmedullary in which the cause of the disease is a mutation in the HABP2 gene. [MONDO:patterns/disease_series_by_gene]...\n  - Synonyms: HABP2 thyroid cancer, nonmedullary, thyroid cancer, nonmedullary caused by mutation in HABP2, thyroi...\n\n**3. thyroid cancer, nonmedullary, 1**\n  - Disease ID: MONDO:0008567\n  - MONDO ID: MONDO:0008567\n  - Synonyms: thyroid cancer, nonmedullary, 1, thyroid cancer, nonmedullary, type 1...\n\n**4. thyroid cancer, nonmedullary, 3**\n  - Disease ID: MONDO:0011653\n  - MONDO ID: MONDO:0011653\n  - Synonyms: NMTC3, thyroid cancer, nonmedullary, 3, thyroid carcinoma, nonmedullary, 3...\n\n**5. thyroid gland papillary carcinoma**\n  - Disease ID: MONDO:0005075\n  - MONDO ID: MONDO:0005075\n  - DOID: DOID:3969\n  - Definition: A differentiated adenocarcinoma arising from the follicular cells of the thyroid gland. Radiation exposure is a risk factor and it is the most common malignant thyroid lesion, comprising 75% to 80% of...\n  - Synonyms: papillary cancer of the thyroid, papillary cancer of the thyroid gland, papillary cancer of thyroid,...\n\n\n## KEGG Results\n\nFound 2 diseases from KEGG:\n\n**1. H00032** - Thyroid cancer\n\n**2. H01592** - Medullary thyroid cancer\n\n\n## OPENTARGETS Results\n\nFound 5 diseases from Open Targets:\n\n**1. thyroid cancer**\n  - EFO ID: MONDO_0002108\n  - Description: A malignant neoplasm involving the thyroid gland...\n  - Entity Type: disease\n\n**2. thyroid gland carcinoma**\n  - EFO ID: MONDO_0015075\n  - Description: A carcinoma arising from the thyroid gland. It is usually an adenocarcinoma and includes the following main subtypes: follicular, papillary, medullary...\n  - Entity Type: disease\n\n**3. thyroid gland follicular carcinoma**\n  - EFO ID: MONDO_0005034\n  - Description: A differentiated adenocarcinoma arising from the follicular cells of the thyroid gland. The nuclear features which characterize the thyroid gland papi...\n  - Entity Type: disease\n\n**4. thyroid gland papillary carcinoma**\n  - EFO ID: MONDO_0005075\n  - Description: A differentiated adenocarcinoma arising from the follicular cells of the thyroid gland. Radiation exposure is a risk factor and it is the most common ...\n  - Entity Type: disease\n\n**5. differentiated thyroid carcinoma**\n  - EFO ID: MONDO_0015447\n  - Description: Differentiated thyroid carcinoma (DTC), also known as papillary or follicular thyroid carcinoma, is a slow-growing malignancy usually presenting in ad...\n  - Entity Type: disease\n\n\n================================================================================\n\n## Aggregated Information\n\n**All Disease Names Found (11):**\n  - Medullary thyroid cancer\n  - Thyroid cancer\n  - differentiated thyroid carcinoma\n  - thyroid cancer\n  - thyroid cancer, nonmedullary, 1\n  - thyroid cancer, nonmedullary, 3\n  - thyroid cancer, nonmedullary, 4\n  - thyroid cancer, nonmedullary, 5\n  - thyroid gland carcinoma\n  - thyroid gland follicular carcinoma\n  - thyroid gland papillary carcinoma\n\n**Cross-Database Identifiers:**\n  - MONDO: MONDO:0005075, MONDO:0008567, MONDO:0011653, MONDO:0014681, MONDO:0014682\n  - DOID: DOID:3969\n  - KEGG: H00032, H01592\n  - EFO: MONDO_0002108, MONDO_0005034, MONDO_0005075, MONDO_0015075, MONDO_0015447\n  - DISEASE_ID: MONDO:0005075, MONDO:0008567, MONDO:0011653, MONDO:0014681, MONDO:0014682\n\n\n**Results saved to:** /home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_cancer.json\n\n\n*Executed locally (no sandbox)*",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_8QSqNaktW63oq3XQqQBu0gaK",
+    "parent_tool_call_id": "call_8lZSYapZ90xXpY9s8gZNE5pA",
+    "round": 2,
+    "tool_input": {
+      "task_name": "thyroid EMT stemness",
+      "boolean_query_text": "thyroid cancer epithelial mesenchymal transition cancer stem cells CD44 self renewal",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='thyroid cancer epithelial mesenchymal transition cancer stem cells CD44 self renewal',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='thyroid cancer epithelial mesenchymal transition cancer stem cells CD44 self renewal',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_EMT_stemness.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_EMT_stemness.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/thyroid_EMT_stemness.csv'\nTotal results found: 23\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 28394318\nTitle: The evolving concept of cancer stem-like cells in thyroid cancer and other solid tumors.\nSource: Laboratory investigation; a journal of technical methods and pathology (2017)\nAbstract: The cancer stem-like cell (CSC) hypothesis postulates that a small population of cells in a cancer has self-renewal and clonal tumor initiation properties. These cells are responsible for tumor initiation, growth, recurrence and for resistance to chemotherapy and radiation therapy. CSCs can be characterized using markers such as SSEA-1, SSEA-4, CD44, CD24, ALDEFLUOR and others. CSCs form spheres when they are cultured in serum-free condition in low attachment plates and can generate tumors when injected into immune-deficient mice. During epithelial to mesenchymal transition (EMT), cells lose cellular adhesion and polarity and acquire an invasive phenotype. Recent studies have established a relationship between EMT and increased numbers of CSCs in some solid malignancies. Non-coding RNAs such as microRNAs and long non-coding RNAs (lncRNAs) have been shown to have important roles during EMT and some of these molecules also have regulatory roles in the proliferation of CSCs. Specific lncRNAs enhanced cell migration and invasion in breast carcinomas, which was associated with the generation of stem cell properties. The tumor microenvironment of CSCs also has an important role in tumor  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 23528862\nTitle: Thyroid cancer stem-like cells and epithelial-mesenchymal transition in thyroid cancers.\nSource: Human pathology (2013)\nAbstract: Cancer stem-like cells are a subpopulation of self-renewing stem cells in cancers that are more resistant to chemotherapy and radiation therapy. Evidence supporting the existence of cancer stem-like cells in thyroid and in many other solid tissue cancers is rapidly accumulating. These cells have been studied using specific biomarkers such as CD133, CD44, and aldehyde dehydrogenase enzymes. Putative cancer stem-like cells can be studied in vitro using serum-free media supplemented with basic fibroblast growth factor and epidermal growth factor grown in nonadherent culture (ultra-low attachment plates) or in extracellular matrix leading to cell spheres formation in vitro. Cancer stem-like cells can also be separated by fluorescent cell sorting and used for in vitro or in vivo studies. Injection of enriched populations of cancer stem-like cells (also referred to as tumor initiating cells) into immunodeficient mice often results in rapid growth of xenografts, which express cancer stem-like cell biomarkers. Human cancer stem-like cells have been identified in thyroid cancer cell lines including papillary, follicular, medullary, and anaplastic carcinoma cell lines. They have also been id ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 28775782\nTitle: Thyrospheres from B-CPAP Cell Line with BRAF and TERT Promoter Mutations have Different Functional and Molecular Features than Parental Cells.\nSource: Journal of Cancer (2017)\nAbstract: Human thyroid cancer derived cell lines are widely used to study the mechanisms involved in thyroid carcinogenesis. However, there is limited availability of non-cross-contaminated cancer cell lines derived from papillary thyroid carcinoma (PTC), and the B-CPAP cell line is one of the few such lines. B-CPAP cells have been genetically and cytogenetically well-characterized, but details of their stemness features remain uncertain. Considering that this cell line is extensively used for in vitro studies on thyroid tumorigenesis, we broaden its functional and molecular profiles as well as the tumorigenic capacity. We used functional assays (sphere-forming capacity and efficiency), assessed self-renewal and propagation efficiency and tested in vivo tumorigenicity in Hsd:Athymic Nude-Foxn1nu mice. Expression of markers of stemness, differentiation, and epithelial-mesenchymal transition were estimated at RNA and protein levels in adherent parental cells and sphere-forming cells. Functional aspects and stemness features were compared with normal thyrocytes. Protein expression of xenograft tumors was evaluated by immunohistochemistry. B-CPAP sphere-forming cells were able to form thyrosphe ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 34150761\nTitle: Markers and Reporters to Reveal the Hierarchy in Heterogeneous Cancer Stem Cells\nSource: Front Cell Dev Biol (2021)\nAbstract: The metastatic <m>cells</m> with extreme <m>mesenchymal</m> characteristics can remain dormant at distant sites and can undergo <m>mesenchymal</m>-<m>epithelial</m> <m>transition</m> to acquire hybrid phenotype and @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ initiation potential.\n--------------------------------------------------------------------------------\nPMID: 35205716\nTitle: Intrinsic and Extrinsic Factors Impacting Cancer Stemness and Tumor Progression\nSource: Cancers (Basel) (2022)\nAbstract: @GENE_NANOG @GENE_79923 @@@NANOG@@@ is also involved in maintaining embryonic <m>stem</m> <m>cell</m> <m>self</m>-<m>renewal</m> and @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ <m>stemness</m>.\n--------------------------------------------------------------------------------\nPMID: 41751352\nTitle: Cancer Stemness and Dedifferentiation in Anaplastic Thyroid Carcinoma: Insights into a Multigenic, Microenvironmental Network and the Role of CD44\nSource: Biomedicines (2026)\nAbstract: We put special emphasis on the role of @GENE_100126860 @GENE_100126860 @@@<m>CD44</m>@@@ and its variant isoforms (CD44v), which play a role in the interface of @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ <m>stemness</m>, @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@tumour@@@ microenvironment crosstalk, modulation of <m>epithelial</m>-<m>mesenchymal</m> <m>transition</m> (EMT), chemoresistance, and @DISEASE_Neoplasm_Metastasis @DISEASE_MESH:D009362 @@@metastasis@@@.\n--------------------------------------------------------------------------------\nPMID: 34064635\nTitle: Therapeutic Strategies for Targeting Ovarian Cancer Stem Cells\nSource: Int J Mol Sci (2021)\nAbstract: @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>Cancer</m>@@@ <m>stem</m> <m>cells</m> (CSCs) are highly tumorigenic as @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@-initiating <m>cells</m> and possess the ability to <m>self</m>-renew, similar to normal <m>stem</m> <m>cells</m>.\n--------------------------------------------------------------------------------\nPMID: 36042526\nTitle: The lipid rafts in cancer stem cell: a target to eradicate cancer\nSource: Stem Cell Res Ther (2022)\nAbstract: ...<m>Self</m>-<m>renewal</m> is the ability of <m>stem</m> <m>cells</m> that divide to produce more <m>stem</m> <m>cells</m>.\n--------------------------------------------------------------------------------\nPMID: 38372877\nTitle: Phenotypic Transitions the Processes Involved in Regulation of Growth and Proangiogenic Properties of Stem Cells, Cancer Stem Cells and Circulating Tumor Cells\nSource: Stem Cell Rev Rep (2024)\nAbstract: The spread of @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ <m>cells</m> in a collective manner highlights the importance of <m>epithelial</m>-to-<m>mesenchymal</m> <m>transition</m> (EMT), a process in which tightly-bound @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ <m>cells</m> acquire <m>mesenchymal</m> plasticity and they become more mobile.\n--------------------------------------------------------------------------------\nPMID: 33916320\nTitle: Thyroid Cancer Stem-Like Cells: From Microenvironmental Niches to Therapeutic Strategies\nSource: J Clin Med (2021)\nAbstract: @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@<m>Thyroid</m> <m>Cancer</m>@@@ <m>Stem</m>-Like <m>Cells</m>: From Microenvironmental Niches to Therapeutic Strategies\n--------------------------------------------------------------------------------\nPMID: 34359786\nTitle: Cancer Stem Cells in Oropharyngeal Cancer\nSource: Cancers (Basel) (2021)\nAbstract: @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>Cancer</m>@@@ <m>stem</m> <m>cells</m> (CSCs) are a subgroup of <m>cells</m> in the heterogeneous @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ bulk, which have the ability of <m>self</m>-<m>renewal</m> and differentiation, like <m>stem</m> <m>cells</m>.\n--------------------------------------------------------------------------------\nPMID: 40809695\nTitle: Cancer stem cells in personalized therapy: mechanisms, microenvironment crosstalk, and therapeutic vulnerabilities\nSource: Front Cell Dev Biol (2025)\nAbstract: @GENE_EPCAM @GENE_4072 @@@<m>Epithelial</m> <m>Cell</m> Adhesion Molecule@@@ (@GENE_EPCAM @GENE_4072 @@@EpCAM@@@), a homophilic <m>cell</m>-<m>cell</m> adhesion glycoprotein, serves as a prognostic marker, therapeutic target, and anchor molecule on circulating and disseminated @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ <m>cells</m>, which regulates @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ <m>cell</m> adhesion, proliferation, migration, <m>stemness</m>, and <m>epithelial</m>-to-<m>mesenchymal</m> <m>transition</m>.\n--------------------------------------------------------------------------------\nPMID: 34680488\nTitle: Osteopontin Expression in Thyroid Cancer: Deciphering EMT-Related Molecular Mechanisms\nSource: Biomedicines (2021)\nAbstract: However, its aggressive subtypes are related to therapeutic resistance and early @DISEASE_Neoplasm_Metastasis @DISEASE_MESH:D009362 @@@metastasis@@@. <m>Epithelial</m>-<m>mesenchymal</m> <m>transition</m> (EMT) and its reverse process, the <m>mesenchymal</m>-<m>epithelial</m> <m>transition</m> (@GENE_SLTM @GENE_79811 @@@MET@@@), are key events mediating @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ progression, including in @DISEASE_Thyroid_Neoplasms @DISEASE_MESH:D013964 @@@<m>thyroid</m> <m>cancer</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 33419089\nTitle: CHD4 Predicts Aggressiveness in PTC Patients and Promotes Cancer Stemness and EMT in PTC Cells\nSource: Int J Mol Sci (2021)\nAbstract: In addition, our in vitro results indicated that @GENE_CHD4 @GENE_1108 @@@CHD4@@@ regulates <m>cell</m> growth, @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ <m>stemness</m> and <m>epithelial</m>-<m>mesenchymal</m> <m>transition</m> (EMT) in @DISEASE_Thyroid_Cancer_Papillary @DISEASE_MESH:D000077273 @@@PTC@@@ <m>cells</m>.\n--------------------------------------------------------------------------------\nPMID: 36535192\nTitle: The roles of Linc-ROR in the regulation of cancer stem cells\nSource: Transl Oncol (2023)\nAbstract: Scholars have successively carried out researchs on solid @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>tumor</m>@@@ <m>stem</m> <m>cells</m>. It's verited by mounting studies that CSCs are derived from normal @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ <m>cells</m> differentiated from progenitor <m>cells</m> or normal <m>stem</m> <m>cells</m>, or from <m>stem</m> <m>cells</m> obtained through the <m>epithelial</m>-<m>mesenchymal</m> <m>transition</m> (EMT) process.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_9rbw0zUPeYBzlnGAh5Ukjl72",
+    "parent_tool_call_id": "call_8QSqNaktW63oq3XQqQBu0gaK",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "CD133; CD133+; CD133-; Oct4; self-renewal; tumorigenesis; NOD/SCID; transplantation",
+      "pmid": "19404394"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('19404394')\noutput = format_paper_content_output(result, filter_keywords='CD133; CD133+; CD133-; Oct4; self-renewal; tumorigenesis; NOD/SCID; transplantation')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (6):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m CD133; CD133+; CD133-; Oct4; self-renewal; tumorigenesis; NOD/SCID; transplantation\n      \u001b[90mpmid:\u001b[0m 19404394\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m ALDH+; ALDH-; self-renewal; xenograft; tumor initiation; hierarchical\n      \u001b[90mpmid:\u001b[0m 29274322\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m sphere; self-renewal; tumorigenicity; stemness; epithelial-mesenchymal transition; B-CPAP\n      \u001b[90mpmid:\u001b[0m 28775782\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m CD133+; initiation; self-renewal; acetylcholine; Akt; thyroid\n      \u001b[90mpmid:\u001b[0m 31830559\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m ALDH; BMI1; SOX2; self-renewal; xenograft; thyroid cancer stem cells\n      \u001b[90mpmid:\u001b[0m 33499351\n\n  \u001b[1m\u001b[93m[6] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m origin; EMT; microenvironment; CD133; CD44; ALDH; thyroid cancer stem-like cells\n      \u001b[90mpmid:\u001b[0m 33916320\n\n=== PMID: 19404394 ===\n\nTitle: CD133+ anaplastic thyroid cancer cells initiate tumors in immunodeficient mice and are regulated by thyrotropin.\n\nJournal/Date: PloS one (2009)\n\nMeSH Keywords: AC133 Antigen, Animals, Antigens, CD, Cell Line, Tumor, Cell Proliferation, Glycoproteins, Humans, Immunophenotyping\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Anaplastic thyroid cancer (ATC) is one of the most lethal human malignancies. Its rapid onset and resistance to conventional therapeutics contribute to a mean survival of six months after diagnosis and make the identification of thyroid-cancer-initiating cells increasingly important.\n[METHODOLOGY/PRINCIPAL FINDINGS]: In prior studies of ATC cell lines, CD133(+) cells exhibited stem-cell-like features such as high proliferation, self-renewal and colony-forming ability in vitro. Here we show that transplantation of CD133(+) cells, but not CD133(-) cells, into immunodeficient NOD/SCID mice is sufficient to induce growth of tumors in vivo. We also describe how the proportion of ATC cells that are CD133(+) increases dramatically over three months of culture, from 7% to more than 80% of the total. This CD133(+) cell pool can be further separated by flow cytometry into two distinct populations: CD133(+/high) and CD133(+/low). Although both subsets are capable of long-term tumorigenesis, the rapidly proliferating CD133(+/high) cells are by far the most efficient. They also express high levels of the stem cell antigen Oct4 and the receptor for thyroid stimulating hormone, TSHR. Treating ATC cells with TSH causes a three-fold increase in the numbers of CD133(+) cells and elicits a dose-dependent up-regulation of the expression of TSHR and Oct4 in these cells. More importantly, immunohistochemical analysis of tissue specimens from ATC patients indicates that CD133 is highly expressed on tumor cells but not on neighboring normal thyroid cells.\n[CONCLUSIONS/SIGNIFICANCE]: To our knowledge, this is the first report indicating that CD133(+) ATC cells are solely responsible for tumor growth in immunodeficient mice. Our data also give a unique insight into the regulation of CD133 by TSH. These highly tumorigenic CD133(+) cells and the activated TSH signaling pathway may be useful targets for future ATC therapies.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nCD133 is expressed on human ATC cell lines but not on papillary thyroid cancer cell lines\n\nTo determine whether a CSC population exists in ATC, we examined CD133 expression in a panel of human thyroid cancer cell lines. Flow cytometric analysis revealed that CD133 is expressed in two ATC cell lines, ARO (in which 7.02% of cells are CD133+) and FRO (in which 6.32% of cells are CD133+), but not in either of two well-differentiated papillary thyroid cancer cell lines (NPA and TPC) (Fig. 1A). These results suggest that CD133 expression is uniquely associated with undifferentiated ATC. Immunofluorescent staining confirms the expression of CD133 on the surface of CD133+ but not CD133− cells (Fig. 1B). Moreover, the two CD133 populations grow differently in culture. In tumors, CD133+ cel...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_9ejgloh9Cy1FJjwCneHWbgeP",
+    "parent_tool_call_id": "call_8QSqNaktW63oq3XQqQBu0gaK",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "ALDH+; ALDH-; self-renewal; xenograft; tumor initiation; hierarchical",
+      "pmid": "29274322"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('29274322')\noutput = format_paper_content_output(result, filter_keywords='ALDH+; ALDH-; self-renewal; xenograft; tumor initiation; hierarchical')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 29274322 ===\n\nTitle: Subpopulations of cancer stem cells found in papillary thyroid carcinoma.\n\nJournal/Date: Experimental cell research (2018)\n\nMeSH Keywords: Adult, Aged, Aldehyde Dehydrogenase, Animals, Carcinoma, Papillary, Cell Line, Tumor, Cell Lineage, Cell Proliferation\n\n\n--- ABSTRACT ---\nPapillary thyroid carcinoma (PTC) is the most common form of thyroid cancer and while it has a generally good prognosis, tumor recurrence remains a major clinical challenge. Studying laboratory cell lines as well as clinical specimens indicate that PTC may follow the cancer stem cell (CSC) model. However, CSC characteristics relevant in PTC initiation and progression remain largely unknown. Here we studied a population of sphere-growing tumor cells isolated from primary cultures of clinical PTC. These sphere-growing cells consisted of aldehyde dehydrogenase positive (ALDH+) and ALDH negative (ALDH-) cell subpopulations and demonstrated a hierarchical pattern of cell division. Using combinations of selective depletion, specific inhibition and cell sorting, we found that both subpopulations of the sphere cells were able to self-renew and initiate xenograft tumors independently, and fulfilled the definition of CSC. Importantly, when the subpopulations functioned together, the cancer-initiation efficiency and the xenograft tumor progression were significantly enhanced compared to either subpopulation alone. These data revealed crucial roles of ALDH- CSC in PTC biology and suggested that CSC subpopulations function cooperatively to control PTC initiation and progression. Together, our study indicates that CSC subpopulations isolated from clinical specimens offer unprecedented opportunities for investigating PTC pathogenesis and developing effective therapies.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_dpTgWgx7trYoB1uLBNjA0i6z",
+    "parent_tool_call_id": "call_8QSqNaktW63oq3XQqQBu0gaK",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "sphere; self-renewal; tumorigenicity; stemness; epithelial-mesenchymal transition; B-CPAP",
+      "pmid": "28775782"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('28775782')\noutput = format_paper_content_output(result, filter_keywords='sphere; self-renewal; tumorigenicity; stemness; epithelial-mesenchymal transition; B-CPAP')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 28775782 ===\n\nTitle: Thyrospheres from B-CPAP Cell Line with BRAF and TERT Promoter Mutations have Different Functional and Molecular Features than Parental Cells.\n\nJournal/Date: Journal of Cancer (2017)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nHuman thyroid cancer derived cell lines are widely used to study the mechanisms involved in thyroid carcinogenesis. However, there is limited availability of non-cross-contaminated cancer cell lines derived from papillary thyroid carcinoma (PTC), and the B-CPAP cell line is one of the few such lines. B-CPAP cells have been genetically and cytogenetically well-characterized, but details of their stemness features remain uncertain. Considering that this cell line is extensively used for in vitro studies on thyroid tumorigenesis, we broaden its functional and molecular profiles as well as the tumorigenic capacity. We used functional assays (sphere-forming capacity and efficiency), assessed self-renewal and propagation efficiency and tested in vivo tumorigenicity in Hsd:Athymic Nude-Foxn1nu mice. Expression of markers of stemness, differentiation, and epithelial-mesenchymal transition were estimated at RNA and protein levels in adherent parental cells and sphere-forming cells. Functional aspects and stemness features were compared with normal thyrocytes. Protein expression of xenograft tumors was evaluated by immunohistochemistry. B-CPAP sphere-forming cells were able to form thyrospheres theoretically indefinitely in an appropriate serum-free medium, reverting to the adherent parental cell phenotype when cultured in differentiation medium. Different expression of ALDH1-A1 and CD44 stemness markers and TTF-1 and CK19 differentiation markers allowed discrimination between isolated sphere-forming cells and adherent parental cells, indicating that sphere-forming cells retained stem-like features. In keeping with these observations, tumorigenicity assays confirmed that, relative to parental adherent cells, thyrospheres had enhanced capacity to initiate xenograft tumors. Thyrospheres from normal cell line retained very low functional capacity, as well as different stemness markers expression compared to tumor thyrospheres. Our findings may constitute a useful background to develop an in vitro model for assessing the origin and progression of papillary thyroid carcinoma bearing BRAFV600E and TERT promoter mutations.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nFunctional characterization\n\nPrimary thyrosphere formation\n\nA subpopulation of adherent B-CPAP parental cells was able to form thyrospheres in SFM. Specifically, cells growing in suspension formed three-dimensional aggregates - spheroid clusters - at day 3. Spheres were visible after five days and reached the maximum size of 150-300 μm after seven days (Figure 1A). The same behavior was observed for Nthy ori 3-1-derived spheres.\n\nSelf-renewal\n\nTo assess the presence of a self-renewing population of stem-like cells within thyrospheres, primary thyrospheres were enzymatically dissociated and re-seeded at the initial cell density. These cells were found to form secondary spheres. B-CPAP cells had an extensive capacity for self-renewal, reaching at least 21 generations (Figure 1B). Th...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_WDZ67WJxZyYIZbjm6MND1Een",
+    "parent_tool_call_id": "call_8QSqNaktW63oq3XQqQBu0gaK",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "CD133+; initiation; self-renewal; acetylcholine; Akt; thyroid",
+      "pmid": "31830559"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('31830559')\noutput = format_paper_content_output(result, filter_keywords='CD133+; initiation; self-renewal; acetylcholine; Akt; thyroid')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 31830559 ===\n\nTitle: Acetylcholine promotes the self-renewal and immune escape of CD133+ thyroid cancer cells through activation of CD133-Akt pathway.\n\nJournal/Date: Cancer letters (2020)\n\nMeSH Keywords: AC133 Antigen, Acetylcholine, Animals, B7-H1 Antigen, Heterografts, Humans, Mice, Microtubule-Associated Proteins\n\n\n--- ABSTRACT ---\nNerves infiltrate the tumor microenvironment and stimulate the growth of cancer cells through the secretion of neurotransmitters. However, the contributions of nerves to the self-renewal capacity of cancer stem cells (CSCs) remain largely unknown. In this study, we found that CD133+ cancer cells were responsible for the initiation of thyroid cancer. Neurons were juxtaposed with CD133+ cells in thyroid cancer tissues. Acetylcholine, one of the most abundant neurotransmitters, promoted CD133 Y828 phosphorylation, and subsequently increased the interaction between CD133 and PI3K regulatory subunit p85, resulting in the activation of the PI3K-Akt pathway. Acetylcholine increased the self-renewal ability of CD133+ thyroid cancer cells through activation of CD133-Akt pathway. Furthermore, acetylcholine promoted the expression of the immune regulator PD-L1 through the activation of the CD133-Akt pathway, resulting in the resistance of CD133+ thyroid cancer cells to CD8+ T cells. However, acetylcholine receptor antagonist 4-DAMP blocked the positive effects of acetylcholine on the self-renewal and immune escape of CD133+ thyroid cancer cells. Taken together, these data suggest that acetylcholine increases the self-renewal and immune escape abilities of CD133+ thyroid cancer cells through the activation of the CD133-Akt pathway.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_kzOm0drfE88LysKY6dMWO3cd",
+    "parent_tool_call_id": "call_8QSqNaktW63oq3XQqQBu0gaK",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "ALDH; BMI1; SOX2; self-renewal; xenograft; thyroid cancer stem cells",
+      "pmid": "33499351"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('33499351')\noutput = format_paper_content_output(result, filter_keywords='ALDH; BMI1; SOX2; self-renewal; xenograft; thyroid cancer stem cells')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 33499351 ===\n\nTitle: Targeting the Sonic Hedgehog Pathway to Suppress the Expression of the Cancer Stem Cell (CSC)-Related Transcription Factors and CSC-Driven Thyroid Tumor Growth.\n\nJournal/Date: Cancers (2021)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nThe sonic hedgehog (Shh) pathway plays important roles in tumorigenesis, tumor growth, drug resistance, and metastasis. We and others have reported earlier that this pathway is highly activated in thyroid cancer. However, its role in thyroid cancer stem cell (CSC) self-renewal and tumor development remains incompletely understood. B lymphoma Mo-MLV insertion region 1 homolog (BMI1) and SRY-Box Transcription Factor 2 (SOX2) are two CSC-related transcription factors that have been implicated in promoting CSC self-renewal. The objective of our current investigation was to determine the role of the Shh pathway in regulating BMI1 and SOX2 expression in thyroid cancer and promoting thyroid tumor growth and development. Here we report that inhibition of the Shh pathway by Gli1 siRNA or by cyclopamine and GANT61 reduced BMI1 and SOX2 expression in SW1736 and KAT-18 cells, two anaplastic thyroid cancer cell lines. The opposite results were obtained in cells overexpressing Gli1 or its downstream transcription factor Snail. The Shh pathway regulated SOX2 and BMI1 expression at a transcriptional and post-transcriptional level, respectively. GANT61 treatment suppressed the growth of SW1736 CSC-derived tumor xenografts but did not significantly inhibit the growth of tumors grown from bulk tumor cells. Clinicopathological analyses of thyroid tumor specimens by immunohistochemical (IHC) staining revealed that BMI1 and SOX2 were highly expressed in thyroid cancer and correlated with Gli1 expression. Our study provides evidence that activation of the Shh pathway leads to increased BMI1 and SOX2 expression in thyroid cancer and promotes thyroid CSC-driven tumor initiation. Targeting the Shh pathway may have therapeutic value for treating thyroid cancer and preventing recurrence.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\n2. Results\n\n2.1. GANT61 and Cyclopamine Inhibit BMI1 and SOX2 Expression\n\nBMI1 and SOX2 are two transcription factors implicated in regulating stem cell self-renewal. We reported earlier that inhibition of the Shh pathway leads to the suppression of thyroid CSC self-renewal. Here we tested if the inhibitors of the Shh pathway also downregulated the expression of BMI1 and SOX2. GANT61 (Figure 1A,C) and cyclopamine (Figure 1B,D), an inhibitor of Gli1 and Smo, respectively, inhibited BMI1 and SOX2 expression in SW1736 (Figure 1A,B) and KAT-18 (Figure 1C,D) cells in a dose- and time-dependent manner. Both GANT61 and cyclopamine inhibited SOX2 expression more than BMI1 in both SW1736 and KAT-18 cells. Both inhibitors suppressed the expression of Gli, BMI1, and SOX2 proteins in KAT-18 cells slig...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_ZzJBCdfg4bNHm00ixNmAZS4S",
+    "parent_tool_call_id": "call_8QSqNaktW63oq3XQqQBu0gaK",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "origin; EMT; microenvironment; CD133; CD44; ALDH; thyroid cancer stem-like cells",
+      "pmid": "33916320"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('33916320')\noutput = format_paper_content_output(result, filter_keywords='origin; EMT; microenvironment; CD133; CD44; ALDH; thyroid cancer stem-like cells')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 33916320 ===\n\nTitle: Thyroid Cancer Stem-Like Cells: From Microenvironmental Niches to Therapeutic Strategies.\n\nJournal/Date: Journal of clinical medicine (2021)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nThyroid cancer (TC) is the most common endocrine malignancy. Recent progress in thyroid cancer biology revealed a certain degree of intratumoral heterogeneity, highlighting the coexistence of cellular subpopulations with distinct proliferative capacities and differentiation abilities. Among those subpopulations, cancer stem-like cells (CSCs) are hypothesized to drive TC heterogeneity, contributing to its metastatic potential and therapy resistance. CSCs principally exist in tumor areas with specific microenvironmental conditions, the so-called stem cell niches. In particular, in thyroid cancer, CSCs' survival is enhanced in the hypoxic niche, the immune niche, and some areas with specific extracellular matrix composition. In this review, we summarize the current knowledge about thyroid CSCs, the tumoral niches that allow their survival, and the implications for TC therapy.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 15,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_fb56QAwQw0kzgj96giSJHxSg",
+    "parent_tool_call_id": "call_ZzJBCdfg4bNHm00ixNmAZS4S",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Human thyroid cancers contain experimentally defined cancer-stem-like/tumor-initiating subpopulations, but the evidence supports a functional state rather than proving a unique normal stem-cell lineage. Across papillary, medullary, follicular and anaplastic models, sphere formation, serial propagation/self-renewal, marker enrichment and immunodeficient-mouse tumor initiation are the recurring evidence types; the thyroid CSC review emphasizes intratumoral heterogeneity and niche dependence.",
+          "source_tools": [
+            {
+              "relevance": "Representative thyroid CSC/EMT review describing markers, spheres, xenografts and multiple thyroid histologies",
+              "tool_call_id": "call_cBLMfDJetofoOjVpIHzcHoah"
+            },
+            {
+              "relevance": "Review explicitly framing the unresolved CSC-origin question and possible re-acquisition of stemness by non-stem cancer cells",
+              "tool_call_id": "call_0AdftsyTofzR6Yi0a5QrZY1h"
+            },
+            {
+              "relevance": "Thyroid CSC niche review",
+              "tool_call_id": "call_ZzJBCdfg4bNHm00ixNmAZS4S"
+            }
+          ]
+        },
+        {
+          "finding": "Anaplastic thyroid carcinoma has the strongest direct tumor-initiation evidence: CD133+ ATC cells, unlike CD133− cells in the reported assay, initiated tumors in NOD/SCID mice; CD133+ cells showed self-renewal/colony formation, and the most proliferative CD133high subset expressed more OCT4 and was more tumorigenic. TSH increased the CD133+ fraction and OCT4/TSHR expression. This supports a potent CD133-enriched state, but not exclusivity in all ATC or proof of a normal-cell origin.",
+          "source_tools": [
+            {
+              "relevance": "Primary ATC transplantation and OCT4/CD133 study",
+              "tool_call_id": "call_9rbw0zUPeYBzlnGAh5Ukjl72"
+            }
+          ]
+        },
+        {
+          "finding": "Papillary thyroid carcinoma evidence supports functional heterogeneity and plasticity rather than a single-marker hierarchy. In primary clinical PTC cultures, both ALDH+ and ALDH− sphere-derived subpopulations independently self-renewed and initiated xenografts, while co-culture/cooperation enhanced initiation and progression. Thus ALDH is not a universal exclusive CSC marker, and ALDH− cells can retain tumor-initiating capacity.",
+          "source_tools": [
+            {
+              "relevance": "Primary PTC study of ALDH+ and ALDH− CSC subpopulations",
+              "tool_call_id": "call_9ejgloh9Cy1FJjwCneHWbgeP"
+            }
+          ]
+        },
+        {
+          "finding": "PTC B-CPAP thyrospheres formed secondary spheres through at least 21 generations, reverted toward the parental adherent phenotype in differentiation medium, and had enhanced xenograft tumorigenicity with altered ALDH1A1/CD44 and EMT/stemness-associated profiles. Reversibility is direct evidence that at least part of the stem-like phenotype is acquired and state-dependent.",
+          "source_tools": [
+            {
+              "relevance": "Primary B-CPAP sphere/self-renewal/differentiation study",
+              "tool_call_id": "call_dpTgWgx7trYoB1uLBNjA0i6z"
+            }
+          ]
+        },
+        {
+          "finding": "Stemness-associated transcriptional programs are mechanistically inducible in thyroid cancer cells. In ATC models, Shh/Gli1 inhibition reduced BMI1 and SOX2 and selectively suppressed growth of CSC-derived xenografts more than bulk-cell xenografts; Gli1/Snail overexpression had opposite effects. CD133+ thyroid cancer cells also responded to neuronal acetylcholine through CD133–PI3K–AKT signaling, increasing self-renewal and PD-L1. These findings favor phenotypic acquisition/maintenance by signaling and microenvironmental cues.",
+          "source_tools": [
+            {
+              "relevance": "Primary ATC Shh–BMI1/SOX2 study",
+              "tool_call_id": "call_kzOm0drfE88LysKY6dMWO3cd"
+            },
+            {
+              "relevance": "Primary CD133+ thyroid cancer niche/signaling study",
+              "tool_call_id": "call_WDZ67WJxZyYIZbjm6MND1Een"
+            }
+          ]
+        },
+        {
+          "finding": "EMT is associated with thyroid cancer aggressiveness and stem-like behavior, but marker expression alone is insufficient to establish CSC identity. Reviews and PTC studies link EMT programs with CSC enrichment, while CD44, CD133, ALDH, NANOG, OCT4/POU5F1 and SOX2 are best interpreted as context-dependent enrichment or state markers; the available evidence does not demonstrate that thyroid CSCs necessarily arise from pre-existing normal thyroid stem cells. Important caveats include cell-line provenance/selection, sphere-culture artifacts, marker non-specificity, immunodeficient xenografts, and limited serial lineage-tracing in human thyroid tumors.",
+          "source_tools": [
+            {
+              "relevance": "Thyroid CSC/EMT review and marker limitations context",
+              "tool_call_id": "call_8QSqNaktW63oq3XQqQBu0gaK"
+            },
+            {
+              "relevance": "Thyroid CSC niche review",
+              "tool_call_id": "call_ZzJBCdfg4bNHm00ixNmAZS4S"
+            },
+            {
+              "relevance": "PTC sphere study showing reversible state and marker changes",
+              "tool_call_id": "call_dpTgWgx7trYoB1uLBNjA0i6z"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_6wu0Ohxz8VzIgpCp1I1ELnLu",
+    "parent_tool_call_id": "call_UOxSaxBcYMOfhZHnFwOtC49t",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE",
+          "name": "Thyroid cancer",
+          "observations": [
+            "Human thyroid cancers contain experimentally defined cancer-stem-like/tumor-initiating subpopulations across papillary, medullary, follicular, and anaplastic models, but evidence supports a functional state rather than a unique normal stem-cell lineage.",
+            "Sphere formation, serial propagation, marker enrichment, and immunodeficient-mouse tumor initiation are recurring evidence types; heterogeneity and niche dependence are emphasized."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Cross-subtype evidence and review synthesis",
+              "tool_call_id": "call_cBLMfDJetofoOjVpIHzcHoah"
+            },
+            {
+              "relevance": "Cross-subtype evidence",
+              "tool_call_id": "call_0AdftsyTofzR6Yi0a5QrZY1h"
+            },
+            {
+              "relevance": "Heterogeneity and niche dependence",
+              "tool_call_id": "call_ZzJBCdfg4bNHm00ixNmAZS4S"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "CD133+ ATC initiation",
+          "observations": [
+            "In anaplastic thyroid carcinoma models, CD133+ cells showed self-renewal and colony formation and initiated tumors in NOD/SCID mice in the reported assay, unlike CD133− cells; CD133high cells expressed more OCT4 and were more tumorigenic.",
+            "This supports a potent CD133-enriched tumor-initiating state but not exclusivity across all ATC or a normal-cell origin."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct ATC functional evidence",
+              "tool_call_id": "call_9rbw0zUPeYBzlnGAh5Ukjl72"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "PTC ALDH plasticity",
+          "observations": [
+            "In primary papillary thyroid carcinoma cultures, both ALDH+ and ALDH− sphere-derived populations independently self-renewed and initiated xenografts; cooperation enhanced tumor initiation and progression.",
+            "ALDH is therefore not a universal exclusive CSC marker, and ALDH− cells can retain tumor-initiating capacity."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary PTC functional heterogeneity",
+              "tool_call_id": "call_9ejgloh9Cy1FJjwCneHWbgeP"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Reversible PTC stemness",
+          "observations": [
+            "PTC B-CPAP thyrospheres formed secondary spheres through at least 21 generations, reverted toward the parental adherent phenotype in differentiation medium, and showed enhanced xenograft tumorigenicity with altered ALDH1A1/CD44 and EMT/stemness profiles.",
+            "Reversibility supports acquisition and state dependence of at least part of the stem-like phenotype."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Reversibility and tumorigenicity",
+              "tool_call_id": "call_dpTgWgx7trYoB1uLBNjA0i6z"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Inducible thyroid stemness",
+          "observations": [
+            "Shh/Gli1 inhibition in ATC models reduced BMI1 and SOX2 and preferentially suppressed CSC-derived xenograft growth; Gli1/Snail overexpression had opposite effects.",
+            "Neuronal acetylcholine increased self-renewal and PD-L1 in CD133+ thyroid cancer cells through CD133–PI3K–AKT signaling.",
+            "These findings support signaling- and microenvironment-dependent induction or maintenance of stem-like states."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Shh/Gli1 regulation",
+              "tool_call_id": "call_kzOm0drfE88LysKY6dMWO3cd"
+            },
+            {
+              "relevance": "Neuronal signaling regulation",
+              "tool_call_id": "call_WDZ67WJxZyYIZbjm6MND1Een"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Thyroid CSC origin caveat",
+          "observations": [
+            "EMT and markers including CD44, CD133, ALDH, NANOG, OCT4/POU5F1, and SOX2 indicate context-dependent enrichment or state, not definitive CSC identity.",
+            "Available evidence does not demonstrate that thyroid CSCs necessarily arise from pre-existing normal thyroid stem cells; major limitations include marker non-specificity, sphere-culture artifacts, cell-line selection, xenograft context, and limited lineage tracing."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Marker and origin caveats",
+              "tool_call_id": "call_8QSqNaktW63oq3XQqQBu0gaK"
+            },
+            {
+              "relevance": "Review synthesis",
+              "tool_call_id": "call_ZzJBCdfg4bNHm00ixNmAZS4S"
+            },
+            {
+              "relevance": "Reversibility and assay caveats",
+              "tool_call_id": "call_dpTgWgx7trYoB1uLBNjA0i6z"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Thyroid cancer",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "CD133+ ATC initiation"
+        },
+        {
+          "from_entity": "Thyroid cancer",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "PTC ALDH plasticity"
+        },
+        {
+          "from_entity": "Thyroid cancer",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Reversible PTC stemness"
+        },
+        {
+          "from_entity": "Thyroid cancer",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Inducible thyroid stemness"
+        },
+        {
+          "from_entity": "Reversible PTC stemness",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Thyroid CSC origin caveat"
+        },
+        {
+          "from_entity": "Inducible thyroid stemness",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Thyroid CSC origin caveat"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 6, \"entities\": [{\"name\": \"Thyroid cancer\", \"entityType\": \"DISEASE\", \"observations\": [\"Human thyroid cancers contain experimentally defined cancer-stem-like/tumor-initiating subpopulations across papillary, medullary, follicular, and anaplastic models, but evidence supports a functional state rather than a unique normal stem-cell lineage.\", \"Sphere formation, serial propagation, marker enrichment, and immunodeficient-mouse tumor initiation are recurring evidence types; heterogeneity and niche dependence are emphasized.\"]}, {\"name\": \"CD133+ ATC initiation\", \"entityType\": \"FINDING\", \"observations\": [\"In anaplastic thyroid carcinoma models, CD133+ cells showed self-renewal and colony formation and initiated tumors in NOD/SCID mice in the reported assay, unlike CD133\\u2212 cells; CD133high cells expressed more OCT4 and were more tumorigenic.\", \"This supports a potent CD133-enriched tumor-initiating state but not exclusivity across all ATC or a normal-cell origin.\"]}, {\"name\": \"PTC ALDH plasticity\", \"entityType\": \"FINDING\", \"observations\": [\"In primary papillary thyroid carcinoma cultures, both ALDH+ and ALDH\\u2212 sphere-derived populations independently self-renewed and initiated xenografts; cooperation enhanced tumor initiation and progression.\", \"ALDH is therefore not a universal exclusive CSC marker, and ALDH\\u2212 cells can retain tumor-initiating capacity.\"]}, {\"name\": \"Reversible PTC stemness\", \"entityType\": \"FINDING\", \"observations\": [\"PTC B-CPAP thyrospheres formed secondary spheres through at least 21 generations, reverted toward the parental adherent phenotype in differentiation medium, and showed enhanced xenograft tumorigenicity with altered ALDH1A1/CD44 and EMT/stemness profiles.\", \"Reversibility supports acquisition and state dependence of at least part of the stem-like phenotype.\"]}, {\"name\": \"Inducible thyroid stemness\", \"entityType\": \"FINDING\", \"observations\": [\"Shh/Gli1 inhibition in ATC models reduced BMI1 and SOX2 and preferentially suppressed CSC-derived xenograft growth; Gli1/Snail overexpression had opposite effects.\", \"Neuronal acetylcholine increased self-renewal and PD-L1 in CD133+ thyroid cancer cells through CD133\\u2013PI3K\\u2013AKT signaling.\", \"These findings support signaling- and microenvironment-dependent induction or maintenance of stem-like states.\"]}, {\"name\": \"Thyroid CSC origin caveat\", \"entityType\": \"FINDING\", \"observations\": [\"EMT and markers including CD44, CD133, ALDH, NANOG, OCT4/POU5F1, and SOX2 indicate context-dependent enrichment or state, not definitive CSC identity.\", \"Available evidence does not demonstrate that thyroid CSCs necessarily arise from pre-existing normal thyroid stem cells; major limitations include marker non-specificity, sphere-culture artifacts, cell-line selection, xenograft context, and limited lineage tracing.\"]}]}, \"relations_created\": {\"count\": 6, \"relations\": [{\"from\": \"Thyroid cancer\", \"to\": \"CD133+ ATC initiation\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Thyroid cancer\", \"to\": \"PTC ALDH plasticity\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Thyroid cancer\", \"to\": \"Reversible PTC stemness\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Thyroid cancer\", \"to\": \"Inducible thyroid stemness\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Reversible PTC stemness\", \"to\": \"Thyroid CSC origin caveat\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Inducible thyroid stemness\", \"to\": \"Thyroid CSC origin caveat\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_6wu0Ohxz8VzIgpCp1I1ELnLu\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_UOxSaxBcYMOfhZHnFwOtC49t\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

@@ -224,6 +224,7 @@ class SearchTrialsTool(BaseTool):
         page_size: Optional[int] = None,
         max_pages: Optional[int] = None,
         expand_synonyms: bool = True,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to search clinical trials."""
 
@@ -366,6 +367,7 @@ class FetchTrialDetailsTool(BaseTool):
         self,
         trial_ids: List[str],
         task_name: str,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the tool to fetch trial details."""
 

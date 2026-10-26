@@ -1,0 +1,3 @@
+**Most likely localization: the cell membrane.** The 111-amino-acid sequence is an exact match to reviewed *Bacillus subtilis* protein YwrE (UniProt O05219), annotated as a multipass membrane protein. Its strongly hydrophobic sequence is consistent with membrane insertion.
+
+**Functional summary:** YwrE contains the DUF4181 domain (residues 18–107), but its specific function is uncharacterized. The available evidence supports a small multipass membrane protein, not a particular transport or enzymatic role.

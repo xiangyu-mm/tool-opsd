@@ -1,0 +1,1 @@
+{"answer": "(6R,6aS,9S)-9-(3,4-dimethoxyphenyl)-6-phenyl-6a,8,9,11-tetrahydro-6H-benzo[c][1,5]benzothiazepin-7-one"}

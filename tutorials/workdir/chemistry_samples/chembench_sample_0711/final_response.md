@@ -1,0 +1,1 @@
+{"answer": "methyl N-[[diethoxyphosphoryl(propan-2-yl)amino]sulfanyl-methylcarbamoyl]oxyethanimidothioate"}

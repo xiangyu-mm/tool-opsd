@@ -1,0 +1,1 @@
+{"answer":"N-[[2-(3-methoxyphenyl)-1,3-benzoxazol-5-yl]carbamothioyl]-4-nitrobenzamide"}

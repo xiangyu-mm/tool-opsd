@@ -8,6 +8,7 @@ from biodsa.sandbox.sandbox_interface import ExecutionSandboxWrapper
 from biodsa.sandbox.execution import ExecutionResults
 from biodsa.memory.memory_graph import visualize_graph
 import warnings
+from biodsa.agents.deepevidence.state import ToolTraceItem
 
 class DeepEvidenceExecutionResults(ExecutionResults):
     """Execution results for the deep evidence agent."""
@@ -15,15 +16,23 @@ class DeepEvidenceExecutionResults(ExecutionResults):
         message_history: List[Dict[str, str]],
         code_execution_results: List[Dict[str, str]],
         final_response: str,
+        tool_trace: Optional[List[ToolTraceItem]] = None,
+        successful_tool_path: Optional[List[ToolTraceItem]] = None,
         sandbox: ExecutionSandboxWrapper = None,
         total_input_tokens: int = 0,
         total_output_tokens: int = 0,
         evidence_graph_data: Dict[str, Any] = {}
     ):
         super().__init__(message_history, code_execution_results, final_response, sandbox)
+        self.tool_trace = tool_trace if tool_trace is not None else []
         self.total_input_tokens = total_input_tokens
         self.total_output_tokens = total_output_tokens
         self.evidence_graph_data = evidence_graph_data
+        self.successful_tool_path = (
+            successful_tool_path
+            if successful_tool_path is not None
+            else []
+        )
 
     def _build_query_section(self, story: list, context: dict):
         """

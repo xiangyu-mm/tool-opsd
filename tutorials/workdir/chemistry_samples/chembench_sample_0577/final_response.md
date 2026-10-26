@@ -1,0 +1,1 @@
+{"answer":"3-(2-chloroanilino)-2-[4-(2,4-dichlorophenyl)-1,3-thiazol-2-yl]prop-2-enenitrile"}

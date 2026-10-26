@@ -1,0 +1,1 @@
+The molecule’s HOMO energy is **−0.2411 Ha** (Hartree), based on a matching record in the QM9 database. The input decodes to `CN(C=O)C12CC1OC2` (formula C₆H₉NO₂). This is a database-reported value, not a new calculation; the computational method was not specified.

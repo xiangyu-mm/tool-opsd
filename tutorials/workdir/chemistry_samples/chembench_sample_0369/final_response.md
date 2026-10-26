@@ -1,0 +1,1 @@
+{"answer":["C1CCC(P(C2CCCCC2)C2CCCCC2)CC1"]}

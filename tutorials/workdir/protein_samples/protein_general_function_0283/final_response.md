@@ -1,0 +1,5 @@
+**Likely function:** This 423-amino-acid protein is a **kynureninase-like enzyme** (EC 3.7.1.3), likely using pyridoxal 5′-phosphate (PLP). Reviewed bacterial kynureninase homologs catalyze the cleavage of L-kynurenine to anthranilate and alanine, and of 3-hydroxy-L-kynurenine to 3-hydroxyanthranilate and alanine. The sequence matches those references at about **51% identity**, with **97–99% query coverage**, supporting the assignment by homology.
+
+**Calculated sequence properties:** molecular mass ~47.8 kDa; theoretical pI 5.70; GRAVY −0.223 (slightly hydrophilic overall). These estimates do not account for modifications, processing, bound cofactors, or oligomerization.
+
+The function and PLP dependence are **inferred from close, reviewed homologs**, not experimentally confirmed for this specific sequence. The homolog annotations associate the enzyme with tryptophan degradation and NAD⁺ biosynthesis via the kynurenine pathway.

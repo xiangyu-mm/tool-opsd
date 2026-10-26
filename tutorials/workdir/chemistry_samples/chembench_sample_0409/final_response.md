@@ -1,0 +1,1 @@
+{"answer": "(2R,3R)-2,3-dihydroxy-2,3-diphenylpropanoate"}

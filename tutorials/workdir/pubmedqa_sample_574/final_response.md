@@ -1,0 +1,3 @@
+Yes. In a prospective cohort of 25 patients with mature hypertrophic burn scars, four fractional CO₂ laser sessions were followed by a significant decrease in Vancouver Scar Scale vascularity score, from 0.85 ± 1.085 to 0.10 ± 0.300 (P < .001; PMID: 39967763). This indicates improvement in clinically rated scar vascularity; the study did not directly map detailed vessel patterns.
+
+FINAL DECISION: YES

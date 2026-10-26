@@ -1,0 +1,5 @@
+Yes. **Tetraploid complementation provides strong functional evidence of pluripotency for the specific murine adipose-derived iPSC lines tested.** In the primary study (PMID: 25430589), iPSCs generated from murine adipose stem cells produced viable, fertile adult mice through tetraploid complementation; the mice were reported to be derived entirely from the reprogrammed iPSCs. This is a stringent test because the candidate cells must support development of the organism in the tetraploid-host embryo.
+
+The conclusion applies to the lines and conditions in that study; it does not establish that every adipose-derived iPSC line will pass the assay, or that all adipose stromal-cell populations are equivalent. **Evidence:** PMID 25430589; search results `call_KnIHE22TVYvAAdUwVN7QHZWd` and `call_HgUWRzdNukxwigiNm4mCmuN1`.
+
+FINAL DECISION: YES

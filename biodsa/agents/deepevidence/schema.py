@@ -43,7 +43,15 @@ from biodsa.agents.deepevidence.tool_wrappers.pathway.tools import (
     UnifiedPathwaySearchTool,
     UnifiedPathwayDetailsFetchTool,
 )
-
+from biodsa.tool_wrappers.chemicals.tools import (
+    UnifiedMoleculeDetailsFetchTool,
+    ChEMBLTargetFetchTool,
+    QuantumComputationTool,
+    UnifiedReactionConditionsFetchTool,
+)
+from biodsa.tool_wrappers.protein.tools import (
+    UnifiedProteinQueryTool,
+)
 __all__ = [
     "KNOWLEDGE_BASE_TO_TOOLS_MAP",
     "KnowledgeBase",
@@ -51,13 +59,14 @@ __all__ = [
 ]
 
 # Define the literal type for knowledge bases
-KnowledgeBase = Literal["pubmed_papers", "gene", "disease", "drug", "variant", "clinical_trials", "web_search", "target", "pathway", "compound"]
+KnowledgeBase = Literal["pubmed_papers", "gene", "disease", "drug", "protein","variant", "clinical_trials", "web_search", "target", "pathway", "compound"]
 
 # Keep the list for runtime validation and iteration
 KNOWLEDGE_BASE_LIST = [
     "pubmed_papers",
     "gene",
     "disease",
+    "protein",
     "drug",
     "variant",
     "clinical_trials",
@@ -65,6 +74,7 @@ KNOWLEDGE_BASE_LIST = [
     "target",
     "pathway",
     "compound",
+    "chemistry",
 ]
 
 KNOWLEDGE_BASE_TO_TOOLS_MAP = {
@@ -82,10 +92,17 @@ KNOWLEDGE_BASE_TO_TOOLS_MAP = {
         UnifiedGeneSearchTool,
         UnifiedGeneDetailsFetchTool
     ],
+    "protein": [UnifiedProteinQueryTool],
     "drug": [UnifiedDrugSearchTool, UnifiedDrugDetailsFetchTool],
     "target": [UnifiedTargetSearchTool, UnifiedTargetDetailsFetchTool],
     "variant": [SearchVariantsTool, FetchVariantDetailsTool],
     "web_search": [WebSearchTool],
     "compound": [UnifiedCompoundSearchTool, UnifiedCompoundDetailsFetchTool],
     "pathway": [UnifiedPathwaySearchTool, UnifiedPathwayDetailsFetchTool],
+    "chemistry": [
+        UnifiedMoleculeDetailsFetchTool,
+        ChEMBLTargetFetchTool,
+        QuantumComputationTool,
+        UnifiedReactionConditionsFetchTool,
+    ],
 }

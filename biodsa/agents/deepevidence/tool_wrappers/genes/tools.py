@@ -50,6 +50,14 @@ class UnifiedGeneSearchToolInput(BaseModel):
         default=False,
         description="Whether to include variant search (searches for variants in genes matching the search term)"
     )
+    context_tool_call_ids: List[str] = Field(
+        default_factory=list,
+        description=(
+            "The tool_call_id of the immediately previous useful tool "
+            "result used for this action. Use [] if no previous tool "
+            "result is directly used."
+        )
+    )
 
 
 class UnifiedGeneSearchTool(BaseTool):
@@ -99,6 +107,7 @@ class UnifiedGeneSearchTool(BaseTool):
         limit_per_source: int = 10,
         sources: Optional[List[str]] = None,
         include_variants: bool = False,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the unified gene search."""
         
@@ -248,6 +257,7 @@ class UnifiedGeneDetailsFetchTool(BaseTool):
         id_type: Optional[str] = None,
         sources: Optional[List[str]] = None,
         include_variants: bool = False,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the unified gene details fetch."""
         

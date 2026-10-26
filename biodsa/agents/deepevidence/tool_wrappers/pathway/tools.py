@@ -89,6 +89,7 @@ class UnifiedPathwaySearchTool(BaseTool):
         search_term: str,
         limit_per_source: int = 20,
         sources: Optional[List[str]] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the unified pathway search."""
         
@@ -237,6 +238,7 @@ class UnifiedPathwayDetailsFetchTool(BaseTool):
         sources: Optional[List[str]] = None,
         include_genes: bool = True,
         include_compounds: bool = True,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the pathway details fetch."""
         

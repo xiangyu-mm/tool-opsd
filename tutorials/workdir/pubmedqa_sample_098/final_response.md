@@ -1,0 +1,3 @@
+Yes. A 2015 study of 372 first-degree relatives of patients with type 2 diabetes found that obese, normal-glucose-tolerant relatives with triglycerides ≥150 mg/dL had **21%–60% higher β-cell function** than the other study groups, measured using OGTT-derived HOMA2-β. Triglycerides also correlated positively with β-cell function among obese participants (ρ = 0.502, P < 0.001). Evidence: PMID 25423015.
+
+FINAL DECISION: YES

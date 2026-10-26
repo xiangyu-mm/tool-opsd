@@ -1,0 +1,322 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_cIX8cG79Q3IBS1MF4Toz2azh",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine whether published clinical evidence reports a 10-year result for a cemented fine-grit-blasted titanium-aluminum-vanadium (Ti-6Al-4V) hip endoprosthesis shaft. Search exact and synonymous wording, identify the paper(s), and extract follow-up duration, implant model/material/surface, fixation method, patient cohort, and outcomes. Distinguish true 10-year results from shorter follow-up or different stem designs."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_xYyzQiPctVoFUkJTIK3F8qwj",
+    "parent_tool_call_id": "call_cIX8cG79Q3IBS1MF4Toz2azh",
+    "round": 1,
+    "tool_input": {
+      "task_name": "exact stem search",
+      "boolean_query_text": "\"fine-grit-blasted\" titanium aluminum vanadium cemented hip stem 10-year",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='\"fine-grit-blasted\" titanium aluminum vanadium cemented hip stem 10-year',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='\"fine-grit-blasted\" titanium aluminum vanadium cemented hip stem 10-year',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/exact_stem_search.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/exact_stem_search.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nUnexpected error (attempt 1/3): \"['pmcid'] not in index\"\nRetry attempt 2 after 0.3333333333333333 seconds...\nUnexpected error (attempt 2/3): \"['pmcid'] not in index\"\nRetry attempt 3 after 0.6666666666666666 seconds...\nUnexpected error (attempt 3/3): \"['pmcid'] not in index\"\nUnexpected error after 3 attempts\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/exact_stem_search.csv'\nTotal results found: 1\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 10730364\nTitle: [10 year results with a cemented fine-grit-blasted titanium-aluminum-vanadium hip endoprosthesis shaft].\nSource: Zeitschrift fur Orthopadie und ihre Grenzgebiete (2000)\nAbstract: PURPOSE: Are the results of cemented titanium hip arthroplasty as bad as described in literature? We present the 10-year results of a cemented mild grid blasted Titanium-Aluminium-Vanadium Stem in Total-Hip-Arthroplasty. METHODS: The clinical and radiological reexamination was documented in standardized questionnaire in which several scores were integrated. All X-rays were stored and analysed by a special hardware and software computer system. RESULTS: 35% of all patients could be reexamined both clinically and roentgenologically. 71 patients were male (mean age 56.1 years) and 130 female (mean age 59.3 years). The average follow-up period was 11 years and 4 months. The mean Merle d'Aubigné hip score increased from 10.5 to 16.0 points at the follow-up evaluation. Radiolucent lines were according to the zones of Gruen seen in 1% to 22% depending on the zone and the size of the femoral component. 18 reoperations of the femoral component (2.9%) had to be performed. The survivorship analysis (Kaplan-Meier) showed a 95.4% survival of the femoral component after 10 years. CONCLUSION: Our findings with a cemented mild grid blasted Titanium-Aluminum-Vanadium stem demonstrate excellent resu ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_jj5D1yKqvxf2bcXsjYPIHib3",
+    "parent_tool_call_id": "call_cIX8cG79Q3IBS1MF4Toz2azh",
+    "round": 1,
+    "tool_input": {
+      "task_name": "synonym stem search",
+      "boolean_query_text": "cemented Ti-6Al-4V femoral stem grit blasted 10 year follow-up hip",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='cemented Ti-6Al-4V femoral stem grit blasted 10 year follow-up hip',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='cemented Ti-6Al-4V femoral stem grit blasted 10 year follow-up hip',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/synonym_stem_search.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/synonym_stem_search.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/synonym_stem_search.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38907318\nTitle: Conservative femoral revision using short cementless stems with a tapered rectangular shape for selected Paprosky II-IV bone defects: an average seven-year follow-up\nSource: Arthroplasty (2024)\nAbstract: ...Classification of <m>femoral</m> <m>stems</m> Number Percent Coating Material SLR-Plus; Smith & Nephew (Memphis, TN, USA) 31 40.8% <m>Grit</m>-<m>blasted</m> surface <m>Ti</m>-<m>6Al</m>-7Nb alloy SL-Plus MIA; Smith & Nephew (Memphis, TN, USA) 18 23.7% Hydroxyapatite <m>Ti</m>-<m>6Al</m>-7Nb alloy SL-Plus; Smith & Nephew (Memphis, TN, USA) 5 6.6% <m>Grit</m>-<m>blasted</m> surface <m>Ti</m>-<m>6Al</m>-7Nb alloy Corail; DePuy Synthes (Warsaw, IN, USA) 13 17.1% Hydroxyapatite <m>Ti</m> alloy Alpha-conserve type I <m>stem</m>; Wego Orhto (Shandong, China) 7 9.2% Hydroxyapatite <m>Ti</m> alloy Polarstem; Smith & Nephew (Memphis, TN, USA) 2 2.6% Hydroxyapatite <m>Ti</m>-<m>6Al</m>-<m>4V</m> alloy\n--------------------------------------------------------------------------------\nPMID: 37130583\nTitle: Similar results after five years with the use of the Fitmore or the CLS femoral components\nSource: Bone Jt Open (2023)\nAbstract: ...The Fitmore <m>Hip</m> <m>Stem</m> is a curved uncemented <m>femoral</m> component with a trapezoidal cross-section made of a titanium alloy (@CHEMICAL_titanium_alloy_(TiAl6V4) @CHEMICAL_MESH:C031462 @@@<m>Ti</m>-<m>6Al</m>-<m>4V</m>@@@, Protasul-64WF).\n--------------------------------------------------------------------------------\nPMID: 39452605\nTitle: Prosthetic Joint Infection Research Models in NZW Rabbits: Opportunities for Standardization:A Systematic Review\nSource: J Funct Biomater (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 41258926\nTitle: Bridging the missing middle in osseointegration: meso-scale topography between macro design and microroughness\nSource: Int J Implant Dent (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36683758\nTitle: Functional engineering strategies of 3D printed implants for hard tissue replacement\nSource: Regen Biomater (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 41519933\nTitle: The dental implant surface: a review of the past, present and future\nSource: J Mater Sci Mater Med (2026)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 22113735\nTitle: High survival in young patients using a second generation uncemented total hip replacement\nSource: Int Orthop (2012)\nAbstract: Photograph showing the Fitmore acetabular component with <m>grit</m>-<m>blasted</m> @CHEMICAL_Titanium @CHEMICAL_MESH:D014025 @@@titanium@@@ wire mesh and the CLS Spotorno <m>stem</m>\n--------------------------------------------------------------------------------\nPMID: 20480036\nTitle: Dental Implant Systems\nSource: Int J Mol Sci (2010)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 24954490\nTitle: Good stability but high periprosthetic bone mineral loss and late-occurring periprosthetic fractures with use of uncemented tapered femoral stems in patients with a femoral neck fracture\nSource: Acta Orthop (2014)\nAbstract: It is made of titanium alloy (@CHEMICAL_titanium_alloy_(TiAl6V4) @CHEMICAL_MESH:C031462 @@@<m>Ti</m>-<m>6Al</m>-<m>4V</m>@@@) with a <m>grit</m>-<m>blasted</m> surface roughness of 7.5-<m>10</m> microm.\n--------------------------------------------------------------------------------\nPMID: 28772697\nTitle: Calcium Phosphate Bioceramics: A Review of Their History, Structure, Properties, Coating Technologies and Biomedical Applications\nSource: Materials (Basel) (2017)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_AE6hmDyYxCvS89jaoBfPnbkr",
+    "parent_tool_call_id": "call_cIX8cG79Q3IBS1MF4Toz2azh",
+    "round": 1,
+    "tool_input": {
+      "task_name": "implant model search",
+      "boolean_query_text": "cemented titanium alloy femoral component roughened grit blasted 10-year clinical results total hip arthroplasty",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='cemented titanium alloy femoral component roughened grit blasted 10-year clinical results total hip arthroplasty',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='cemented titanium alloy femoral component roughened grit blasted 10-year clinical results total hip arthroplasty',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/implant_model_search.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/implant_model_search.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/implant_model_search.csv'\nTotal results found: 7\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 37363463\nTitle: Effect of cementing technique on aseptic stem loosening in cemented primary total hip arthroplasty: a systematic review and meta-analysis\nSource: Ann Med Surg (Lond) (2023)\nAbstract: This investigative analysis showed that there is a minimal difference between <m>results</m> of <m>cementing</m> techniques of <m>total</m> <m>hip</m> <m>arthroplasty</m> in <m>femoral</m> <m>components</m> in long-term follow-ups, and usually have a low risk of failure.\n--------------------------------------------------------------------------------\nPMID: 41295056\nTitle: Micropatterning and Nanodropletting of Titanium by Shifted Surface Laser Texturing Significantly Enhances In Vitro Osteogenesis of Healthy and Osteoporotic Mesenchymal Stromal Cells\nSource: J Funct Biomater (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36683758\nTitle: Functional engineering strategies of 3D printed implants for hard tissue replacement\nSource: Regen Biomater (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 28097108\nTitle: The Current Concepts of Total Hip Arthroplasty\nSource: Hip Pelvis (2016)\nAbstract: ...1. <m>Cemented</m> <m>Total</m> <m>Hip</m> <m>Arthroplasty</m>\n--------------------------------------------------------------------------------\nPMID: 24955373\nTitle: The Use of a Modular Titanium Baseplate with a Press-Fit Keel Implanted with a Surface Cementing Technique for Primary Total Knee Arthroplasty\nSource: Biomed Res Int (2014)\nAbstract: ... Although <m>results</m> of tibial <m>component</m> fixation with <m>cement</m> in <m>total</m> knee <m>arthroplasty</m> (TKA) have been good, the ideal technique of <m>cementing</m> is still debated.\n--------------------------------------------------------------------------------\nPMID: 30515334\nTitle: Acetabular Debonding: An Investigation of Porous Coating Delamination in Hip Resurfacing Arthroplasty\nSource: Adv Orthop (2018)\nAbstract: Between December 2004 and December 2007, Biomet devices comprised a <m>cemented</m> ReCap <m>femoral</m> <m>component</m> and an uncemented Magnum acetabular <m>component</m> (Biomet, Warsaw, Indiana) and were used in an off-label fashion for <m>total</m> <m>hip</m> resurfacing.\n--------------------------------------------------------------------------------\nPMID: 33235984\nTitle: Titanium for Orthopedic Applications: An Overview of Surface Modification to Improve Biocompatibility and Prevent Bacterial Biofilm Formation\nSource: iScience (2020)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_UoJxxfuSqH7FTk6aHiEQivFD",
+    "parent_tool_call_id": "call_AE6hmDyYxCvS89jaoBfPnbkr",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "implant|shaft|stem|material|surface|cement|follow-up|patients|cohort|score|survival|reoperation|radiolucent|model|Ti-6Al-4V|titanium|grit",
+      "pmid": "10730364"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('10730364')\noutput = format_paper_content_output(result, filter_keywords='implant|shaft|stem|material|surface|cement|follow-up|patients|cohort|score|survival|reoperation|radiolucent|model|Ti-6Al-4V|titanium|grit')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (4):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m implant|shaft|stem|material|surface|cement|fo ... ion|radiolucent|model|Ti-6Al-4V|titanium|grit\n      \u001b[90mpmid:\u001b[0m 10730364\n\n  \u001b[1m\u001b[93m[2] fetch_paper_annotations\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 10\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mpmids:\u001b[0m ['10730364']\n\n  \u001b[1m\u001b[93m[3] get_paper_references\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 100\n      \u001b[90mmax_workers:\u001b[0m 2\n      \u001b[90mmini_batch_size:\u001b[0m 20\n      \u001b[90mpmids:\u001b[0m ['10730364']\n      \u001b[90mrate_limit:\u001b[0m 3\n      \u001b[90mtask_name:\u001b[0m stem paper references\n\n  \u001b[1m\u001b[93m[4] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m title variants\n      \u001b[90mboolean_query_text:\u001b[0m \"10 year results\" cemented titanium hip endoprosthesis shaft\n      \u001b[90mtop_k:\u001b[0m 20\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n=== PMID: 10730364 ===\n\nTitle: [10 year results with a cemented fine-grit-blasted titanium-aluminum-vanadium hip endoprosthesis shaft].\n\nJournal/Date: Zeitschrift fur Orthopadie und ihre Grenzgebiete (2000)\n\nMeSH Keywords: Alloys, Bone Cements, Equipment Failure Analysis, Female, Follow-Up Studies, Hip Prosthesis, Humans, Male\n\n\n--- ABSTRACT ---\n[PURPOSE]: Are the results of cemented titanium hip arthroplasty as bad as described in literature? We present the 10-year results of a cemented mild grid blasted Titanium-Aluminium-Vanadium Stem in Total-Hip-Arthroplasty.\n[METHODS]: The clinical and radiological reexamination was documented in standardized questionnaire in which several scores were integrated. All X-rays were stored and analysed by a special hardware and software computer system.\n[RESULTS]: 35% of all patients could be reexamined both clinically and roentgenologically. 71 patients were male (mean age 56.1 years) and 130 female (mean age 59.3 years). The average follow-up period was 11 years and 4 months. The mean Merle d'Aubigné hip score increased from 10.5 to 16.0 points at the follow-up evaluation. Radiolucent lines were according to the zones of Gruen seen in 1% to 22% depending on the zone and the size of the femoral component. 18 reoperations of the femoral component (2.9%) had to be performed. The survivorship analysis (Kaplan-Meier) showed a 95.4% survival of the femoral component after 10 years.\n[CONCLUSION]: Our findings with a cemented mild grid blasted Titanium-Aluminum-Vanadium stem demonstrate excellent results unlike it was reported for cemented femoral components of similar alloy but different design and cementation philosophy.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_annotations",
+    "tool_call_id": "call_nlOjhPOyhH9bAo4DF0kC6unl",
+    "parent_tool_call_id": "call_AE6hmDyYxCvS89jaoBfPnbkr",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "pmids": [
+        "10730364"
+      ]
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_fetch_paper_annotations\nimport json\nsearch_results = pubtator_api_fetch_paper_annotations(\n    pmids=['10730364'], batch_size=10, max_retries=3, max_requests_per_second=3\n)\nprint(json.dumps(search_results, indent=4))\n\n```\n\n### Output:\n```\nSuccessfully processed 1 publications from chunk\nTotal results: 1\n[\n    {\n        \"Relevant_Chemical\": [\n            \"Titanium\"\n        ],\n        \"Relevant_Species\": [\n            \"9606\"\n        ],\n        \"Relation_Mentions\": [],\n        \"PMID\": 10730364\n    }\n]\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "get_paper_references",
+    "tool_call_id": "call_RIeQ9MgigAshnIi8wbEUqmcQ",
+    "parent_tool_call_id": "call_AE6hmDyYxCvS89jaoBfPnbkr",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 100,
+      "max_workers": 2,
+      "mini_batch_size": 20,
+      "pmids": [
+        "10730364"
+      ],
+      "rate_limit": 3,
+      "task_name": "stem paper references"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_get_paper_references\nimport pandas as pd\n\nsearch_results = pubmed_api_get_paper_references(\n    pmids=['10730364'], batch_size=100, mini_batch_size=20,\n    max_workers=2, rate_limit=3\n)\n\nsearch_results_df = pd.DataFrame(search_results)\nsearch_results_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/stem_paper_references.csv', index=False)\nprint(\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/stem_paper_references.csv'\")\nprint(search_results_df.head().to_markdown())\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/stem_paper_references.csv'\n\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_vMdBoIypIT5wV8eAUb4hhrCZ",
+    "parent_tool_call_id": "call_AE6hmDyYxCvS89jaoBfPnbkr",
+    "round": 2,
+    "tool_input": {
+      "task_name": "title variants",
+      "boolean_query_text": "\"10 year results\" cemented titanium hip endoprosthesis shaft",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='\"10 year results\" cemented titanium hip endoprosthesis shaft',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='\"10 year results\" cemented titanium hip endoprosthesis shaft',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/title_variants.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/title_variants.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nUnexpected error (attempt 1/3): \"['pmcid'] not in index\"\nRetry attempt 2 after 0.3333333333333333 seconds...\nUnexpected error (attempt 2/3): \"['pmcid'] not in index\"\nRetry attempt 3 after 0.6666666666666666 seconds...\nUnexpected error (attempt 3/3): \"['pmcid'] not in index\"\nUnexpected error after 3 attempts\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/title_variants.csv'\nTotal results found: 1\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 10730364\nTitle: [10 year results with a cemented fine-grit-blasted titanium-aluminum-vanadium hip endoprosthesis shaft].\nSource: Zeitschrift fur Orthopadie und ihre Grenzgebiete (2000)\nAbstract: PURPOSE: Are the results of cemented titanium hip arthroplasty as bad as described in literature? We present the 10-year results of a cemented mild grid blasted Titanium-Aluminium-Vanadium Stem in Total-Hip-Arthroplasty. METHODS: The clinical and radiological reexamination was documented in standardized questionnaire in which several scores were integrated. All X-rays were stored and analysed by a special hardware and software computer system. RESULTS: 35% of all patients could be reexamined both clinically and roentgenologically. 71 patients were male (mean age 56.1 years) and 130 female (mean age 59.3 years). The average follow-up period was 11 years and 4 months. The mean Merle d'Aubigné hip score increased from 10.5 to 16.0 points at the follow-up evaluation. Radiolucent lines were according to the zones of Gruen seen in 1% to 22% depending on the zone and the size of the femoral component. 18 reoperations of the femoral component (2.9%) had to be performed. The survivorship analysis (Kaplan-Meier) showed a 95.4% survival of the femoral component after 10 years. CONCLUSION: Our findings with a cemented mild grid blasted Titanium-Aluminum-Vanadium stem demonstrate excellent resu ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_dCvME2qCBvFiNUJuJmOfvR8H",
+    "parent_tool_call_id": "call_vMdBoIypIT5wV8eAUb4hhrCZ",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "A published true 10-year result was identified: PMID 10730364, “[10 year results with a cemented fine-grit-blasted titanium-aluminum-vanadium hip endoprosthesis shaft]” (Zeitschrift für Orthopädie und ihre Grenzgebiete, 2000). The abstract explicitly states 10-year results for a cemented titanium–aluminum–vanadium stem in total hip arthroplasty and reports Kaplan–Meier femoral-component survival of 95.4% at 10 years.",
+          "source_tools": [
+            {
+              "relevance": "Exact-title/search result and bibliographic record with the 10-year claim and outcomes",
+              "tool_call_id": "call_xYyzQiPctVoFUkJTIK3F8qwj"
+            },
+            {
+              "relevance": "Full abstract confirming the implant, cemented fixation, follow-up, cohort, and outcomes",
+              "tool_call_id": "call_UoJxxfuSqH7FTk6aHiEQivFD"
+            }
+          ]
+        },
+        {
+          "finding": "The reported follow-up was not merely a nominal 10 years: average follow-up was 11 years 4 months. Outcomes included Merle d’Aubigné score improvement from 10.5 to 16.0, Gruen-zone radiolucent lines in 1%–22% depending on zone/component size, and 18 femoral-component reoperations (2.9%).",
+          "source_tools": [
+            {
+              "relevance": "Abstract-level clinical and radiographic outcome data",
+              "tool_call_id": "call_UoJxxfuSqH7FTk6aHiEQivFD"
+            }
+          ]
+        },
+        {
+          "finding": "The implant is described as a cemented fine-grit-blasted (the abstract contains the apparent OCR/translation variant “mild grid blasted”) titanium–aluminum–vanadium stem/shaft. The abstract does not provide a commercial implant model, exact alloy designation (e.g., Ti-6Al-4V), stem geometry, or detailed cementing technique; therefore those details should not be inferred beyond the stated titanium–aluminum–vanadium material and grit-blasted surface.",
+          "source_tools": [
+            {
+              "relevance": "Primary abstract wording and its stated limitation",
+              "tool_call_id": "call_UoJxxfuSqH7FTk6aHiEQivFD"
+            }
+          ]
+        },
+        {
+          "finding": "The cohort information is incompletely specified in the accessible abstract: 71 men (mean age 56.1 years) and 130 women (mean age 59.3 years) are reported, while only 35% of all patients underwent both clinical and radiographic re-examination. The denominator behind the 2.9% reoperation figure and whether the sex/age counts represent the re-examined subset or the full treated cohort cannot be resolved from the abstract alone.",
+          "source_tools": [
+            {
+              "relevance": "Primary abstract cohort and ascertainment statement",
+              "tool_call_id": "call_UoJxxfuSqH7FTk6aHiEQivFD"
+            }
+          ]
+        },
+        {
+          "finding": "The exact-title search returned this same PMID as the only directly matching publication. The other synonym/model searches mainly retrieved unrelated cementless or different titanium stem designs and did not establish an additional 10-year result for this cemented fine-grit-blasted Ti–Al–V shaft; thus shorter-follow-up/different-design records should not be counted as confirmation of this result.",
+          "source_tools": [
+            {
+              "relevance": "Exact and synonym search screening",
+              "tool_call_id": "call_xYyzQiPctVoFUkJTIK3F8qwj"
+            },
+            {
+              "relevance": "Synonym search showing unrelated designs, including cementless stems and nonmatching alloys",
+              "tool_call_id": "call_jj5D1yKqvxf2bcXsjYPIHib3"
+            },
+            {
+              "relevance": "Broader implant-model search yielding reviews/unrelated implants rather than a matching clinical 10-year series",
+              "tool_call_id": "call_AE6hmDyYxCvS89jaoBfPnbkr"
+            },
+            {
+              "relevance": "Exact title-variant search reproducing only PMID 10730364",
+              "tool_call_id": "call_vMdBoIypIT5wV8eAUb4hhrCZ"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_QfHGiTJSzjxWRJv2WtbZNXsS",
+    "parent_tool_call_id": "call_cIX8cG79Q3IBS1MF4Toz2azh",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:10730364",
+          "observations": [
+            "2000 report titled '[10 year results with a cemented fine-grit-blasted titanium-aluminum-vanadium hip endoprosthesis shaft].'",
+            "Reports 95.4% Kaplan–Meier femoral-component survival at 10 years; mean follow-up was 11 years 4 months.",
+            "Mean Merle d’Aubigné score improved from 10.5 to 16.0; 18 femoral-component reoperations were reported (2.9%).",
+            "Accessible abstract reports a cemented titanium–aluminum–vanadium stem with fine-grit-blasted surface but does not identify a commercial model or explicitly state Ti-6Al-4V."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Directly matching publication and 10-year result",
+              "tool_call_id": "call_UoJxxfuSqH7FTk6aHiEQivFD"
+            },
+            {
+              "relevance": "Exact-title and synonym search confirmation",
+              "tool_call_id": "call_xYyzQiPctVoFUkJTIK3F8qwj"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL / DRUG",
+          "name": "Titanium-aluminum-vanadium",
+          "observations": [
+            "The implant shaft/stem is described as titanium–aluminum–vanadium; exact alloy designation is not specified in the accessible abstract."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Implant material description",
+              "tool_call_id": "call_UoJxxfuSqH7FTk6aHiEQivFD"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "10-year stem survival",
+          "observations": [
+            "In the reported cemented fine-grit-blasted titanium–aluminum–vanadium hip stem cohort, Kaplan–Meier femoral-component survival was 95.4% at 10 years."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary reported endpoint",
+              "tool_call_id": "call_UoJxxfuSqH7FTk6aHiEQivFD"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:10730364",
+          "relation_type": "SUPPORTS",
+          "to_entity": "10-year stem survival"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"PMID:10730364\", \"entityType\": \"PAPER\", \"observations\": [\"2000 report titled '[10 year results with a cemented fine-grit-blasted titanium-aluminum-vanadium hip endoprosthesis shaft].'\", \"Reports 95.4% Kaplan\\u2013Meier femoral-component survival at 10 years; mean follow-up was 11 years 4 months.\", \"Mean Merle d\\u2019Aubign\\u00e9 score improved from 10.5 to 16.0; 18 femoral-component reoperations were reported (2.9%).\", \"Accessible abstract reports a cemented titanium\\u2013aluminum\\u2013vanadium stem with fine-grit-blasted surface but does not identify a commercial model or explicitly state Ti-6Al-4V.\"]}, {\"name\": \"Titanium-aluminum-vanadium\", \"entityType\": \"CHEMICAL / DRUG\", \"observations\": [\"The implant shaft/stem is described as titanium\\u2013aluminum\\u2013vanadium; exact alloy designation is not specified in the accessible abstract.\"]}, {\"name\": \"10-year stem survival\", \"entityType\": \"FINDING\", \"observations\": [\"In the reported cemented fine-grit-blasted titanium\\u2013aluminum\\u2013vanadium hip stem cohort, Kaplan\\u2013Meier femoral-component survival was 95.4% at 10 years.\"]}]}, \"relations_created\": {\"count\": 1, \"relations\": [{\"from\": \"PMID:10730364\", \"to\": \"10-year stem survival\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_QfHGiTJSzjxWRJv2WtbZNXsS\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_cIX8cG79Q3IBS1MF4Toz2azh\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_1oQJ5glb4F8ce16Xw7v2AKde",
+    "parent_tool_call_id": "call_QfHGiTJSzjxWRJv2WtbZNXsS",
+    "round": 3,
+    "tool_input": {
+      "entity_names": "[\"PMID:10730364\",\"10-year stem survival\",\"Titanium-aluminum-vanadium\"]",
+      "get_full_map": false,
+      "max_entities": null,
+      "max_observations_per_entity": 5,
+      "query": null,
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"requested_entities\": [\"PMID:10730364\", \"10-year stem survival\", \"Titanium-aluminum-vanadium\"], \"results\": {\"entities\": [{\"name\": \"PMID:10730364\", \"entityType\": \"PAPER\", \"observations\": [\"2000 report titled '[10 year results with a cemented fine-grit-blasted titanium-aluminum-vanadium hip endoprosthesis shaft].'\", \"Reports 95.4% Kaplan\\u2013Meier femoral-component survival at 10 years; mean follow-up was 11 years 4 months.\", \"Mean Merle d\\u2019Aubign\\u00e9 score improved from 10.5 to 16.0; 18 femoral-component reoperations were reported (2.9%).\", \"Accessible abstract reports a cemented titanium\\u2013aluminum\\u2013vanadium stem with fine-grit-blasted surface but does not identify a commercial model or explicitly state Ti-6Al-4V.\"]}, {\"name\": \"Titanium-aluminum-vanadium\", \"entityType\": \"CHEMICAL / DRUG\", \"observations\": [\"The implant shaft/stem is described as titanium\\u2013aluminum\\u2013vanadium; exact alloy designation is not specified in the accessible abstract.\"]}, {\"name\": \"10-year stem survival\", \"entityType\": \"FINDING\", \"observations\": [\"In the reported cemented fine-grit-blasted titanium\\u2013aluminum\\u2013vanadium hip stem cohort, Kaplan\\u2013Meier femoral-component survival was 95.4% at 10 years.\"]}], \"relations\": [{\"from\": \"PMID:10730364\", \"to\": \"10-year stem survival\", \"relationType\": \"SUPPORTS\"}]}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

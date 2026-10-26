@@ -1,0 +1,1 @@
+{"answer": ["Cc1ccc2c(cnn2C2CCCCO2)c1B1OC(C)(C)C(C)(C)O1"]}

@@ -1,0 +1,1 @@
+The input decodes to **C₈H₁₂** (`C1CC2CC2C2CC12`). Its reported LUMO energy is **0.0792 Hartree (Ha)**, from an exact QM9 InChIKey match. The source does not specify the calculation method. [Source: `call_KVFMIzLUE1YZNRBFAGHkorCh`; structure validation: `call_s6xTkLnV6hfhFamDjCMDWqEe`]

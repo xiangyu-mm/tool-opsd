@@ -1,0 +1,3 @@
+Yes—one small human tracer study found that oligomeric silica reduced aluminum availability, while monomeric silica did not. In three healthy volunteers, 17 mg of oligomeric silica reduced aluminum availability by 67% versus aluminum alone (P=0.01); monomeric silica had no significant effect (P=0.40). The study used an aluminum tracer and measured serum and urine. Because the comparison involved only three participants, it supports the claim but is not strong enough to establish a general clinical effect. (PMID: 10731501)
+
+FINAL DECISION: YES

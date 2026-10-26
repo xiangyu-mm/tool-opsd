@@ -1,0 +1,5 @@
+**Yes—within the reported mouse model.** Sun et al. (2014; PMID: 25076362) found that mPGES-2 knockout mice given STZ developed markedly more severe liver injury than wild-type controls. By day 4, 6 of 9 knockout mice had died; day-3 assessments showed severe steatosis, elevated liver enzymes, hepatocyte apoptosis, and increased inflammation and oxidative stress. Blood glucose was similar between groups.
+
+The study also reported about a 50% increase in hepatic GLUT2 and greater STZ accumulation in knockout mice. In primary hepatocytes, the GLUT2 inhibitor phloretin reduced excess STZ accumulation and injury, supporting a role for GLUT2. However, this is pharmacologic evidence: the findings suggest GLUT2 mediation but do not prove it definitively through genetic deletion or rescue.
+
+FINAL DECISION: YES

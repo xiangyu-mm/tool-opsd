@@ -1,0 +1,3 @@
+The evidence supports **yes**. In a CFA-induced inflammatory hyperalgesia rat model, BI113823 reduced mechanical hyperalgesia after both oral and intrathecal administration. Electrophysiology showed reduced mechanosensitivity in peripheral saphenous-nerve afferents and spinal nociceptive-specific neurons, but not spinal wide-dynamic-range neurons. This supports functional desensitization at both peripheral and spinal levels. The study did not demonstrate molecular receptor desensitization or receptor internalization. (2015; PMID: 25088373)
+
+FINAL DECISION: YES

@@ -1,0 +1,371 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_nAtbsROX90jgGYOfwQKP9teR",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether maturation of a tracheostomy stoma increases the rate of persistent tracheocutaneous fistula after decannulation. Search for studies, reviews, and surgical series involving stomal maturation, epithelialization, duration of tracheostomy, and tracheocutaneous fistula incidence, especially pediatric and adult populations. Report direct evidence, effect estimates if available, and whether stomal maturation itself is causal versus confounded by duration of cannulation or other factors."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_xnzconxt3KCQKabSSSe0TrPl",
+    "parent_tool_call_id": "call_nAtbsROX90jgGYOfwQKP9teR",
+    "round": 1,
+    "tool_input": {
+      "task_name": "adult fistula series",
+      "boolean_query_text": "adult persistent tracheocutaneous fistula tracheostomy duration stomal maturation",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='adult persistent tracheocutaneous fistula tracheostomy duration stomal maturation',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='adult persistent tracheocutaneous fistula tracheostomy duration stomal maturation',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/adult_fistula_series.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/adult_fistula_series.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/adult_fistula_series.csv'\nTotal results found: 2\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 37155437\nTitle: A Comparative Analysis of Conventional Tracheotomy Versus Bjork Flap Tracheotomy\nSource: Cureus (2023)\nAbstract: Additionally, delayed @DISEASE_Postoperative_Complications @DISEASE_MESH:D011183 @@@postoperative complications@@@, namely <m>stomal</m> granulation, @DISEASE_Constriction_Pathologic @DISEASE_MESH:D003251 @@@<m>stomal</m> stenosis@@@, @DISEASE_Tracheoesophageal_Fistula @DISEASE_MESH:D014138 @@@tracheoesophageal <m>fistula</m>@@@, @DISEASE_Fistula @DISEASE_MESH:D005402 @@@<m>tracheocutaneous</m> <m>fistula</m>@@@, <m>tracheostomy</m> tube blockage, @DISEASE_Infections @DISEASE_MESH:D007239 @@@stoma infection@@@, and secondary @DISEASE_Hemorrhage @DISEASE_MESH:D006470 @@@hemorrhage@@@ were assessed in both groups.\n--------------------------------------------------------------------------------\nPMID: 37761012\nTitle: Tracheostomy in Severe Bronchopulmonary Dysplasia:How to Decide in the Absence of Evidence\nSource: Biomedicines (2023)\nAbstract: The factors associated with <m>persistent</m> @DISEASE_Fistula @DISEASE_MESH:D005402 @@@TCF@@@ include younger age at the time of <m>tracheostomy</m> placement and the <m>duration</m> of <m>tracheostomy</m> dependence.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_I7X7Ym8r4YR5PYqY26GbGF4z",
+    "parent_tool_call_id": "call_xnzconxt3KCQKabSSSe0TrPl",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "stomal maturation|duration|tracheocutaneous fistula|odds|multivariable|regression|conclusion",
+      "pmid": "38265121"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('38265121')\noutput = format_paper_content_output(result, filter_keywords='stomal maturation|duration|tracheocutaneous fistula|odds|multivariable|regression|conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (5):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m stomal maturation|duration|tracheocutaneous fistula|odds|multivariable|regression|conclusion\n      \u001b[90mpmid:\u001b[0m 38265121\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m stomal maturation|tracheocutaneous fistula|decannulation|duration|odds|risk\n      \u001b[90mpmid:\u001b[0m 27519875\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m persistent tracheocutaneous fistula|duration|maturation|epithelialization|risk factor\n      \u001b[90mpmid:\u001b[0m 33875932\n\n  \u001b[1m\u001b[93m[4] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m TCF risk factors\n      \u001b[90mboolean_query_text:\u001b[0m tracheocutaneous fistula risk factors duration tracheostomy pediatric\n      \u001b[90mtop_k:\u001b[0m 30\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[5] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m adult TCF incidence\n      \u001b[90mboolean_query_text:\u001b[0m adult tracheocutaneous fistula decannulation incidence duration tracheostomy series\n      \u001b[90mtop_k:\u001b[0m 30\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n=== PMID: 38265121 ===\n\nTitle: Pediatric Tracheotomy Stomal Maturation and Tracheocutaneous Fistulas.\n\nJournal/Date: The Laryngoscope (2024)\n\nMeSH Keywords: Humans, Retrospective Studies, Male, Female, Infant, Child, Preschool, Cutaneous Fistula, Tracheal Diseases\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: The purpose of this study is to determine whether tracheostomy stomal maturation affects the risk of tracheocutaneous fistula (TCF) in children.\n[METHODS]: A retrospective chart review was conducted for all children who both underwent a tracheostomy and were decannulated between 2012 and 2021 at a tertiary children's hospital. Charts were analyzed for demographics, surgical technique, and development of a TCF. TCF was defined as a persistent fistula following 3 months after decannulation.\n[RESULTS]: 179 children met inclusion criteria. The median (interquartile range) age at tracheostomy was 1.5 (82.4) months, average (standard deviation [SD]) duration of tracheotomy was 20.0 (20.6) months, and length of follow-up after decannulation (range; SD) was 39.3 (4.4-110.0; 26.7) months. 107 patients (60.0%) underwent stomal maturation and 98 patients developed a TCF (54.7%). Younger age at tracheostomy placement was significantly associated with increased risk of TCF, mean (SD) age 28.4 (51.4) version 80.1 (77.5) months (p < 0.001). Increased duration of tracheostomy was significantly associated with increased risk of TCF, 27.5 (18.4) version 11.0 (18.2) months (p < 0.001). Stomal maturation was not significantly associated with the risk of TCF, including on multivariable analysis adjusting for age at tracheostomy and duration of tracheostomy (p = 0.089).\n[CONCLUSION]: Tracheostomy stomal maturation did not affect the risk of TCF in children, even after adjusting for age and duration of tracheostomy.\n[LEVEL OF EVIDENCE]: 4 Laryngoscope, 134:2941-2944, 2024.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_xkm3JqD8nN6KEUiOxmAvyYBM",
+    "parent_tool_call_id": "call_xnzconxt3KCQKabSSSe0TrPl",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "stomal maturation|tracheocutaneous fistula|decannulation|duration|odds|risk",
+      "pmid": "27519875"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27519875')\noutput = format_paper_content_output(result, filter_keywords='stomal maturation|tracheocutaneous fistula|decannulation|duration|odds|risk')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 27519875 ===\n\nTitle: Stomal maturation does not increase the rate of tracheocutaneous fistulas.\n\nJournal/Date: The Laryngoscope (2016)\n\nMeSH Keywords: Cutaneous Fistula, Device Removal, Female, Fistula, Follow-Up Studies, Humans, Infant, Male\n\n\n--- ABSTRACT ---\n[OBJECTIVES/HYPOTHESIS]: To determine the rate of persistent tracheocutaneous fistula (TCF) in pediatric patients managed with stomal maturation at the time of the tracheostomy.\n[STUDY DESIGN]: Retrospective chart analysis of all cases of tracheostomy performed at a tertiary pediatric care center between 2001 and 2011.\n[METHODS]: The use of stomal maturation, number of decannulations, number of persistent TCFs, timing of TCF repair, and the overall mortality were assessed.\n[RESULTS]: A total of 264 patients received tracheostomy between 2001 and 2011. Of the total, 173 (66%) underwent stomal maturation. Of those 173 patients, 89 patients (51% of maturation group) underwent planned decannulation. Forty seven (53%) of the 89 decannulated were found to have a persistent TCF in the stomal maturation group. These were diagnosed an average of 1.3 years (range, 4-43 months) after decannulation. Of the 91 patients (34% of the total) who did not undergo stomal maturation, 44 (48% of nonmaturation group) underwent planned decannulation. Twenty of the 44 patients decannulated (45%) were diagnosed with a residual TCF 8 to 28 months later. Both groups achieved similar rates of decannulation (51% maturation vs. 48% non-maturation [P = .80]) and TCF (27% maturation vs. 22% non-maturation [P = .44]). Overall, mortality rates were (32/173) 18% (matured) versus (26/91) 29% (nonmatured). No mortalities were tracheostomy related. The mean (standard deviation) time from operation to TCF closure among those with TCF was 4.0 (1.9) years.\n[CONCLUSIONS]: Comparable rates of persistent TCF with stomal maturation (27%) and without maturation (22%) were found in this single institution's 10-year experience.\n[LEVEL OF EVIDENCE]: 4. Laryngoscope, 126:2395-2398, 2016.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_zgf3y8deThsjgTlUn7Se4duo",
+    "parent_tool_call_id": "call_xnzconxt3KCQKabSSSe0TrPl",
+    "round": 2,
+    "tool_input": {
+      "task_name": "adult TCF incidence",
+      "boolean_query_text": "adult tracheocutaneous fistula decannulation incidence duration tracheostomy series",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='adult tracheocutaneous fistula decannulation incidence duration tracheostomy series',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='adult tracheocutaneous fistula decannulation incidence duration tracheostomy series',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/adult_TCF_incidence.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/adult_TCF_incidence.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/adult_TCF_incidence.csv'\nTotal results found: 11\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 39132833\nTitle: Percutaneous Tracheostomy Via Grigg's Technique in Children: Does Age and Size Matter?\nSource: Laryngoscope (2024)\nAbstract: @DISEASE_Fistula @DISEASE_MESH:D005402 @@@<m>Tracheocutaneous</m> <m>fistula</m>@@@ is the epithelization of the <m>tracheostomy</m> tract, preventing spontaneous <m>tracheostomy</m> closure following <m>decannulation</m>.\n--------------------------------------------------------------------------------\nPMID: 34509427\nTitle: Tracheostomy practices in children on mechanical ventilation: a systematic review and meta-analysis1\nSource: J Pediatr (Rio J) (2022)\nAbstract: Failed <m>decannulation</m> when <m>tracheostomy</m> was indicated for upper @DISEASE_Airway_Obstruction @DISEASE_MESH:D000402 @@@airway obstruction@@@ was reported to be 20.3%, in the Canning et al. <m>series</m>, and in 36.4% in Funamura et al.\n--------------------------------------------------------------------------------\nPMID: 34316177\nTitle: Tracheostomy in Pediatric Intensive Care Unit:A Two Decades of Experience\nSource: Indian J Crit Care Med (2021)\nAbstract: Tube dislodgement and subsequent surgical @DISEASE_Emphysema @DISEASE_MESH:D004646 @@@emphysema@@@ were life-threatening complications in the immediate postprocedure period. Although the <m>duration</m> of <m>tracheostomy</m> was the longest in @SPECIES_9606 @@@patients@@@ with @DISEASE_Airway_Obstruction @DISEASE_MESH:D000402 @@@UAO@@@, the proportion of successful <m>decannulation</m> was higher in this group.\n--------------------------------------------------------------------------------\nPMID: 37943736\nTitle: Tracheostomy care quality improvement in low- and middle-income countries: A scoping review\nSource: PLOS Glob Public Health (2023)\nAbstract: Equipment Spare <m>tracheostomy</m> tubeSuction cathetersFoot-operated suction pump Foot-operated suction pump Spare <m>tracheostomy</m> tubesManually or electrically operated suction pump Post-Discharge Support Outpatient follow-up clinic Not specified Follow up with advanced pediatric clinical nurse specialists Outcomes for Patients Discharged with <m>Tracheostomies</m> Mortality in hospital <m>Tracheostomy</m>-related 0.7% Unrelated to <m>tracheostomy</m> 18.1%Mortality post-discharge <m>Tracheostomy</m>-related 2.4% Unrelated to <m>tracheostomy</m> 7.4%<m>Tracheostomy</m> related complication rate post-discharge 22% Accidental <m>decannulation</m> 1.2% Cannula obstruction 5% <m>Tracheocutaneous</m> <m>fistula</m> 5%<m>Decannulation</m> rate 49%Lost to follow up 41% Overall survival rate: 82% Discharge to home (85%) vs institution (66%), p = 0.19Readmission rate overall 95%Median number of readmissions 3-4 times/childReasons for readmission Infection (34%) <m>Tracheostomy</m> related complications (7%) Social indications (3%) Planned surgery/endoscopy (49%)Overall <m>decannulation</m> rate 50% Mortality Any cause 21.1% <m>Tracheostomy</m>-related mortality 1.2%Readmission rate 5 ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 40534759\nTitle: Economic Study of a Pediatric Tracheostomy Remote Home Monitoring Program (PTRHMP) Compared to Prolonged Hospitalization for Children With Tracheostomy\nSource: Laryngoscope Investig Otolaryngol (2025)\nAbstract: ...For all <m>tracheostomy</m> @SPECIES_9606 @@@patients@@@ for 7 days after <m>decannulation</m> and/or <m>tracheocutaneous</m> @DISEASE_Fistula @DISEASE_MESH:D005402 @@@<m>fistula</m>@@@ closure\n--------------------------------------------------------------------------------\nPMID: 32274112\nTitle: Decision algorithm and surgical strategies for managing tracheocutaneous fistula\nSource: J Thorac Dis (2020)\nAbstract: The <m>duration</m> of cannulation and a history of multiple <m>tracheostomies</m> are known to increase risk of persistent @DISEASE_Fistula @DISEASE_MESH:D005402 @@@<m>tracheocutaneous</m> <m>fistulas</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 21566788\nTitle: Challenges of Tracheostomy in Patients Managed for Severe Tetanus in a Developing Country\nSource: Int J Prev Med (2010)\nAbstract: Other complications seen in this <m>series</m> included severe @DISEASE_Infections @DISEASE_MESH:D007239 @@@<m>tracheostomy</m> infection@@@, persistent @DISEASE_Fistula @DISEASE_MESH:D005402 @@@<m>tracheocutaneous</m> <m>fistula</m>@@@ and impacted dislodged tip of <m>tracheostomy</m> tube.\n--------------------------------------------------------------------------------\nPMID: 33209457\nTitle: Tracheotomy, closure of long-term tracheostomy and standard tracheal segmental resections\nSource: J Thorac Dis (2020)\nAbstract: A @DISEASE_Fistula @DISEASE_MESH:D005402 @@@tracheocutanous <m>fistula</m>@@@ is a pathologic complication that occurs post <m>decannulation</m>, in which the <m>tracheostomy</m> tract does not close spontaneously.\n--------------------------------------------------------------------------------\nPMID: 26557488\nTitle: An overview of complications associated with open and percutaneous tracheostomy procedures\nSource: Int J Crit Illn Inj Sci (2015)\nAbstract: ...Delayed closure of <m>tracheostomy</m> wound after <m>decannulation</m>\n--------------------------------------------------------------------------------\nPMID: 31890877\nTitle: Best practices for emergency surgical airway: A systematic review\nSource: Laryngoscope Investig Otolaryngol (2019)\nAbstract: The most common late complications were peristomal @DISEASE_Infections @DISEASE_MESH:D007239 @@@infection@@@ (7.6%) and @DISEASE_Constriction_Pathologic @DISEASE_MESH:D003251 @@@airway stenosis@@@ (7.0%).23, 24 @DISEASE_Specific_Granule_Deficiency @DISEASE_MESH:C562873 @@@Granulation tissue@@@, accidental <m>decannulation</m>, @DISEASE_Pneumonia_Aspiration @DISEASE_MESH:D011015 @@@aspiration pneumonia@@@, @DISEASE_Fistula @DISEASE_MESH:D005402 @@@<m>tracheocutaneous</m> <m>fistula</m>@@@, @DISEASE_Mediastinal_Cyst @DISEASE_MESH:D008476 @@@tracheal tube obstruction@@@, and @DISEASE_Tracheoesophageal_Fistula @DISEASE_MESH:D014138 @@@tracheoesophageal <m>fistula</m>@@@ were less common.21, 22, 23, 24, 25 Follow-up time was not always specified.\n--------------------------------------------------------------------------------\nPMID: 31565633\nTitle: The Effect of Flexible Lightwand and Ultrasonography Combination on Complications of the Percutaneous Dilatational Tracheostomy Procedure\nSource: Cureus (2019)\nAbstract: Late-stage complications of <m>tracheostomy</m> include @DISEASE_Tracheal_Stenosis @DISEASE_MESH:D014135 @@@tracheal stenosis@@@, @DISEASE_Tracheal_Diseases @DISEASE_MESH:D014133 @@@tracheal-oesophageal <m>fistula</m>@@@, and @DISEASE_Fistula @DISEASE_MESH:D005402 @@@<m>tracheocutaneous</m> <m>fistula</m>@@@.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_Mkgn5YBwhXJcBYiPlql6xvGC",
+    "parent_tool_call_id": "call_zgf3y8deThsjgTlUn7Se4duo",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "relative risk|duration|24 months|12 months|persistent TCF|conclusion",
+      "pmid": "28802009"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('28802009')\noutput = format_paper_content_output(result, filter_keywords='relative risk|duration|24 months|12 months|persistent TCF|conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (5):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m relative risk|duration|24 months|12 months|persistent TCF|conclusion\n      \u001b[90mpmid:\u001b[0m 28802009\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m maturation|tracheocutaneous fistula|decannulated|duration|conclusion\n      \u001b[90mpmid:\u001b[0m 10605914\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m frequency|risk factors|duration|stomal maturation|spontaneous closure|multivariable|conclusion\n      \u001b[90mpmid:\u001b[0m 31299421\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m duration of cannulation|maturation|epithelialization|persistent tracheocutaneous fistula|risk\n      \u001b[90mpmid:\u001b[0m 32274112\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m duration|tracheocutaneous fistula|maturation|epithelialization|adult\n      \u001b[90mpmid:\u001b[0m 33209457\n\n=== PMID: 28802009 ===\n\nTitle: Duration of tracheostomy dependence and development of tracheocutaneous fistula in children.\n\nJournal/Date: The Laryngoscope (2017)\n\nMeSH Keywords: Child, Child, Preschool, Cutaneous Fistula, Device Removal, Female, Humans, Infant, Infant, Newborn\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: To determine whether the risk of developing a tracheocutaneous fistula (TCF) increases with longer tracheostomy dependence times in children.\n[STUDY DESIGN]: Retrospective review of medical records.\n[METHOD]: A retrospective chart review was conducted for all children who both underwent tracheotomy and were decannulated between 2002 and 2011 at a tertiary children's hospital. Charts were analyzed for duration of tracheostomy and evidence of TCF up to 12 months. Data for these criteria was available on 164 out of 182 patients.\n[RESULTS]: A significant difference in the duration of tracheostomy dependence between children with and without resultant TCF was determined by the Wilcoxon signed rank test (P = 0.0003). The relative risk (RR) of a persistent TCF was significantly increased when the duration of tracheostomy dependence was greater than 24 months (RR = 2.5217, P < 0.005) when compared to those decannulated before 12 months. The mean tracheostomy dependence times for children with and without TCF were 33.1 and 23.4 months, respectively. Overall, 94 children (57.3%) developed a TCF.\n[CONCLUSION]: To our knowledge, this study represents the largest collection of data for children who have been decannulated following tracheostomy placement. These data demonstrate that the risk of developing a TCF increases with longer tracheostomy dependence times in children.\n[LEVEL OF EVIDENCE]: 4. Laryngoscope, 127:2709-2712, 2017.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_mUlmDckdAYlYX9fenWrwR7U0",
+    "parent_tool_call_id": "call_zgf3y8deThsjgTlUn7Se4duo",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "maturation|tracheocutaneous fistula|decannulated|duration|conclusion",
+      "pmid": "10605914"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('10605914')\noutput = format_paper_content_output(result, filter_keywords='maturation|tracheocutaneous fistula|decannulated|duration|conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 10605914 ===\n\nTitle: Maturation of the pediatric tracheostomy stoma: effect on complications.\n\nJournal/Date: The Annals of otology, rhinology, and laryngology (1999)\n\nMeSH Keywords: Adolescent, Adult, Child, Child, Preschool, Female, Granulation Tissue, Humans, Infant\n\n\n--- ABSTRACT ---\nThe pediatric tracheostomy stoma can be matured via a technique that places 4-quadrant sutures from the tracheal cartilage to the dermis. This has the potential of decreasing the risk of accidental decannulation and the formation of granulation tissue. A retrospective analysis of 149 tracheostomies performed between January 1989 and December 1996 was done for the following factors: age, underlying diagnosis, indication for tracheostomy, type of tracheal incision, maturation of stoma, duration of tracheostomy, and early and late (>7 days) complications. Maturation of the stoma was performed in 88 (59.1%) of the 149 tracheostomies. There was an overall complication rate of 21.5% (32/149, not including granulation tissue formation). There were 9 (6.0%) early complications and 23 (15.4%) late complications. The overall incidence of tracheocutaneous fistulas occurred in 11 (11.2%) of the 98 decannulated patients: 6 (10.2%) of the 59 matured stomas and 5 (12.8%) of the 39 nonmatured stomas. Granulation tissue was found on subsequent laryngoscopy in 24 (27.3%) of the 88 matured stomas versus 23 (37.7%) of the 61 nonmatured stomas. There were no tracheostomy-related mortalities. Maturing the tracheostomy stoma resulted in a decreased morbidity from accidental decannulations and did not increase the incidence of tracheocutaneous fistulas or granulation tissue formation.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_d0bKFQ1yYCYU8wGldvu1OYXk",
+    "parent_tool_call_id": "call_zgf3y8deThsjgTlUn7Se4duo",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "frequency|risk factors|duration|stomal maturation|spontaneous closure|multivariable|conclusion",
+      "pmid": "31299421"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('31299421')\noutput = format_paper_content_output(result, filter_keywords='frequency|risk factors|duration|stomal maturation|spontaneous closure|multivariable|conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 31299421 ===\n\nTitle: Pediatric tracheocutaneous fistula closure following tracheostomy decannulation.\n\nJournal/Date: International journal of pediatric otorhinolaryngology (2019)\n\nMeSH Keywords: Adolescent, Airway Extubation, Child, Child, Preschool, Colorado, Cutaneous Fistula, Device Removal, Female\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: To determine the frequency and risk factors that lead to the development of persistent TCF (tracheocutaneous fistula) formation in children following tracheostomy decannulation at our institution.\n[METHODS]: A retrospective chart review of all pediatric patients at Children's Hospital Colorado who underwent tracheostomy decannulation and were being followed between January 1, 2007 and December 31, 2013. TCF was defined as a persistent fistula six months following decannulation. We determined patient demographics, age at tracheotomy, primary indication for tracheotomy, tracheostomy-tube size, medical comorbidities, age at decannulation, date of TCF closure, and method of TCF closure.\n[RESULTS]: One hundred twenty-nine patients ranging from 51 days to 19 years of age underwent tracheostomy decannulation. 63 (49%) patients underwent surgical closure of TCF. Compared to those with spontaneous closure by multivariable analysis, those with surgical closure were younger at tracheostomy placement (p = 0.0002), had a tracheostomy for a longer duration (p = 0.0025), and were diagnosed with tracheobronchomalacia (p = 0.0051). The likelihood of spontaneous closure decreased over time. Tracheostomy tube internal diameter correlated with age (R = 0.64, p < 0.0001).\n[CONCLUSIONS]: Approximately 50% of pediatric tracheostomy stoma sites will close spontaneously. Development of a persistent TCF was associated with younger age at placement, longer duration of tracheostomy, and the presence of tracheobronchomalacia. These observations may help clinicians anticipate outcomes following tracheostomy decannulation in children.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_45hsnVphyzqlF9hIalqD80xh",
+    "parent_tool_call_id": "call_zgf3y8deThsjgTlUn7Se4duo",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "duration of cannulation|maturation|epithelialization|persistent tracheocutaneous fistula|risk",
+      "pmid": "32274112"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('32274112')\noutput = format_paper_content_output(result, filter_keywords='duration of cannulation|maturation|epithelialization|persistent tracheocutaneous fistula|risk')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 32274112 ===\n\nTitle: Decision algorithm and surgical strategies for managing tracheocutaneous fistula.\n\nJournal/Date: Journal of thoracic disease (2020)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Persistent tracheocutaneous fistula (TCF) is a complication of prolonged use of tracheostomy tube. Although many procedures exist to correct this issue, there is no consensus regarding its optimal management. We constructed a decision algorithm to determine appropriate surgical strategies for TCF repair.\n[METHODS]: Retrospectively reviewing our hospital's records, we found fourteen consecutive patients who had received surgical repair of tracheocutaneous fistula (primary closure or advanced local flap) between February 2013 and December 2018 and collected data relevant to their cases.\n[RESULTS]: We identified 11 male and 3 female patients. Duration of tracheostomy dependence was 8.1±4.7 months, and timespan from decannulation to surgical closure 7.4±6.5 months. Seven patients received primary closures, six received hinged turnover flaps, and one received random and perforator flap reconstruction. There was no perioperative mortality or morbidity except for one patient requiring a repeat tracheostomy 11 months after TCF repair due to pneumonia and subsequent respiratory failure. We used our findings and those reported in the literature to construct a modified risk factor scoring system based on patient's physical status, major comorbidities, perifistular soft tissue condition, and nutritional status and an algorithm for managing TCF based on the patients' fistula size and modified risk factor scores.\n[CONCLUSIONS]: In conclusion, we were able to review our cases and those of other studies to create a risk scoring system and a decision algorithm that we believe will help optimize patient-directed surgical management of TCF repair.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nThe cases we identified at our hospital consisted of eleven male and three female patients aged 58.6±19.0 years. Prolonged mechanical ventilation necessitating tracheostomies were needed in five patients who had brain injuries incurred in motor vehicle collisions, eight patients who had complications related to surgical operations, and one who had an inhalation injury. Mean duration of tracheostomy dependence was 8.1±4.7 months, and mean time interval from decannulation to surgical of TCF 7.4±6.5 months. Simple primary closures with fistulectomies were performed in seven, hinged turnover flap with fistulectomies in six, and perforator flap reconstruction in one tailored to the fistula size and perifistular soft tissue condition. Mean operative time was 38.6±15.6 minutes and mean p...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_RnVFzB4vm7LqvBPE1ObkWZp0",
+    "parent_tool_call_id": "call_zgf3y8deThsjgTlUn7Se4duo",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "duration|tracheocutaneous fistula|maturation|epithelialization|adult",
+      "pmid": "33209457"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('33209457')\noutput = format_paper_content_output(result, filter_keywords='duration|tracheocutaneous fistula|maturation|epithelialization|adult')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 33209457 ===\n\nTitle: Tracheotomy, closure of long-term tracheostomy and standard tracheal segmental resections.\n\nJournal/Date: Journal of thoracic disease (2020)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nTracheotomy is a surgical procedure commonly employed to establish stable and long-term airway access. Iatrogenic airway injury post procedure may have serious consequences with limited treatment options. Tracheostoma or long standing tracheostomies require special closing techniques. Tracheotomies, tracheostomies, complications of these and treatment options, long standing tracheostomy closure techniques, and standard tracheal segmental resections are discussed.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_HH1Tu1kI9nmPjMkg2fmYHpNn",
+    "parent_tool_call_id": "call_RnVFzB4vm7LqvBPE1ObkWZp0",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "In the strongest direct pediatric study (179 children, retrospective, 2012–2021), stomal maturation was not significantly associated with persistent TCF after adjustment for age at tracheostomy and duration of tracheostomy (multivariable p=0.089). Overall, 98/179 (54.7%) developed TCF and 107/179 (60.0%) had matured stomas; the authors concluded maturation did not affect TCF risk.",
+          "source_tools": [
+            {
+              "relevance": "Direct adjusted comparison of stomal maturation and TCF",
+              "tool_call_id": "call_I7X7Ym8r4YR5PYqY26GbGF4z"
+            }
+          ]
+        },
+        {
+          "finding": "An earlier pediatric retrospective series (264 tracheostomies; 133 planned decannulations) likewise found no significant increase with maturation: persistent TCF occurred in 47/89 (53%; reported cohort rate 27%) after maturation versus 20/44 (45%; reported cohort rate 22%) without maturation; P=0.44 for TCF and P=0.80 for decannulation. This is compatible with no causal increase, but the nonrandomized groups may differ in baseline risk.",
+          "source_tools": [
+            {
+              "relevance": "Direct matured versus nonmatured pediatric comparison",
+              "tool_call_id": "call_xkm3JqD8nN6KEUiOxmAvyYBM"
+            }
+          ]
+        },
+        {
+          "finding": "A pediatric surgical series of 149 tracheostomies found TCF in 6/59 (10.2%) decannulated patients with matured stomas versus 5/39 (12.8%) with nonmatured stomas, concluding maturation did not increase TCF; maturation was also associated with fewer accidental decannulations. This study did not establish that groups were comparable for duration or other confounders.",
+          "source_tools": [
+            {
+              "relevance": "Earlier direct surgical-series comparison",
+              "tool_call_id": "call_mUlmDckdAYlYX9fenWrwR7U0"
+            }
+          ]
+        },
+        {
+          "finding": "Duration of cannulation is a much more consistent predictor than maturation. In 164 children, TCF risk was significantly higher when tracheostomy dependence exceeded 24 months versus less than 12 months (RR 2.5217, P<0.005); mean duration was 33.1 months with TCF versus 23.4 months without. A separate 129-child multivariable study found persistent TCF associated with longer tracheostomy duration, younger age at placement, and tracheobronchomalacia.",
+          "source_tools": [
+            {
+              "relevance": "Effect estimate for duration",
+              "tool_call_id": "call_Mkgn5YBwhXJcBYiPlql6xvGC"
+            },
+            {
+              "relevance": "Adjusted duration and comorbidity associations",
+              "tool_call_id": "call_d0bKFQ1yYCYU8wGldvu1OYXk"
+            }
+          ]
+        },
+        {
+          "finding": "The biologic rationale is that persistent TCF reflects epithelialization of a chronically maintained tract, but the available clinical studies do not show that surgically maturing the skin-to-trachea stoma itself causes more epithelialization or fistula persistence. Maturation is plausibly confounded by age, indication, anatomy, expected duration of dependence, and institutional surgical practice; the 2024 study's adjustment for age and duration attenuated concern for an independent maturation effect.",
+          "source_tools": [
+            {
+              "relevance": "Epithelialization definition and mechanism",
+              "tool_call_id": "call_sMuU2xkd8IlS6ybDTq1B8ZHB"
+            },
+            {
+              "relevance": "Adjusted causal-relevance evidence",
+              "tool_call_id": "call_I7X7Ym8r4YR5PYqY26GbGF4z"
+            }
+          ]
+        },
+        {
+          "finding": "Adult-specific incidence evidence directly comparing stomal maturation versus no maturation was not identified in the retrieved literature. An adult TCF repair series (14 patients; mean tracheostomy duration 8.1±4.7 months) addresses surgical management rather than incidence or maturation causality, and reviews describe prolonged cannulation/multiple tracheostomies as risk factors. Thus, conclusions are substantially stronger for children than adults.",
+          "source_tools": [
+            {
+              "relevance": "Adult surgical series, not causal incidence comparison",
+              "tool_call_id": "call_45hsnVphyzqlF9hIalqD80xh"
+            },
+            {
+              "relevance": "Review statement on duration and repeated tracheostomy",
+              "tool_call_id": "call_zgf3y8deThsjgTlUn7Se4duo"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_udEhkSoGrkjaBB0QuDiRXg5g",
+    "parent_tool_call_id": "call_EqjKtFF8zsSXgwfnq9bjDeyK",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:38265121",
+          "observations": [
+            "Retrospective cohort of 179 children: stomal maturation was not independently associated with persistent tracheocutaneous fistula after adjustment for age at tracheostomy and tracheostomy duration; multivariable p=0.089.",
+            "Overall, 98/179 children developed TCF and 107/179 had matured stomas."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct pediatric evidence on stomal maturation and TCF",
+              "tool_call_id": "call_I7X7Ym8r4YR5PYqY26GbGF4z"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:27519875",
+          "observations": [
+            "Retrospective pediatric series: persistent TCF occurred in 47/89 (53%) after maturation versus 20/44 (45%) without maturation; difference was not significant (P=0.44).",
+            "Nonrandomized groups may have differed in baseline risk."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Comparative pediatric maturation study",
+              "tool_call_id": "call_xkm3JqD8nN6KEUiOxmAvyYBM"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:10605914",
+          "observations": [
+            "Pediatric surgical series: TCF occurred in 6/59 (10.2%) decannulated patients with matured stomas versus 5/39 (12.8%) with nonmatured stomas.",
+            "The study concluded maturation did not increase TCF, but did not establish comparable groups."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Earlier comparative pediatric study",
+              "tool_call_id": "call_mUlmDckdAYlYX9fenWrwR7U0"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Stomal maturation and TCF",
+          "observations": [
+            "Across three retrospective pediatric comparative series, surgical stomal maturation was not shown to increase persistent tracheocutaneous fistula rates.",
+            "The strongest adjusted study found no independent maturation effect after accounting for age and duration."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Synthesis of direct evidence",
+              "tool_call_id": "call_I7X7Ym8r4YR5PYqY26GbGF4z"
+            },
+            {
+              "relevance": "Supporting comparative evidence",
+              "tool_call_id": "call_xkm3JqD8nN6KEUiOxmAvyYBM"
+            },
+            {
+              "relevance": "Supporting comparative evidence",
+              "tool_call_id": "call_mUlmDckdAYlYX9fenWrwR7U0"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Duration and TCF risk",
+          "observations": [
+            "In children, longer tracheostomy duration was more consistently associated with persistent TCF than stomal maturation; dependence exceeding 24 months versus less than 12 months had RR 2.5217, P<0.005.",
+            "Younger age at placement and tracheobronchomalacia were also reported predictors in a separate pediatric multivariable study."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Duration risk estimate",
+              "tool_call_id": "call_Mkgn5YBwhXJcBYiPlql6xvGC"
+            },
+            {
+              "relevance": "Multivariable pediatric risk factors",
+              "tool_call_id": "call_d0bKFQ1yYCYU8wGldvu1OYXk"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Adult evidence limitation",
+          "observations": [
+            "Direct adult incidence studies comparing matured versus nonmatured stomas were not identified; adult evidence mainly concerns TCF repair and prolonged cannulation risk.",
+            "Therefore, the conclusion is stronger for pediatric populations than adults."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Adult evidence review",
+              "tool_call_id": "call_45hsnVphyzqlF9hIalqD80xh"
+            },
+            {
+              "relevance": "Review-level context",
+              "tool_call_id": "call_zgf3y8deThsjgTlUn7Se4duo"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": null
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 6, \"entities\": [{\"name\": \"PMID:38265121\", \"entityType\": \"PAPER\", \"observations\": [\"Retrospective cohort of 179 children: stomal maturation was not independently associated with persistent tracheocutaneous fistula after adjustment for age at tracheostomy and tracheostomy duration; multivariable p=0.089.\", \"Overall, 98/179 children developed TCF and 107/179 had matured stomas.\"]}, {\"name\": \"PMID:27519875\", \"entityType\": \"PAPER\", \"observations\": [\"Retrospective pediatric series: persistent TCF occurred in 47/89 (53%) after maturation versus 20/44 (45%) without maturation; difference was not significant (P=0.44).\", \"Nonrandomized groups may have differed in baseline risk.\"]}, {\"name\": \"PMID:10605914\", \"entityType\": \"PAPER\", \"observations\": [\"Pediatric surgical series: TCF occurred in 6/59 (10.2%) decannulated patients with matured stomas versus 5/39 (12.8%) with nonmatured stomas.\", \"The study concluded maturation did not increase TCF, but did not establish comparable groups.\"]}, {\"name\": \"Stomal maturation and TCF\", \"entityType\": \"FINDING\", \"observations\": [\"Across three retrospective pediatric comparative series, surgical stomal maturation was not shown to increase persistent tracheocutaneous fistula rates.\", \"The strongest adjusted study found no independent maturation effect after accounting for age and duration.\"]}, {\"name\": \"Duration and TCF risk\", \"entityType\": \"FINDING\", \"observations\": [\"In children, longer tracheostomy duration was more consistently associated with persistent TCF than stomal maturation; dependence exceeding 24 months versus less than 12 months had RR 2.5217, P<0.005.\", \"Younger age at placement and tracheobronchomalacia were also reported predictors in a separate pediatric multivariable study.\"]}, {\"name\": \"Adult evidence limitation\", \"entityType\": \"FINDING\", \"observations\": [\"Direct adult incidence studies comparing matured versus nonmatured stomas were not identified; adult evidence mainly concerns TCF repair and prolonged cannulation risk.\", \"Therefore, the conclusion is stronger for pediatric populations than adults.\"]}]}}, \"provenance\": {\"tool_call_id\": \"call_udEhkSoGrkjaBB0QuDiRXg5g\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_EqjKtFF8zsSXgwfnq9bjDeyK\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

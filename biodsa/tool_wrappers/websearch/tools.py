@@ -1,7 +1,7 @@
 """
 Web Search Tool
 """
-from typing import Optional, Type
+from typing import Optional, Type, List
 from pydantic import BaseModel, Field
 from langchain_core.tools import BaseTool
 import os
@@ -90,7 +90,7 @@ class WebSearchTool(BaseTool):
         self.max_search_uses = max_search_uses
         self.sandbox = sandbox
     
-    def _run(self, query: str) -> str:
+    def _run(self, query: str, context_tool_call_ids: Optional[List[str]] = None,) -> str:
         """
         Execute the web search tool.
         

@@ -1,0 +1,1 @@
+{"answer": "C#CCOc1ccc2c(c1)C(=O)OC2=O"}

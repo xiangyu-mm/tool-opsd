@@ -103,6 +103,7 @@ class BaseAgent():
         api_key: str,
         model_name: SupportedModelName = None,
         endpoint: str = None,
+        base_url: str = None,
         max_completion_tokens=5000,
         container_id: str = None,
         model_kwargs: Dict[str, Any] = None,
@@ -151,6 +152,8 @@ class BaseAgent():
         
         # Timeout for LLM calls in seconds (default: None for no timeout)
         self.llm_timeout = llm_timeout
+
+        self.base_url = base_url
         
         # get the model            
         self.llm = self._get_model(
@@ -158,6 +161,7 @@ class BaseAgent():
             model_name=self.model_name,
             api_key=self.api_key,
             endpoint=self.endpoint,
+            base_url=self.base_url,
             **kwargs
         )
 
@@ -167,6 +171,7 @@ class BaseAgent():
             api_key: str,
             model_name: str,
             endpoint: str = None,
+            base_url: str = None,
             **kwargs
     ) -> BaseLanguageModel:
         """
@@ -196,12 +201,22 @@ class BaseAgent():
                 **kwargs
             )
         elif (api == "openai"):
-            llm = ChatOpenAI(
-                model=model_name,
-                api_key=api_key,
-                max_retries=0,
-                **kwargs
-            )
+            if base_url is not None:
+                print("initializing openai with base_url:", base_url)
+                llm = ChatOpenAI(
+                    model=model_name,
+                    api_key=api_key,
+                    max_retries=0,
+                    base_url=base_url,
+                    **kwargs
+                )
+            else:
+                llm = ChatOpenAI(
+                    model=model_name,
+                    api_key=api_key,
+                    max_retries=0,
+                    **kwargs
+                )
         elif (api == "google"): 
             llm = ChatGoogleGenerativeAI(
                 model=model_name,
@@ -275,7 +290,15 @@ class BaseAgent():
         """
         return [res.model_dump() for res in code_execution_results]
 
-    def _call_model(self, model_name: str, messages: List[BaseMessage], tools: List[BaseTool]=None, model_kwargs: Dict[str, Any]=None, parallel_tool_calls: bool=True, api_type: str=None, api_key: str=None, endpoint: str=None) -> BaseMessage:
+    def _call_model(self, model_name: str, 
+                    messages: List[BaseMessage], 
+                    tools: List[BaseTool]=None, 
+                    model_kwargs: Dict[str, Any]=None, 
+                    parallel_tool_calls: bool=True, 
+                    api_type: str=None, 
+                    api_key: str=None,
+                    endpoint: str=None,
+                    base_url: str=None) -> BaseMessage:
         if tools is None:
             tools = []
         if model_kwargs is None:
@@ -293,6 +316,7 @@ class BaseAgent():
             model_name=model_name,
             api_key=api_key,
             endpoint=endpoint,
+            base_url=base_url,
             **model_kwargs
         )
         if tools:

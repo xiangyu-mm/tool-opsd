@@ -1,0 +1,3 @@
+The answer is **no**. Keil, Platts-Mills, and Jones’s 2015 cross-sectional analysis in *Annals of Emergency Medicine* concluded that systematic reviews published in emergency medicine journals **did not routinely search clinical trials registries** (DOI: [10.1016/j.annemergmed.2014.10.001]). I could verify the article and its conclusion, but not the study’s exact measured proportion from the records retrieved.
+
+FINAL DECISION: NO

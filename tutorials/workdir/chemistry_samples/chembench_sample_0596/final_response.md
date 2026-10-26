@@ -1,0 +1,1 @@
+{"answer": "N-(1,3-benzothiazol-2-yl)-N-(2-methoxy-5-methylphenyl)-2-(4-methoxyphenyl)acetamide"}

@@ -99,6 +99,7 @@ class UnifiedGeneSearchTool(BaseTool):
         limit_per_source: int = 10,
         sources: Optional[List[str]] = None,
         include_variants: bool = False,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the unified gene search."""
         
@@ -248,6 +249,7 @@ class UnifiedGeneDetailsFetchTool(BaseTool):
         id_type: Optional[str] = None,
         sources: Optional[List[str]] = None,
         include_variants: bool = False,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the unified gene details fetch."""
         

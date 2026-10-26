@@ -1,0 +1,3 @@
+Yes. In the directly relevant study, cationic nanogels delivered siRNAs targeting Runx2 and Osterix (Osx) to rhBMP-2-stimulated MC3T3-E1.4 preosteoblasts. After 21 days, treated cultures showed significantly less hydroxyapatite deposition than rhBMP-2-only controls (OsteoImage assay, p<0.001). The effect was incomplete: mineralization remained above that of cultures without rhBMP-2. (PMID: 25448327)
+
+FINAL DECISION: YES

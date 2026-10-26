@@ -1,0 +1,249 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_nm3ttm3KVvEKumYOzBFxXqfp",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "disease",
+        "drug",
+        "clinical_trials",
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine the standard management of a 28-week pregnant Rh(D)-negative, unsensitized woman: timing of routine antenatal anti-D (Rho(D) immune globulin) prophylaxis, whether repeat dosing is needed before delivery, and postpartum dosing based on neonatal Rh(D) status. Compare specifically with choices A-J."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "unified_drug_search",
+    "tool_call_id": "call_Qr5euriZuSDrDeqy6gFANSqO",
+    "parent_tool_call_id": "call_nm3ttm3KVvEKumYOzBFxXqfp",
+    "round": 1,
+    "tool_input": {
+      "context_tool_call_ids": [],
+      "limit_per_source": 5,
+      "search_term": "Rho(D) immune globulin antenatal postpartum prophylaxis",
+      "sources": [
+        "openfda_label",
+        "biothings"
+      ],
+      "task_name": "anti-D prophylaxis"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.drugs import search_drugs_unified\n\n# Perform unified drug search across multiple sources\nresults, output = search_drugs_unified(\n    search_term='Rho(D) immune globulin antenatal postpartum prophylaxis',\n    limit_per_source=5,\n    sources=['openfda_label', 'biothings'],\n    save_path='/home/data4/xiangyu/BioDSA/workdir/workdir/anti-D_prophylaxis.json',\n)\n\n# Display formatted output\nprint(output)\n\n```\n\n### Output:\n# Unified Drug Search Results\n\n## Search Term: 'Rho(D) immune globulin antenatal postpartum prophylaxis'\n\n**Total results:** 0 across 2 sources\n\n### Results by Source:\n- **BioThings (MyChem.info):** Found 0 drugs in 1ms\n- **OpenFDA Labels:** Found 0 drug labels\n\n================================================================================\n\n\n================================================================================\n\n## Aggregated Information\n\n\n**Results saved to:** /home/data4/xiangyu/BioDSA/workdir/workdir/anti-D_prophylaxis.json\n\n\n*Executed locally (no sandbox)*",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_qlssBBBaT5ektgfx6d6mIpSV",
+    "parent_tool_call_id": "call_nm3ttm3KVvEKumYOzBFxXqfp",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "Rh(D)-negative unsensitized pregnancy routine antenatal anti-D 28 weeks postpartum neonatal Rh positive repeat dose delivery",
+      "relation_query": null,
+      "task_name": "Rh prophylaxis guidance",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='Rh(D)-negative unsensitized pregnancy routine antenatal anti-D 28 weeks postpartum neonatal Rh positive repeat dose delivery',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='Rh(D)-negative unsensitized pregnancy routine antenatal anti-D 28 weeks postpartum neonatal Rh positive repeat dose delivery',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/Rh_prophylaxis_guidance.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/Rh_prophylaxis_guidance.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nNo search results found. Please try again with different query. TIP: Try simpler keyword phrases.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "fetch_drug_details",
+    "tool_call_id": "call_qRGcyVxR8i7LbVbcnzkrto9Z",
+    "parent_tool_call_id": "call_qlssBBBaT5ektgfx6d6mIpSV",
+    "round": 2,
+    "tool_input": {
+      "drug_id": "Rho(D) immune globulin",
+      "id_type": "name",
+      "sources": [
+        "openfda_label",
+        "biothings"
+      ],
+      "task_name": "anti-D label"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.drugs import fetch_drug_details_unified\n\n# Fetch drug details from multiple sources\ndetails, output = fetch_drug_details_unified(\n    drug_id='Rho(D) immune globulin',\n    id_type='name',\n    sources=['openfda_label', 'biothings'],\n    save_path='/home/data4/xiangyu/BioDSA/workdir/workdir/anti-D_label.json',\n)\n\n# Display formatted output\nprint(output)\n\n```\n\n### Output:\n# Drug Details\n\n## Drug ID: 'Rho(D) immune globulin' (ID Type: name)\n\n**Sources found:** 1 / 2\n\n### Results by Source:\n- **BioThings:** Found drug information\n- **OpenFDA Labels:** No results found\n\n================================================================================\n\n\n## BIOTHINGS Data\n\n**Chemical and Pharmacological Information:**\n\n- **Name:** RHO(D) IMMUNE GLOBULIN (HUMAN)\n- **DrugBank ID:** None\n- **ChEBI ID:** None\n- **ChEMBL ID:** None\n- **PubChem CID:** None\n- **Formula:** None\n- **InChI Key:** None...\n\n================================================================================\n\n**Results saved to:** /home/data4/xiangyu/BioDSA/workdir/workdir/anti-D_label.json\n\n\n*Executed locally (no sandbox)*",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g",
+    "parent_tool_call_id": "call_qlssBBBaT5ektgfx6d6mIpSV",
+    "round": 2,
+    "tool_input": {
+      "boolean_query_text": "Rh negative pregnancy anti-D 28 weeks postpartum",
+      "relation_query": null,
+      "task_name": "anti-D timing",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='Rh negative pregnancy anti-D 28 weeks postpartum',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='Rh negative pregnancy anti-D 28 weeks postpartum',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/anti-D_timing.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/anti-D_timing.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/anti-D_timing.csv'\nTotal results found: 20\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 26334436\nTitle: Anti-D administration in pregnancy for preventing Rhesus alloimmunisation.\nSource: The Cochrane database of systematic reviews (2015)\nAbstract: BACKGROUND: During pregnancy, a Rhesus negative (Rh-negative) woman may develop antibodies when her fetus is Rhesus positive (Rh-positive). These antibodies may harm Rh-positive babies. OBJECTIVES: To assess the effects of antenatal anti-D immunoglobulin on the incidence of Rhesus D alloimmunisation when given to Rh-negative women without anti-D antibodies. SEARCH METHODS: We searched the Cochrane Pregnancy and Childbirth Group's Trials Register (31 May 2015) and reference lists of retrieved studies. SELECTION CRITERIA: Randomised trials in Rh-negative women without anti-D antibodies given anti-D after 28 weeks of pregnancy, compared with no treatment, placebo or a different regimen of anti-D. DATA COLLECTION AND ANALYSIS: Two review authors independently assessed trials for inclusion and risk of bias, extracted data and checked them for accuracy. MAIN RESULTS: We included two trials involving over 4500 women, comparing anti-D prophylaxis with no anti-D during pregnancy in this review. Overall, the trials were judged to be at moderate to high risk of bias. The quality of the evidence for pre-specified outcomes was also assessed using the GRADE (Grades of Recommendation, Assessment, ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 40121290\nTitle: Perinatal outcomes in RhD-negative pregnant women in Japan.\nSource: Scientific reports (2025)\nAbstract: Managing RhD-negative pregnancies is vital for preventing hemolytic disease of the fetus and newborn, which occurs when RhD-negative mothers develop anti-D antibodies after exposure to RhD-positive fetal blood. This retrospective cohort study evaluated the proportion of RhD-negative pregnancies and newborns in Japan by assessing current management practices and outcomes. This study included RhD-negative pregnant women who delivered at 22 weeks or later at 47 Japanese facilities between April 2018 and March 2023. Pregnancies with unknown newborn RhD status were excluded. Data were obtained from medical records. Among the 1088 RhD-negative women, 1062 met the inclusion criteria. RhD-negative pregnancies comprised 0.71% of the total cohort, with 8.7% RhD-negative newborns. Anti-D immunoglobulin was administered in 96.5% of pregnancies, with a maternal spontaneous sensitization rate of 0.6% before 28 weeks and no sensitization detected from 28 weeks to postpartum. Sensitized RhD-negative women had higher cesarean section, preterm delivery, and neonatal hemolytic anemia rates than the non-sensitized group, leading to increased neonatal intensive care unit admissions. Despite the low inc ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 12970812\nTitle: Prevention of Rh alloimmunization.\nSource: Journal of obstetrics and gynaecology Canada : JOGC = Journal d'obstetrique et gynecologie du Canada : JOGC (2003)\nAbstract: OBJECTIVE: To provide guidelines on use of anti-D prophylaxis to optimize prevention of rhesus (Rh) alloimmunization in Canadian women. OUTCOMES: Decreased incidence of Rh alloimmunization and minimized practice variation with regards to immunoprophylaxis strategies. EVIDENCE: The Cochrane Library and MEDLINE were searched for English-language articles from 1968 to 2001, relating to the prevention of Rh alloimmunization. Search terms included: Rho(D) immune globulin, Rh iso- or allo-immunization, anti-D, anti-Rh, WinRho, Rhogam, and pregnancy. Additional publications were identified from the bibliographies of these articles. All study types were reviewed. Randomized controlled trials were considered evidence of highest quality, followed by cohort studies. Key individual studies on which the principal recommendations are based are referenced. Supporting data for each recommendation is briefly summarized with evaluative comments and referenced. VALUES: The evidence collected was reviewed by the Maternal-Fetal Medicine and Genetics Committees of the Society of Obstetricians and Gynaecologists of Canada (SOGC) and quantified using the Evaluation of Evidence guidelines developed by the  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 40203017\nTitle: Point-of-care determination of the frequency of Rhesus(D)-negative blood types and the uptake of anti(D) immunoglobulin among Rh(D)-negative women in Dadu district, Sindh, Pakistan.\nSource: PLOS global public health (2025)\nAbstract: Rhesus (Rh) disease remains a serious problem in low- and middle-income countries. Rh disease prevention requires early identification and prophylactic treatment of Rh(D)-negative women. We evaluated the feasibility of point-of-care identification of Rh(D)-negative women and timely administration of two doses of anti(D) immunoglobulin by lady health visitors in Dadu district, Sindh, Pakistan. Pregnant women were enrolled at two hospitals and followed until 29 days postpartum. Rh(D)-antigen status was determined using the EldonCard2521 test and all Rh(D)-negative point-of-care test results were attempted to be verified using the conventional test tube agglutination method. Rh(D)-negative women were offered two injections of anti(D) immunoglobulin, one at 28 weeks' gestation and one within 72 hours of delivery. Knowledge pertaining to Rh disease was assessed among participants at study entry and exit, and in a sample of 30 health care providers. All participants (n=1619) had their blood tested with the EldonCard2521, and 279 (17%) women were found to be Rh(D)-negative; however, the conventional test tube method identified one discordant Rh(D)-antigen result. Among 278 Rh(D)-negative  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 39530874\nTitle: Colombian consensus for the diagnosis, prevention, and management of Rhesus disease.\nSource: Revista colombiana de obstetricia y ginecologia (2024)\nAbstract: OBJECTIVE: To train healthcare professionals involved in the care of Rh-D negative pregnant women, with the aim of standardizing the management of Rh isoimmunization prevention, timely antenatal diagnosis of Rh disease, fetal assessment, and treatment of fetuses with Rh disease, in order to prevent adverse perinatal outcomes. MATERIALS AND METHODS: A group of 23 expert panelists participated in the development of the consensus through three rounds, answering a questionnaire consisting of 8 domains and 22 questions. A modified Delphi method was used until the consensus threshold among participants was reached, defined as 80% or greater agreement in responses. In the third round of the expert panel, a twenty-third question emerged, which was answered by one of the thematic leaders. The eight domains of antenatal management for Rh-D negative pregnant women were: 1) Rh-D determination, 2) initial prenatal care for Rh-D negative patients, 3) titration and periodicity of the indirect Coombs test, 4) sensitizing events, 5) administration of anti-D immunoglobulin (IgG), 6) Doppler velocimetry of the middle cerebral artery (MCA), 7) antenatal management of isoimmunized patients and anemic f ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 33772800\nTitle: Altered strategy of prophylactic anti-D administration in pregnancy to cover term and post-term - a pilot study.\nSource: Vox sanguinis (2021)\nAbstract: BACKGROUND AND OBJECTIVE: Routine antenatal anti-D prophylaxis (RAADP) to RhD-negative women is most often administered in gestational age (GA) 28-30 weeks with the next anti-D dose administered postpartum. The aim of this study was to analyse the proportion of RhD-negative women where RAADP is not detectable at term and in a pilot study to investigate whether RAADP administered in GA 28 and 38 results in detectable levels at term, post-term and post-delivery. MATERIALS AND METHODS: In a retrospective analysis, 4280 RhD-negative women carrying an RHD positive fetus were included and the proportion with a negative antibody screen at delivery was determined. In the second part, 39 pregnancies were included prospectively, a second dose of RAADP was administered in GA 38 weeks, and anti-D was quantified before the second dose and then weekly for 5 weeks. RESULTS: In the retrospective analysis, 20·5% (856/4280) with RAADP administered in GA 28 were negative in routine antibody screening at delivery. In the small prospective study, 18% (7/39) had a negative antibody screen and 26% (10/39) had levels below 0·005 IU/ml, in the quantification assay, in GA 38. Anti-D prophylaxis administered ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 23710977\nTitle: [Guideline for prevention of RhD alloimmunizationin RhD negative women].\nSource: Ceska gynekologie (2013)\nAbstract: Events following which immunoglobulin (Ig) G anti-D should be given to all RhD negative women with no anti-D alloantibodies: First trimester indications (IgG anti-D sufficient dose of 50 μg*) - termination of pregnancy, spontaneous abortion followed by instrumentation, ectopic pregnancy, chorionic villus sampling, partial molar pregnancy; Second and third trimester indications (IgG anti-D sufficient dose of 100 μg*) - amniocentesis, cordocentesis, other invasive prenatal diagnostic or therapeutic procedures, spontaneous or induced abortion, intrauterine fetal death, attempt at external cephalic version of a breech presentation, abdominal trauma, obstetric hemorrhage; Antenatal prophylaxis at 28th weeks of gestation (IgG anti-D sufficient dose of 250 μg*); Delivery of an RhD positive infant** (IgG anti-D sufficient dose of 100 μg*); Minimal dose*: before 20 weeks gestation - 50 μg (250 IU), after 20 weeks gestation*** - 100 μg (500 IU); Timing: as soon as possible, but no later than 72 hours after the event. In cases where prevention of RhD alloimmunization is not performed within 72 hours of a potentially sensitising event, it is still reasonable to administer IgG anti-D within 13  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 22352370\nTitle: Pharmacokinetics of 250 μg anti-D IgG in the third trimester of pregnancy: an observational study.\nSource: Acta obstetricia et gynecologica Scandinavica (2012)\nAbstract: OBJECTIVE: We present a pharmacokinetic study evaluating a single intramuscular dose of 250 μg anti-D immunoglobulin in the third trimester of pregnancy. The aim of the study was to determine the kinetic profile and duration of detectable levels of anti-D. DESIGN: Prospective observational study. SETTING: Antenatal outpatient clinic. POPULATION: Healthy Rhesus D (RhD)-negative pregnant women with an RHD-positive fetus. METHODS: Serial plasma anti-D quantitations following antenatal administration of anti-D immunoglobulin were performed using flow cytometry. Kinetic profiles for anti-D levels were generated from the concentration values at predetermined sampling time points. The half-lives were calculated by linear regression analysis. Main outcome measures. Time vs. concentration profile, half-life and anti-D concentration ≥1 ng/mL close to term. RESULTS: The maximal plasma concentration of anti-D was usually seen at 3-10 days postinjection, with a median value of 25 ng/mL. The half-life varied between individuals, with a median of 23 days. We found detectable levels of anti-D IgG within two weeks of parturition in 11 of 12 women. CONCLUSIONS: The preparation of anti-D immunoglobul ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 20925231\nTitle: [Guideline for prevention of RhD alloimmunization in RhD negative women].\nSource: Ceska gynekologie (2010)\nAbstract: Events following which anti-D immunoglobulin should be given to all RhD negative women with no anti-D antibodies: First trimester indications (50 microg)--termination of pregnancy, spontaneous abortion followed by instrumentation, ectopic pregnancy, chorionic villus sampling, partial molar pregnancy; Second and third trimester indications (100 microg)--amniocentesis, cordocentesis, other invasive prenatal diagnostic or therapeutic procedures, spontaneous or induced abortion, intrauterine fetal death, attempt at external cephalic version of a breech presentation, abdominal trauma, obstetric haemorrhage; Antenatal prophylaxis at 28th weeks of gestation (250 microg); Delivery of an RhD positive infant * (100 microg); Minimal dose: before 20 weeks gestation--50 microg (250 IU), after 20 weeks gestation **--100 microg (500 IU); Timing: as soon as possible, but no later than 72 hours after the event. In cases where prevention of RhD alloimmunization is not performed within 72 hours of a potentially sensitising event, it is still reasonable to administer anti-D immunoglobulin (IgG anti-D) within 13 days, and in special cases, administration is still recommended up to a maximum interval of ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 40718264\nTitle: Alloimmunization in a Rhesus (Rh) D-Negative Pregnant Woman With an Uncommon Rh Phenotype: A Case Report.\nSource: Cureus (2025)\nAbstract: Rhesus (Rh) alloimmunization remains a critical concern in obstetrics, particularly in RhD-negative pregnant women who have not received postpartum Rh immunoglobulin (RhIg) prophylaxis. This report describes the case of a 19-year-old pregnant woman in her second pregnancy who had no documented administration of anti-D prophylaxis after her first childbirth. During routine screening at 28 weeks of gestation, her Indirect Coombs Test (ICT) showed strong positivity (3+), with an anti-D antibody titer of 1:128. Antibody identification confirmed anti-D specificity. Further immunohematological evaluation revealed that the patient had blood group B negative and an uncommon dCe/dce (also known as r'r) Rh phenotype, lacking D and E antigens. Though the fetus was at risk for hemolytic disease of the fetus and newborn (HDFN), there was no need for intrauterine transfusion during the pregnancy. This case highlights the importance of routine antenatal antibody screening, awareness of Rh phenotypes, and timely prophylactic measures to prevent Rh alloimmunization. Comprehensive monitoring and genotype-informed transfusion planning are especially crucial in resource-limited settings.\n--------------------------------------------------------------------------------\nPMID: 40718264\nTitle: Alloimmunization in a Rhesus (Rh) D-Negative Pregnant Woman With an Uncommon Rh Phenotype: A Case Report.\nSource: Cureus (2025)\nAbstract: During routine screening at <m>28</m> <m>weeks</m> of <m>gestation</m>, her Indirect Coombs Test (ICT) showed strong positivity (3+), with an <m>anti</m>-<m>D</m> antibody titer of 1:128.\n--------------------------------------------------------------------------------\nPMID: 40203017\nTitle: Point-of-care determination of the frequency of Rhesus(D)-negative blood types and the uptake of anti(D) immunoglobulin among Rh(D)-negative women in Dadu district, Sindh, Pakistan.\nSource: PLOS Glob Public Health (2025)\nAbstract: @GENE_RHD @GENE_6007 @@@<m>Rh</m>(<m>D</m>)@@@-<m>negative</m> @SPECIES_9606 @@@women@@@ were offered two injections of <m>anti</m>(<m>D</m>) immunoglobulin, one at <m>28</m> <m>weeks</m>' <m>gestation</m> and one within 72 hours of delivery.\n--------------------------------------------------------------------------------\nPMID: 39530874\nTitle: Colombian consensus for the diagnosis, prevention, and management of Rhesus disease\nSource: Rev Colomb Obstet Ginecol (2024)\nAbstract: If not feasible, it can be administered up to 4 <m>weeks</m> after the event if it was not given initially.7.1. For non-isoimmunized pregnant @SPECIES_9606 @@@women@@@ (with a <m>negative</m> Coombs test and @CHEMICAL_Rhodium @CHEMICAL_MESH:D012238 @@@<m>Rh</m>@@@-positive newborn), it is recommended to administer <m>anti</m>-<m>D</m> IgG between <m>weeks</m> <m>28</m> and 32, and within the first 72 hours <m>postpartum</m> if the newborn is @CHEMICAL_Rhodium @CHEMICAL_MESH:D012238 @@@<m>Rh</m>@@@-positive.\n--------------------------------------------------------------------------------\nPMID: 40999654\nTitle: A novel RHD allele combining partial D (c.455A>C) and weak D (c.1154G>C) variants\nSource: Transfusion (2025)\nAbstract: @SPECIES_9606 @@@Patients@@@ with weak <m>D</m> types 1, 2, 3, 4.0, and 4.1 can be managed as @GENE_RHD @GENE_6007 @@@RhD@@@-positive, with caveats for type 4.0 in <m>pregnancy</m>; other genotypes are managed as @GENE_RHD @GENE_6007 @@@RhD@@@-<m>negative</m> for uncertain or known risk of <m>anti</m>-<m>D</m> alloimmunization.\n--------------------------------------------------------------------------------\nPMID: 33128246\nTitle: FIGO/ICM guidelines for preventing Rhesus disease: A call to action\nSource: Int J Gynaecol Obstet (2021)\nAbstract: ...Routine <m>anti</m>-@GENE_RHD @GENE_6007 @@@<m>Rh</m>(<m>D</m>)@@@ prophylaxis during <m>pregnancy</m>: 1500 IU (300 microg) at <m>28</m>-34 <m>weeks</m>.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_bXqQI08OUGCILbiKC3u2A8Fd",
+    "parent_tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Routine antenatal anti-D prophylaxis is given to an unsensitized Rh(D)-negative pregnant woman at about 28 weeks (guidelines commonly allow 28–32 or 28–34 weeks; typical US regimen is 300 micrograms/1500 IU at 28 weeks).",
+          "source_tools": [
+            {
+              "relevance": "Cochrane review specifically evaluated prophylaxis after 28 weeks",
+              "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g"
+            },
+            {
+              "relevance": "FIGO/ICM guideline states 1500 IU at 28–34 weeks",
+              "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g"
+            },
+            {
+              "relevance": "Guideline abstract specifies antenatal prophylaxis at 28 weeks",
+              "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g"
+            }
+          ]
+        },
+        {
+          "finding": "A routine additional antenatal dose before delivery is not required in the standard single-dose 28-week regimen; a second pre-delivery dose is only used when a local protocol specifically uses a two-dose regimen or when clinically indicated by a sensitizing event/large fetomaternal hemorrhage.",
+          "source_tools": [
+            {
+              "relevance": "Evidence describes routine antenatal prophylaxis as generally administered at 28–30 weeks with the next dose postpartum",
+              "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g"
+            }
+          ]
+        },
+        {
+          "finding": "After delivery, administer anti-D as soon as possible, ideally within 72 hours, if the newborn is Rh(D)-positive (or Rh status is unknown); no postpartum anti-D is needed if the newborn is confirmed Rh(D)-negative. Quantify fetomaternal hemorrhage when indicated and give additional units if the standard dose is insufficient.",
+          "source_tools": [
+            {
+              "relevance": "Guideline abstract recommends anti-D after delivery of an RhD-positive infant and within 72 hours",
+              "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g"
+            },
+            {
+              "relevance": "Consensus abstract recommends postpartum anti-D within 72 hours when newborn is Rh-positive",
+              "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_MZ065jPanphnbXj0GcQsuxrq",
+    "parent_tool_call_id": "call_nm3ttm3KVvEKumYOzBFxXqfp",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DRUG",
+          "name": "Rho(D) immune globulin",
+          "observations": [
+            "Routine antenatal prophylaxis is given at about 28 weeks to an Rh(D)-negative, unsensitized pregnant woman.",
+            "After delivery, administer within 72 hours when the neonate is Rh(D)-positive or Rh status is unknown; no postpartum dose is needed if the neonate is confirmed Rh(D)-negative.",
+            "A standard single-dose 28-week regimen does not require a routine additional antenatal dose before delivery."
+          ],
+          "source_tools": [
+            {
+              "relevance": "All timing and postpartum management findings",
+              "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g"
+            }
+          ]
+        },
+        {
+          "entity_type": "PHENOTYPE",
+          "name": "Rh(D)-negative pregnancy",
+          "observations": [
+            "At 28 weeks, an unsensitized pregnant patient should receive routine antenatal anti-D prophylaxis to prevent maternal alloimmunization."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Antenatal prophylaxis indication and timing",
+              "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Anti-D timing in pregnancy",
+          "observations": [
+            "For an Rh(D)-negative, antibody-negative woman at 28 weeks, give anti-D now; give postpartum anti-D within 72 hours if the infant is Rh(D)-positive or Rh status is unknown.",
+            "The best listed option is D because it includes antenatal administration now and immediate postpartum prophylaxis; postpartum dosing is conditional on neonatal Rh(D) status in actual practice."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Choice comparison and clinical conclusion",
+              "tool_call_id": "call_CwTKfKQxbedHED13V2wiM73g"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Rho(D) immune globulin",
+          "relation_type": "PREVENTS",
+          "to_entity": "Rh(D)-negative pregnancy"
+        },
+        {
+          "from_entity": "Rho(D) immune globulin",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Anti-D timing in pregnancy"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"Rho(D) immune globulin\", \"entityType\": \"DRUG\", \"observations\": [\"Routine antenatal prophylaxis is given at about 28 weeks to an Rh(D)-negative, unsensitized pregnant woman.\", \"After delivery, administer within 72 hours when the neonate is Rh(D)-positive or Rh status is unknown; no postpartum dose is needed if the neonate is confirmed Rh(D)-negative.\", \"A standard single-dose 28-week regimen does not require a routine additional antenatal dose before delivery.\"]}, {\"name\": \"Rh(D)-negative pregnancy\", \"entityType\": \"PHENOTYPE\", \"observations\": [\"At 28 weeks, an unsensitized pregnant patient should receive routine antenatal anti-D prophylaxis to prevent maternal alloimmunization.\"]}, {\"name\": \"Anti-D timing in pregnancy\", \"entityType\": \"FINDING\", \"observations\": [\"For an Rh(D)-negative, antibody-negative woman at 28 weeks, give anti-D now; give postpartum anti-D within 72 hours if the infant is Rh(D)-positive or Rh status is unknown.\", \"The best listed option is D because it includes antenatal administration now and immediate postpartum prophylaxis; postpartum dosing is conditional on neonatal Rh(D) status in actual practice.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"Rho(D) immune globulin\", \"to\": \"Rh(D)-negative pregnancy\", \"relationType\": \"PREVENTS\"}, {\"from\": \"Rho(D) immune globulin\", \"to\": \"Anti-D timing in pregnancy\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_MZ065jPanphnbXj0GcQsuxrq\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_nm3ttm3KVvEKumYOzBFxXqfp\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_x208rhQkIcLBog00cCabkgu2",
+    "parent_tool_call_id": "call_MZ065jPanphnbXj0GcQsuxrq",
+    "round": 3,
+    "tool_input": {
+      "entity_names": "[\"Rho(D) immune globulin\",\"Rh(D)-negative pregnancy\",\"Anti-D timing in pregnancy\"]",
+      "get_full_map": false,
+      "max_entities": null,
+      "max_observations_per_entity": 5,
+      "query": null,
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"requested_entities\": [\"Rho(D) immune globulin\", \"Rh(D)-negative pregnancy\", \"Anti-D timing in pregnancy\"], \"results\": {\"entities\": [{\"name\": \"Rho(D) immune globulin\", \"entityType\": \"DRUG\", \"observations\": [\"Routine antenatal prophylaxis is given at about 28 weeks to an Rh(D)-negative, unsensitized pregnant woman.\", \"After delivery, administer within 72 hours when the neonate is Rh(D)-positive or Rh status is unknown; no postpartum dose is needed if the neonate is confirmed Rh(D)-negative.\", \"A standard single-dose 28-week regimen does not require a routine additional antenatal dose before delivery.\"]}, {\"name\": \"Rh(D)-negative pregnancy\", \"entityType\": \"PHENOTYPE\", \"observations\": [\"At 28 weeks, an unsensitized pregnant patient should receive routine antenatal anti-D prophylaxis to prevent maternal alloimmunization.\"]}, {\"name\": \"Anti-D timing in pregnancy\", \"entityType\": \"FINDING\", \"observations\": [\"For an Rh(D)-negative, antibody-negative woman at 28 weeks, give anti-D now; give postpartum anti-D within 72 hours if the infant is Rh(D)-positive or Rh status is unknown.\", \"The best listed option is D because it includes antenatal administration now and immediate postpartum prophylaxis; postpartum dosing is conditional on neonatal Rh(D) status in actual practice.\"]}], \"relations\": [{\"from\": \"Rho(D) immune globulin\", \"to\": \"Rh(D)-negative pregnancy\", \"relationType\": \"PREVENTS\"}, {\"from\": \"Rho(D) immune globulin\", \"to\": \"Anti-D timing in pregnancy\", \"relationType\": \"SUPPORTS\"}]}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

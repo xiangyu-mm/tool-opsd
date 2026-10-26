@@ -1,0 +1,291 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_jdxEBS0uTs83lrIFeQI48pHt",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine guideline-supported next test for hemodynamically stabilized patient with overt melena and negative EGD and colonoscopy (suspected small-bowel bleeding), comparing video capsule endoscopy with CT angiography, tagged RBC scan, angiography, and enteroscopy. Include timing/active bleeding considerations and whether aortic stenosis suggests angiodysplasia/Heyde syndrome. Provide authoritative sources and citations."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_dRdoqWXYlS6VQ3sx322ZnF2l",
+    "parent_tool_call_id": "call_jdxEBS0uTs83lrIFeQI48pHt",
+    "round": 1,
+    "tool_input": {
+      "task_name": "Heyde syndrome guidance",
+      "boolean_query_text": "Heyde syndrome aortic stenosis angiodysplasia gastrointestinal bleeding guideline review",
+      "top_k": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='Heyde syndrome aortic stenosis angiodysplasia gastrointestinal bleeding guideline review',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='Heyde syndrome aortic stenosis angiodysplasia gastrointestinal bleeding guideline review',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/Heyde_syndrome_guidance.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/Heyde_syndrome_guidance.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/Heyde_syndrome_guidance.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 35898365\nTitle: An Important Association With Lower Gastrointestinal Bleed: A Case of Heyde Syndrome\nSource: Cureus (2022)\nAbstract: First described in 1958, @DISEASE_Syndrome @DISEASE_MESH:D013577 @@@<m>Heyde</m> <m>syndrome</m>@@@ is a condition that is defined by a triad of @DISEASE_Aortic_Valve_Stenosis @DISEASE_MESH:D001024 @@@<m>aortic</m> <m>stenosis</m>@@@ (@DISEASE_Aortic_Valve_Stenosis @DISEASE_MESH:D001024 @@@AS@@@), @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@<m>gastrointestinal</m> (GI) <m>bleeding</m>@@@ from @DISEASE_Angiodysplasia @DISEASE_MESH:D016888 @@@<m>angiodysplasia</m>@@@, and acquired @DISEASE_von_Willebrand_Diseases @DISEASE_MESH:D014842 @@@Von Willebrand <m>syndrome</m>@@@ .\n--------------------------------------------------------------------------------\nPMID: 35070916\nTitle: Recurrent gastrointestinal bleeding in a patient with Heyde syndrome with elevated factor VIII levels: A case report\nSource: Int J Crit Illn Inj Sci (2021)\nAbstract: @DISEASE_Syndrome @DISEASE_MESH:D013577 @@@<m>Heyde</m> <m>syndrome</m>@@@ is the association between @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@<m>gastrointestinal</m> (GI) <m>bleeding</m>@@@ from @DISEASE_Angiodysplasia @DISEASE_MESH:D016888 @@@intestinal <m>angiodysplasia</m>@@@ (@DISEASE_Angiodysplasia @DISEASE_MESH:D016888 @@@IA@@@) and @DISEASE_Aortic_Valve_Stenosis @DISEASE_MESH:D001024 @@@<m>aortic</m> <m>stenosis</m>@@@ (@DISEASE_Aortic_Valve_Stenosis @DISEASE_MESH:D001024 @@@AS@@@).\n--------------------------------------------------------------------------------\nPMID: 39476231\nTitle: Gastrointestinal Angiodysplasia Resolution After Transcatheter Aortic Valve Implantation\nSource: JAMA Netw Open (2024)\nAbstract: @DISEASE_Syndrome @DISEASE_MESH:D013577 @@@<m>Heyde</m> <m>syndrome</m>@@@ is the cooccurrence of @DISEASE_Aortic_Valve_Stenosis @DISEASE_MESH:D001024 @@@<m>aortic</m> <m>stenosis</m>@@@ and @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@<m>gastrointestinal</m> <m>bleeding</m>@@@ secondary to @DISEASE_Vascular_Diseases @DISEASE_MESH:D014652 @@@vascular lesions@@@, including @DISEASE_Angiodysplasia @DISEASE_MESH:D016888 @@@<m>angiodysplasias</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 37555393\nTitle: Effectiveness of aortic valve replacement in Heyde syndrome: a meta-analysis\nSource: Eur Heart J (2023)\nAbstract: @DISEASE_Syndrome @DISEASE_MESH:D013577 @@@<m>Heyde</m> <m>syndrome</m>@@@ is the co-occurrence of @DISEASE_Aortic_Valve_Stenosis @DISEASE_MESH:D001024 @@@<m>aortic</m> <m>stenosis</m>@@@, @DISEASE_von_Willebrand_Diseases @DISEASE_MESH:D014842 @@@acquired von Willebrand <m>syndrome</m>@@@, and @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@<m>gastrointestinal</m> <m>bleeding</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 36926669\nTitle: Tranexamic acid may be a useful pharmacotherapy for endoscopically resistant small bowel angiodysplasia\nSource: World J Gastroenterol (2023)\nAbstract: When @DISEASE_Angiodysplasia @DISEASE_MESH:D016888 @@@SBAD@@@ occurs frequently, it is difficult to treat all the @DISEASE_Angiodysplasia @DISEASE_MESH:D016888 @@@<m>angiodysplasias</m>@@@ endoscopically, and @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@<m>gastrointestinal</m> <m>bleeding</m>@@@ often recurs.\n--------------------------------------------------------------------------------\nPMID: 40481967\nTitle: Small Bowel Bleeding Due to Vascular Lesions: Pathogenesis and Management\nSource: Curr Gastroenterol Rep (2025)\nAbstract: In @SPECIES_9606 @@@patients@@@ with @DISEASE_Fibrous_Dysplasia_Polyostotic @DISEASE_MESH:D005359 @@@<m>Heyde's</m> <m>syndrome</m>@@@, <m>aortic</m> valve replacement has been associated with decreased re-@DISEASE_Hemorrhage @DISEASE_MESH:D006470 @@@<m>bleeding</m>@@@ rates.\n--------------------------------------------------------------------------------\nPMID: 35747979\nTitle: Incidence, Current Guidelines and Management of Gastrointestinal Bleeding after Transcatheter Aortic Valve Replacement: A Systematic Review\nSource: Curr Cardiol Rev (2023)\nAbstract: Incidence, Current Guidelines and Management of @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@<m>Gastrointestinal</m> <m>Bleeding</m>@@@ after Transcatheter <m>Aortic</m> Valve Replacement: A Systematic <m>Review</m>\n--------------------------------------------------------------------------------\nPMID: 34095769\nTitle: New Developments in Diagnosis and Management of Acquired Hemophilia and Acquired von Willebrand Syndrome\nSource: Hemasphere (2021)\nAbstract: The association between @DISEASE_von_Willebrand_Diseases @DISEASE_MESH:D014842 @@@aVWS@@@ and @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@<m>gastrointestinal</m> <m>bleeding</m>@@@ is well known in @DISEASE_Syndrome @DISEASE_MESH:D013577 @@@<m>Heyde</m> <m>syndrome</m>@@@, typically characterized by @DISEASE_Aortic_Valve_Stenosis @DISEASE_MESH:D001024 @@@<m>aortic</m> <m>stenosis</m>@@@, @DISEASE_von_Willebrand_Diseases @DISEASE_MESH:D014842 @@@aVWS@@@, and @DISEASE_Angiodysplasia @DISEASE_MESH:D016888 @@@<m>angiodysplasia</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 34300211\nTitle: New Trends and Advances in Non-Variceal Gastrointestinal Bleeding:Series II\nSource: J Clin Med (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35806997\nTitle: Hemostasis Disturbances in Continuous-Flow Left Ventricular Assist Device (CF-LVAD) Patients:Rationale and Study Design\nSource: J Clin Med (2022)\nAbstract: The mechanism is similar as in severe @DISEASE_Aortic_Valve_Stenosis @DISEASE_MESH:D001024 @@@<m>aortic</m> <m>stenosis</m>@@@. In severe @DISEASE_Aortic_Valve_Stenosis @DISEASE_MESH:D001024 @@@<m>aortic</m> <m>stenosis</m>@@@, non-pulsatile systemic flow and increased shear stress cause the development of @DISEASE_Angiodysplasia @DISEASE_MESH:D016888 @@@<m>angiodysplasia</m>@@@ and the @DISEASE_von_Willebrand_Diseases @DISEASE_MESH:D014842 @@@acquired von Willebrand <m>syndrome</m> with <m>gastrointestinal</m> <m>bleeding</m>@@@ (@DISEASE_Syndrome @DISEASE_MESH:D013577 @@@<m>Heyde</m> <m>syndrome</m>@@@).\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_emaTwPe4z7FAaHFviKsTLMRj",
+    "parent_tool_call_id": "call_jdxEBS0uTs83lrIFeQI48pHt",
+    "round": 1,
+    "tool_input": {
+      "task_name": "ACG small bowel bleeding",
+      "boolean_query_text": "ACG clinical guideline diagnosis management small bowel bleeding 2015 capsule endoscopy",
+      "top_k": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='ACG clinical guideline diagnosis management small bowel bleeding 2015 capsule endoscopy',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='ACG clinical guideline diagnosis management small bowel bleeding 2015 capsule endoscopy',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ACG_small_bowel_bleeding.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ACG_small_bowel_bleeding.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ACG_small_bowel_bleeding.csv'\nTotal results found: 11\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 26303132\nTitle: ACG Clinical Guideline: Diagnosis and Management of Small Bowel Bleeding.\nSource: The American journal of gastroenterology (2015)\nAbstract: Bleeding from the small intestine remains a relatively uncommon event, accounting for ~5-10% of all patients presenting with gastrointestinal (GI) bleeding. Given advances in small bowel imaging with video capsule endoscopy (VCE), deep enteroscopy, and radiographic imaging, the cause of bleeding in the small bowel can now be identified in most patients. The term small bowel bleeding is therefore proposed as a replacement for the previous classification of obscure GI bleeding (OGIB). We recommend that the term OGIB should be reserved for patients in whom a source of bleeding cannot be identified anywhere in the GI tract. A source of small bowel bleeding should be considered in patients with GI bleeding after performance of a normal upper and lower endoscopic examination. Second-look examinations using upper endoscopy, push enteroscopy, and/or colonoscopy can be performed if indicated before small bowel evaluation. VCE should be considered a first-line procedure for small bowel investigation. Any method of deep enteroscopy can be used when endoscopic evaluation and therapy are required. VCE should be performed before deep enteroscopy if there is no contraindication. Computed tomograp ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 37620810\nTitle: Clinical characteristics of Dieulafoy's lesion in the small bowel diagnosed and treated by double-balloon endoscopy\nSource: BMC Gastroenterol (2023)\nAbstract: <m>Clinical</m> characteristics of @DISEASE_Mouth_Diseases @DISEASE_MESH:D009059 @@@Dieulafoy's lesion@@@ in the <m>small</m> <m>bowel</m> <m>diagnosed</m> and treated by double-balloon <m>endoscopy</m>\n--------------------------------------------------------------------------------\nPMID: 41559881\nTitle: Taiwan practical consensus for evaluation and management of small-bowel bleeding\nSource: J Chin Med Assoc (2026)\nAbstract: In @SPECIES_9606 @@@patients@@@ with suspected <m>small</m> <m>bowel</m> @DISEASE_Hemorrhage @DISEASE_MESH:D006470 @@@<m>bleeding</m>@@@, the use of a patency <m>capsule</m> prior to <m>small</m>-<m>bowel</m> <m>capsule</m> <m>endoscopy</m> could be considered when @SPECIES_9606 @@@patients@@@ with <m>clinical</m> obstructive symptoms.\n--------------------------------------------------------------------------------\nPMID: 37434106\nTitle: Endoscopic injection sclerotherapy for treating recurrent bleeding of small bowel angioectasias\nSource: BMC Gastroenterol (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34842672\nTitle: Colorectal Dysplasia and Cancer Surveillance in Ulcerative Colitis\nSource: Diseases (2021)\nAbstract: ...As per the current ASGE <m>guideline</m>, SCENIC international consensus statement, ECCO consensus statement, <m>ACG</m> <m>guideline</m>, and AGA <m>clinical</m> practice update on @DISEASE_Retinal_Dysplasia @DISEASE_MESH:D015792 @@@dysplasia@@@ in @DISEASE_Colitis_Ulcerative @DISEASE_MESH:D003093 @@@UC@@@, @DISEASE_Retinal_Dysplasia @DISEASE_MESH:D015792 @@@dysplasia@@@ detected on biopsy with a discrete lesion should be resected endoscopically if possible.\n--------------------------------------------------------------------------------\nPMID: 35599752\nTitle: Disparities in Recommendations for Colorectal Cancer Screening Among Average-Risk Individuals: An Ecobiosocial Approach\nSource: Risk Manag Healthc Policy (2022)\nAbstract: @DISEASE_Colorectal_Neoplasms @DISEASE_MESH:D015179 @@@CRC@@@ Screening Test Advantages Disadvantages Mechanism of Action Target Population Risk During Application Specificity Sensitivity Stool testGuaiac fecal occult blood test (FOBT/gFOBT) Noninvasive False positives may be due to peroxidase activity from high consumption of meat, fruit, vegetables and NSAIDs use.Stool samples should be taken three times for reliable outcome.Compliance to diet restriction at least 3 days is necessary before taking the test; such as avoid eating red meat and vegetables such as @SPECIES_36774 @@@broccoli@@@ and @SPECIES_3715 @@@cauliflower@@@.Discontinuation of NSAIDs and @CHEMICAL_Ascorbic_Acid @CHEMICAL_MESH:D001205 @@@vitamin C@@@ prior to testing.Inability to distinguish between @DISEASE_Respiratory_Tract_Infections @DISEASE_MESH:D012141 @@@upper@@@ and lower @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@gastrointestinal <m>bleeding</m>@@@.It does not detect Hb at concentration below 600 microgram/g of feces, hence limits the ability to detect <m>small</m> @DISEASE_Polyps @DISEASE_MESH:D011127 @@@polyps@@@ with less @DISEASE_Hemorrhage @DISEASE_MESH:D006470 @@@<m>bleeding</m>@@@ ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 40512051\nTitle: A Guide to the Patient-Centric Use of Vedolizumab for Crohn's Disease\nSource: Inflamm Bowel Dis (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37629600\nTitle: Imaging in Gastroparesis: Exploring Innovative Diagnostic Approaches, Symptoms, and Treatment\nSource: Life (Basel) (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35884008\nTitle: Surgical Treatment of Short Bowel Syndrome:The Past, the Present and the Future, a Descriptive Review of the Literature\nSource: Children (Basel) (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39099217\nTitle: Management of ulcerative colitis in Taiwan: consensus guideline of the Taiwan Society of Inflammatory Bowel Disease updated in 2023\nSource: Intest Res (2024)\nAbstract: <m>Management</m> of @DISEASE_Colitis_Ulcerative @DISEASE_MESH:D003093 @@@ulcerative colitis@@@ in Taiwan: consensus <m>guideline</m> of the Taiwan Society of @DISEASE_Inflammatory_Bowel_Diseases @DISEASE_MESH:D015212 @@@Inflammatory <m>Bowel</m> Disease@@@ updated in 2023\n--------------------------------------------------------------------------------\nPMID: 30338188\nTitle: Cavernous Hemangioma of the Small Bowel: A Case Report and Literature Review\nSource: Cureus (2018)\nAbstract: The American College of Gastroenterology (<m>ACG</m>) <m>clinical</m> <m>guideline</m> in <m>2015</m> also recommends the use of <m>capsule</m> <m>endoscopy</m> followed by deep enteroscopy based on findings on <m>capsule</m> <m>endoscopy</m>.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_vPnbVeoV7J3jM265gyNnRa4o",
+    "parent_tool_call_id": "call_emaTwPe4z7FAaHFviKsTLMRj",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "recommend|video capsule|CTA|CT angiography|tagged|angiography|active bleeding|enteroscopy|hemodynamically",
+      "pmid": "26303132"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('26303132')\noutput = format_paper_content_output(result, filter_keywords='recommend|video capsule|CTA|CT angiography|tagged|angiography|active bleeding|enteroscopy|hemodynamically')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m recommend|video capsule|CTA|CT angiography|ta ... y|active bleeding|enteroscopy|hemodynamically\n      \u001b[90mpmid:\u001b[0m 26303132\n\n  \u001b[1m\u001b[93m[2] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m ESGE capsule timing\n      \u001b[90mboolean_query_text:\u001b[0m ESGE guideline small bowel capsule endoscopy overt obscure gastrointestinal bleeding within 14 days\n      \u001b[90mtop_k:\u001b[0m 5\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[3] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m radiology GI bleeding guideline\n      \u001b[90mboolean_query_text:\u001b[0m ACG guideline acute lower gastrointestinal bl ... raphy hemodynamically stable ongoing bleeding\n      \u001b[90mtop_k:\u001b[0m 8\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n=== PMID: 26303132 ===\n\nTitle: ACG Clinical Guideline: Diagnosis and Management of Small Bowel Bleeding.\n\nJournal/Date: The American journal of gastroenterology (2015)\n\nMeSH Keywords: Capsule Endoscopy, Colonoscopy, Disease Management, Gastrointestinal Hemorrhage, Humans, Intestine, Small, Tomography, X-Ray Computed, United States\n\n\n--- ABSTRACT ---\nBleeding from the small intestine remains a relatively uncommon event, accounting for ~5-10% of all patients presenting with gastrointestinal (GI) bleeding. Given advances in small bowel imaging with video capsule endoscopy (VCE), deep enteroscopy, and radiographic imaging, the cause of bleeding in the small bowel can now be identified in most patients. The term small bowel bleeding is therefore proposed as a replacement for the previous classification of obscure GI bleeding (OGIB). We recommend that the term OGIB should be reserved for patients in whom a source of bleeding cannot be identified anywhere in the GI tract. A source of small bowel bleeding should be considered in patients with GI bleeding after performance of a normal upper and lower endoscopic examination. Second-look examinations using upper endoscopy, push enteroscopy, and/or colonoscopy can be performed if indicated before small bowel evaluation. VCE should be considered a first-line procedure for small bowel investigation. Any method of deep enteroscopy can be used when endoscopic evaluation and therapy are required. VCE should be performed before deep enteroscopy if there is no contraindication. Computed tomographic enterography should be performed in patients with suspected obstruction before VCE or after negative VCE examinations. When there is acute overt hemorrhage in the unstable patient, angiography should be performed emergently. In patients with occult hemorrhage or stable patients with active overt bleeding, multiphasic computed tomography should be performed after VCE or CTE to identify the source of bleeding and to guide further management. If a source of bleeding is identified in the small bowel that is associated with significant ongoing anemia and/or active bleeding, the patient should be managed with endoscopic therapy. Conservative management is recommended for patients without a source found after small bowel investigation, whereas repeat diagnostic investigations are recommended for patients with initial negative small bowel evaluations and ongoing overt or occult bleeding.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_Vgg7jvd7aM9DborUkd7XXjOF",
+    "parent_tool_call_id": "call_emaTwPe4z7FAaHFviKsTLMRj",
+    "round": 2,
+    "tool_input": {
+      "task_name": "ESGE capsule timing",
+      "boolean_query_text": "ESGE guideline small bowel capsule endoscopy overt obscure gastrointestinal bleeding within 14 days",
+      "top_k": 5,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='ESGE guideline small bowel capsule endoscopy overt obscure gastrointestinal bleeding within 14 days',\n        top_k=5,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='ESGE guideline small bowel capsule endoscopy overt obscure gastrointestinal bleeding within 14 days',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ESGE_capsule_timing.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ESGE_capsule_timing.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ESGE_capsule_timing.csv'\nTotal results found: 9\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 25826168\nTitle: Small-bowel capsule endoscopy and device-assisted enteroscopy for diagnosis and treatment of small-bowel disorders: European Society of Gastrointestinal Endoscopy (ESGE) Clinical Guideline.\nSource: Endoscopy (2015)\nAbstract: This Guideline is an official statement of the European Society of Gastrointestinal Endoscopy (ESGE). The Guideline was also reviewed and endorsed by the British Society of Gastroenterology (BSG). It addresses the roles of small-bowel capsule endoscopy and device-assisted enteroscopy for diagnosis and treatment of small-bowel disorders. Main recommendations 1 ESGE recommends small-bowel video capsule endoscopy as the first-line investigation in patients with obscure gastrointestinal bleeding (strong recommendation, moderate quality evidence). 2 In patients with overt obscure gastrointestinal bleeding, ESGE recommends performing small-bowel capsule endoscopy as soon as possible after the bleeding episode, optimally within 14 days, in order to maximize the diagnostic yield (strong recommendation, moderate quality evidence). 3 ESGE does not recommend the routine performance of second-look endoscopy prior to small-bowel capsule endoscopy; however whether to perform second-look endoscopy before capsule endoscopy in patients with obscure gastrointestinal bleeding or iron-deficiency anaemia should be decided on a case-by-case basis (strong recommendation, low quality evidence). 4 In patie ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 38481597\nTitle: A comprehensive examination of small-bowel capsule endoscopy in Spanish centers to meet European Society of Gastrointestinal Endoscopy standards\nSource: Endosc Int Open (2024)\nAbstract: A comprehensive examination of <m>small</m>-<m>bowel</m> <m>capsule</m> <m>endoscopy</m> in Spanish centers to meet European Society of <m>Gastrointestinal</m> <m>Endoscopy</m> standards\n--------------------------------------------------------------------------------\nPMID: 37387712\nTitle: Critical Analysis of the Applicability of Small Bowel Capsule Endoscopy Performance Measures among 2 Portuguese Centers with Different Capsule Endoscopy Platforms\nSource: GE Port J Gastroenterol (2022)\nAbstract: The European Society of <m>Gastrointestinal</m> <m>Endoscopy</m> (<m>ESGE</m>) identified the need to benchmark the quality of <m>small</m> <m>bowel</m> <m>capsule</m> <m>endoscopy</m> (SBCE) and produced a set of performance measures (PM).\n--------------------------------------------------------------------------------\nPMID: 34393155\nTitle: Combined Use of Computed Tomography Enterography/Enteroclysis and Capsule Endoscopy Improves the Accuracy of Diagnosis of Small Bowel Bleeding\nSource: Intern Med (2021)\nAbstract: Combined Use of Computed Tomography Enterography/Enteroclysis and <m>Capsule</m> <m>Endoscopy</m> Improves the Accuracy of Diagnosis of @DISEASE_Intestinal_Atresia @DISEASE_MESH:D007409 @@@<m>Small</m> <m>Bowel</m> <m>Bleeding</m>@@@\n--------------------------------------------------------------------------------\nPMID: 35572472\nTitle: Video Capsule Endoscopy in Gastroenterology\nSource: Gastroenterology Res (2022)\nAbstract: SBCE is a passive form of <m>endoscopy</m>. <m>Capsule</m> movement depends on gastric and <m>small</m> <m>bowel</m> motility.\n--------------------------------------------------------------------------------\nPMID: 40481967\nTitle: Small Bowel Bleeding Due to Vascular Lesions: Pathogenesis and Management\nSource: Curr Gastroenterol Rep (2025)\nAbstract: Pennazio M, Rondonotti E, Despott EJ, et al. <m>Small</m>-<m>bowel</m> <m>capsule</m> <m>endoscopy</m> and device-assisted enteroscopy for diagnosis and treatment of @DISEASE_Intestinal_Atresia @DISEASE_MESH:D007409 @@@<m>small</m>-<m>bowel</m> disorders@@@: European Society of <m>Gastrointestinal</m> <m>Endoscopy</m> (<m>ESGE</m>) Guideline:Update 2022.\n--------------------------------------------------------------------------------\nPMID: 41559881\nTitle: Taiwan practical consensus for evaluation and management of small-bowel bleeding\nSource: J Chin Med Assoc (2026)\nAbstract: ...In cases of suspected <m>small</m> <m>bowel</m> @DISEASE_Hemorrhage @DISEASE_MESH:D006470 @@@<m>bleeding</m>@@@ with hemodynamically stable status, <m>small</m>- <m>bowel</m> <m>capsule</m> <m>endoscopy</m> is recommended.\n--------------------------------------------------------------------------------\nPMID: 25826168\nTitle: Small-bowel capsule endoscopy and device-assisted enteroscopy for diagnosis and treatment of small-bowel disorders: European Society of Gastrointestinal Endoscopy (ESGE) Clinical Guideline.\nSource: Endoscopy (2015)\nAbstract: <m>Small</m>-<m>bowel</m> <m>capsule</m> <m>endoscopy</m> and device-assisted enteroscopy for diagnosis and treatment of @DISEASE_Intestinal_Atresia @DISEASE_MESH:D007409 @@@<m>small</m>-<m>bowel</m> disorders@@@: European Society of <m>Gastrointestinal</m> <m>Endoscopy</m> (<m>ESGE</m>) Clinical <m>Guideline</m>.\n--------------------------------------------------------------------------------\nPMID: 30837783\nTitle: Diagnostic and therapeutic considerations for obscure gastrointestinal bleeding in patients with chronic kidney disease\nSource: Ann Gastroenterol (2019)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_0lvSdEqizclhMHEMg3Fngznm",
+    "parent_tool_call_id": "call_emaTwPe4z7FAaHFviKsTLMRj",
+    "round": 2,
+    "tool_input": {
+      "task_name": "radiology GI bleeding guideline",
+      "boolean_query_text": "ACG guideline acute lower gastrointestinal bleeding CT angiography tagged red blood cell scan angiography hemodynamically stable ongoing bleeding",
+      "top_k": 8,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='ACG guideline acute lower gastrointestinal bleeding CT angiography tagged red blood cell scan angiography hemodynamically stable ongoing bleeding',\n        top_k=8,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='ACG guideline acute lower gastrointestinal bleeding CT angiography tagged red blood cell scan angiography hemodynamically stable ongoing bleeding',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/radiology_GI_bleeding_guideline.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/radiology_GI_bleeding_guideline.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nNo search results found. Please try again with different query. TIP: Try simpler keyword phrases.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_L91fV2BQpqc7bHL9cdUhqUEL",
+    "parent_tool_call_id": "call_0lvSdEqizclhMHEMg3Fngznm",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "For a hemodynamically stabilized patient with overt melena after negative EGD and colonoscopy, the guideline-supported next test is small-bowel video capsule endoscopy (VCE), provided there is no suspected obstruction or capsule contraindication. The ACG guideline calls VCE first-line for small-bowel investigation and recommends VCE before deep enteroscopy when feasible (PMID 26303132). ESGE likewise recommends VCE as first-line and, for overt obscure GI bleeding, as soon as possible after the bleeding episode, optimally within 14 days to maximize diagnostic yield (PMID 25826168).",
+          "source_tools": [
+            {
+              "relevance": "ACG guideline abstract with first-line VCE and sequencing recommendations",
+              "tool_call_id": "call_vPnbVeoV7J3jM265gyNnRa4o"
+            },
+            {
+              "relevance": "ESGE guideline abstract with first-line VCE and timing within 14 days",
+              "tool_call_id": "call_Vgg7jvd7aM9DborUkd7XXjOF"
+            }
+          ]
+        },
+        {
+          "finding": "CT angiography/multiphasic CT is not generally the default replacement for VCE in a stabilized patient whose overt bleeding has stopped; it becomes particularly useful when bleeding is active/brisk, when rapid localization is needed, or after VCE/CT enterography depending on the clinical scenario. The ACG abstract states that multiphasic CT should be used in stable patients with active overt bleeding, while emergent angiography is for acute overt hemorrhage in an unstable patient (PMID 26303132).",
+          "source_tools": [
+            {
+              "relevance": "ACG guideline abstract explicitly distinguishes stable active bleeding, unstable bleeding, and VCE",
+              "tool_call_id": "call_vPnbVeoV7J3jM265gyNnRa4o"
+            }
+          ]
+        },
+        {
+          "finding": "Tagged-RBC scintigraphy is generally a localization option for intermittent/slow bleeding rather than the preferred next diagnostic test for a currently stabilized patient with suspected small-bowel bleeding; it has poorer spatial localization and does not provide therapy. Catheter angiography is primarily for ongoing brisk bleeding with a therapeutic embolization opportunity, especially when unstable or when CTA localizes active hemorrhage. Deep/device-assisted enteroscopy is usually a subsequent test for targeted diagnosis and endoscopic treatment after VCE (or when VCE is contraindicated/unavailable), not the routine initial test (PMID 26303132; PMID 25826168).",
+          "source_tools": [
+            {
+              "relevance": "ACG guideline supports VCE first-line, deep enteroscopy when endoscopic evaluation/therapy is required, and emergent angiography in unstable hemorrhage",
+              "tool_call_id": "call_vPnbVeoV7J3jM265gyNnRa4o"
+            },
+            {
+              "relevance": "ESGE guideline supports VCE first-line and device-assisted enteroscopy as the complementary therapeutic approach",
+              "tool_call_id": "call_Vgg7jvd7aM9DborUkd7XXjOF"
+            }
+          ]
+        },
+        {
+          "finding": "Aortic stenosis should raise suspicion for small-bowel angioectasia/angiodysplasia and possible Heyde syndrome, classically the triad of aortic stenosis, GI bleeding from angiodysplasia, and acquired von Willebrand syndrome. This association is clinically relevant to the differential and may influence evaluation for vascular lesions, but it does not change the immediate diagnostic algorithm: after negative EGD/colonoscopy in a stable patient, VCE remains the guideline-supported next test. The PubMed evidence retrieved describes Heyde syndrome as the association of aortic stenosis and intestinal angiodysplasia/GI bleeding, often with acquired von Willebrand syndrome (PMIDs 35898365, 35070916, 37555393).",
+          "source_tools": [
+            {
+              "relevance": "PubMed search results defining Heyde syndrome and its triad",
+              "tool_call_id": "call_dRdoqWXYlS6VQ3sx322ZnF2l"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_SYSdQCpxpRyybxeq2OcXKrFk",
+    "parent_tool_call_id": "call_jdxEBS0uTs83lrIFeQI48pHt",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE / PHENOTYPE",
+          "name": "Small-bowel bleeding",
+          "observations": [
+            "After negative EGD and colonoscopy in a hemodynamically stabilized patient with overt bleeding, video capsule endoscopy is guideline-supported first-line small-bowel evaluation.",
+            "Multiphasic CT/CTA is preferred when stable patients have active overt bleeding; catheter angiography is for unstable acute overt hemorrhage."
+          ],
+          "source_tools": [
+            {
+              "relevance": "ACG small-bowel bleeding guideline findings",
+              "tool_call_id": "call_vPnbVeoV7J3jM265gyNnRa4o"
+            },
+            {
+              "relevance": "ESGE capsule endoscopy guideline findings",
+              "tool_call_id": "call_Vgg7jvd7aM9DborUkd7XXjOF"
+            }
+          ]
+        },
+        {
+          "entity_type": "DISEASE / PHENOTYPE",
+          "name": "Heyde syndrome",
+          "observations": [
+            "Aortic stenosis with gastrointestinal bleeding from angiodysplasia/angioectasia, often involving acquired von Willebrand syndrome.",
+            "The association increases suspicion for small-bowel vascular lesions but does not change the immediate next-test algorithm in a stabilized patient."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Aortic stenosis and intestinal angiodysplasia association",
+              "tool_call_id": "call_dRdoqWXYlS6VQ3sx322ZnF2l"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:26303132 ACG guideline",
+          "observations": [
+            "ACG guideline recommends video capsule endoscopy as first-line small-bowel investigation and recommends multiphasic CT for stable patients with active overt bleeding."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary guideline evidence",
+              "tool_call_id": "call_vPnbVeoV7J3jM265gyNnRa4o"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25826168 ESGE guideline",
+          "observations": [
+            "ESGE guideline recommends video capsule endoscopy as first-line evaluation and as soon as possible after overt obscure gastrointestinal bleeding, optimally within 14 days."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary guideline evidence",
+              "tool_call_id": "call_Vgg7jvd7aM9DborUkd7XXjOF"
+            }
+          ]
+        },
+        {
+          "entity_type": "TEST",
+          "name": "Video capsule endoscopy",
+          "observations": [
+            "Noninvasive first-line small-bowel test after unrevealing upper and lower endoscopy when the patient is stable and bleeding is not briskly ongoing."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Guideline-supported diagnostic role",
+              "tool_call_id": "call_vPnbVeoV7J3jM265gyNnRa4o"
+            },
+            {
+              "relevance": "ESGE first-line recommendation",
+              "tool_call_id": "call_Vgg7jvd7aM9DborUkd7XXjOF"
+            }
+          ]
+        },
+        {
+          "entity_type": "TEST",
+          "name": "CT angiography",
+          "observations": [
+            "Useful for stable patients with active or brisk overt bleeding and rapid localization, but not the default next test after bleeding has stopped."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Comparison with capsule endoscopy",
+              "tool_call_id": "call_vPnbVeoV7J3jM265gyNnRa4o"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Video capsule endoscopy",
+          "relation_type": "TREATS",
+          "to_entity": "Small-bowel bleeding"
+        },
+        {
+          "from_entity": "Aortic stenosis",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Heyde syndrome"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 6, \"entities\": [{\"name\": \"Small-bowel bleeding\", \"entityType\": \"DISEASE / PHENOTYPE\", \"observations\": [\"After negative EGD and colonoscopy in a hemodynamically stabilized patient with overt bleeding, video capsule endoscopy is guideline-supported first-line small-bowel evaluation.\", \"Multiphasic CT/CTA is preferred when stable patients have active overt bleeding; catheter angiography is for unstable acute overt hemorrhage.\"]}, {\"name\": \"Heyde syndrome\", \"entityType\": \"DISEASE / PHENOTYPE\", \"observations\": [\"Aortic stenosis with gastrointestinal bleeding from angiodysplasia/angioectasia, often involving acquired von Willebrand syndrome.\", \"The association increases suspicion for small-bowel vascular lesions but does not change the immediate next-test algorithm in a stabilized patient.\"]}, {\"name\": \"PMID:26303132 ACG guideline\", \"entityType\": \"PAPER\", \"observations\": [\"ACG guideline recommends video capsule endoscopy as first-line small-bowel investigation and recommends multiphasic CT for stable patients with active overt bleeding.\"]}, {\"name\": \"PMID:25826168 ESGE guideline\", \"entityType\": \"PAPER\", \"observations\": [\"ESGE guideline recommends video capsule endoscopy as first-line evaluation and as soon as possible after overt obscure gastrointestinal bleeding, optimally within 14 days.\"]}, {\"name\": \"Video capsule endoscopy\", \"entityType\": \"TEST\", \"observations\": [\"Noninvasive first-line small-bowel test after unrevealing upper and lower endoscopy when the patient is stable and bleeding is not briskly ongoing.\"]}, {\"name\": \"CT angiography\", \"entityType\": \"TEST\", \"observations\": [\"Useful for stable patients with active or brisk overt bleeding and rapid localization, but not the default next test after bleeding has stopped.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"Video capsule endoscopy\", \"to\": \"Small-bowel bleeding\", \"relationType\": \"TREATS\"}, {\"from\": \"Aortic stenosis\", \"to\": \"Heyde syndrome\", \"relationType\": \"ASSOCIATED_WITH\"}]}}, \"provenance\": {\"tool_call_id\": \"call_SYSdQCpxpRyybxeq2OcXKrFk\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_jdxEBS0uTs83lrIFeQI48pHt\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

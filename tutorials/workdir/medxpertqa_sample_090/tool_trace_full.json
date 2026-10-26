@@ -1,0 +1,344 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_O4RGdzK5wzFoLtpaxD2U8KTV",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease",
+        "clinical_trials",
+        "drug"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine the most effective intervention to prevent recurrent food-triggered anaphylaxis in a 7-year-old who had urticaria, angioedema, hypotension, and respiratory distress responsive to IM epinephrine. Compare allergen identification followed by avoidance with desensitization/specific immunotherapy, prophylactic corticosteroids, antihistamines, and epinephrine autoinjector. Identify guideline-supported recommendations and clarify which listed answer choice is best."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "unified_disease_search",
+    "tool_call_id": "call_RvpYhFtGgYFeCT5KIGy17T1h",
+    "parent_tool_call_id": "call_O4RGdzK5wzFoLtpaxD2U8KTV",
+    "round": 1,
+    "tool_input": {
+      "context_tool_call_ids": [],
+      "limit_per_source": 5,
+      "search_term": "food allergy anaphylaxis",
+      "sources": [
+        "biothings",
+        "kegg",
+        "opentargets"
+      ],
+      "task_name": "anaphylaxis search"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.diseases import search_diseases_unified\n\n# Perform unified disease search across multiple sources\nresults, output = search_diseases_unified(\n    search_term='food allergy anaphylaxis',\n    limit_per_source=5,\n    sources=['biothings', 'kegg', 'opentargets'],\n    save_path='/home/data4/xiangyu/BioDSA/workdir/workdir/anaphylaxis_search.json',\n)\n\n# Display formatted output\nprint(output)\n\n```\n\n### Output:\n# Unified Disease Search Results\n\n## Search Term: 'food allergy anaphylaxis'\n\n**Total results:** 0 across 3 sources\n\n### Results by Source:\n- **BioThings (MyDisease.info):** Found 0 diseases\n- **KEGG Disease:** Found 0 diseases\n- **Open Targets:** Found 0 diseases\n\n================================================================================\n\n\n================================================================================\n\n## Aggregated Information\n\n\n**Results saved to:** /home/data4/xiangyu/BioDSA/workdir/workdir/anaphylaxis_search.json\n\n\n*Executed locally (no sandbox)*",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_bH1gvPx04WTQH1VmSh1txu5T",
+    "parent_tool_call_id": "call_O4RGdzK5wzFoLtpaxD2U8KTV",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "food-induced anaphylaxis prevention guideline children allergen avoidance immunotherapy corticosteroids antihistamines epinephrine",
+      "relation_query": null,
+      "task_name": "anaphylaxis guidelines",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='food-induced anaphylaxis prevention guideline children allergen avoidance immunotherapy corticosteroids antihistamines epinephrine',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='food-induced anaphylaxis prevention guideline children allergen avoidance immunotherapy corticosteroids antihistamines epinephrine',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/anaphylaxis_guidelines.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/anaphylaxis_guidelines.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/anaphylaxis_guidelines.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 35958944\nTitle: Acute Urticaria and Anaphylaxis: Differences and Similarities in Clinical Management\nSource: Front Allergy (2022)\nAbstract: @DISEASE_Anaphylaxis @DISEASE_MESH:D000707 @@@<m>Anaphylaxis</m>@@@ <m>Prevention</m> - Venom <m>Immunotherapy</m>, Desensitization for Drugs and <m>Foods</m>\n--------------------------------------------------------------------------------\nPMID: 34649404\nTitle: Recent update on the management of anaphylaxis\nSource: Clin Exp Emerg Med (2021)\nAbstract: <m>Food</m> <m>allergens</m> and drugs are major causes of @DISEASE_Anaphylaxis @DISEASE_MESH:D000707 @@@<m>anaphylaxis</m>@@@ among <m>children</m> and adults.\n--------------------------------------------------------------------------------\nPMID: 41332221\nTitle: Global trend of food-induced anaphylaxis: Up to date\nSource: Pediatr Allergy Immunol (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38408152\nTitle: Clinical Practice Guideline: Immunotherapy for Inhalant Allergy\nSource: Otolaryngol Head Neck Surg (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34079922\nTitle: Precision medicine reaching out to the patients in allergology - a German-Japanese workshop report \nSource: Allergol Select (2021)\nAbstract: The recommendation concerning the strictness of <m>allergen</m> <m>avoidance</m> for the @DISEASE_Food_Hypersensitivity @DISEASE_MESH:D005512 @@@<m>food</m>-allergic@@@ <m>child</m> seems to differ between Germany and Japan.\n--------------------------------------------------------------------------------\nPMID: 35418863\nTitle: A Clinical Practice Guideline for the Emergency Management of Anaphylaxis (2020)\nSource: Front Pharmacol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35313976\nTitle: Proceedings of the Canadian Society of Allergy and Clinical Immunology Annual Scientific Meeting 2021\nSource: Allergy Asthma Clin Immunol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 41330701\nTitle: Update on Tree Nut and Seed Allergies: Prevalence, Clinical Characteristics, Diagnosis, and Management\nSource: Allergy Asthma Immunol Res (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40143213\nTitle: Omalizumab and Oral Immunotherapy in IgE-Mediated Food Allergy in Children: A Systematic Review and a Meta-Analysis\nSource: Pharmaceuticals (Basel) (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36426395\nTitle: Chinese Guideline on Allergen Immunotherapy for Allergic Rhinitis: The 2022 Update\nSource: Allergy Asthma Immunol Res (2022)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_kPiSFTLtIVAp5uJN1VAejsnZ",
+    "parent_tool_call_id": "call_O4RGdzK5wzFoLtpaxD2U8KTV",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "2023 anaphylaxis practice parameter food allergy prevention recurrent anaphylaxis epinephrine autoinjector",
+      "relation_query": null,
+      "task_name": "practice parameter",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='2023 anaphylaxis practice parameter food allergy prevention recurrent anaphylaxis epinephrine autoinjector',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='2023 anaphylaxis practice parameter food allergy prevention recurrent anaphylaxis epinephrine autoinjector',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/practice_parameter.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/practice_parameter.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/practice_parameter.csv'\nTotal results found: 6\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38108678\nTitle: Anaphylaxis: A 2023 practice parameter update.\nSource: Annals of allergy, asthma & immunology : official publication of the American College of Allergy, Asthma, & Immunology (2024)\nAbstract: This practice parameter update focuses on 7 areas in which there are new evidence and new recommendations. Diagnostic criteria for anaphylaxis have been revised, and patterns of anaphylaxis are defined. Measurement of serum tryptase is important for diagnosis of anaphylaxis and to identify underlying mast cell disorders. In infants and toddlers, age-specific symptoms may differ from older children and adults, patient age is not correlated with reaction severity, and anaphylaxis is unlikely to be the initial reaction to an allergen on first exposure. Different community settings for anaphylaxis require specific measures for prevention and treatment of anaphylaxis. Optimal prescribing and use of epinephrine autoinjector devices require specific counseling and training of patients and caregivers, including when and how to administer the epinephrine autoinjector and whether and when to call 911. If epinephrine is used promptly, immediate activation of emergency medical services may not be required if the patient experiences a prompt, complete, and durable response. For most medical indications, the risk of stopping or changing beta-blocker or angiotensin-converting enzyme inhibitor med ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 39659712\nTitle: Occupational anaphylaxis: A Position Paper of the German Society of Allergology and Clinical Immunology (DGAKI) \nSource: Allergol Select (2024)\nAbstract: Occupational @DISEASE_Food_Hypersensitivity @DISEASE_MESH:D005512 @@@<m>food</m> <m>allergy</m>@@@ may also develop due to immunological cross-reactions between non-<m>food</m> allergens and <m>food</m>, e.g., in healthcare workers a sensitization to @GENE_NRL @GENE_4901 @@@NRL@@@ may lead to @DISEASE_Anaphylaxis @DISEASE_MESH:D000707 @@@<m>anaphylaxis</m>@@@ when eating @SPECIES_3435 @@@avocado@@@, @SPECIES_4641 @@@banana@@@, etc..\n--------------------------------------------------------------------------------\nPMID: 41832433\nTitle: Post-anaphylaxis observation in the ED: a decade of data challenging the traditional 24-hour rule\nSource: Int J Emerg Med (2026)\nAbstract: The teaching strategies include emergency action plan and <m>autoinjector</m> as per child's weight. Whereas the adult @DISEASE_Anaphylaxis @DISEASE_MESH:D000707 @@@<m>anaphylaxis</m>@@@ policies recognized drug and insect venom as compared to @DISEASE_Food_Hypersensitivity @DISEASE_MESH:D005512 @@@<m>food</m> <m>allergies</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 38443973\nTitle: 2023 CSACI annual scientific meeting book of abstracts\nSource: Allergy Asthma Clin Immunol (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40745660\nTitle: 2024 CSACI Annual Scientific Meeting Book of Abstracts\nSource: Allergy Asthma Clin Immunol (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37854067\nTitle: Diagnosis and treatment of Hymenoptera venom allergy\nSource: Allergol Select (2023)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_Naov2BGePsCLs5HPIfDu7GmQ",
+    "parent_tool_call_id": "call_kPiSFTLtIVAp5uJN1VAejsnZ",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "food allergy|avoidance|immunotherapy|corticosteroid|antihistamine|epinephrine autoinjector|prevention|recurrent",
+      "pmid": "38108678"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('38108678')\noutput = format_paper_content_output(result, filter_keywords='food allergy|avoidance|immunotherapy|corticosteroid|antihistamine|epinephrine autoinjector|prevention|recurrent')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (4):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m food allergy|avoidance|immunotherapy|corticos ... epinephrine autoinjector|prevention|recurrent\n      \u001b[90mpmid:\u001b[0m 38108678\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m food allergen|avoidance|immunotherapy|corticosteroid|antihistamine|epinephrine|prevention\n      \u001b[90mpmid:\u001b[0m 35418863\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m food|avoidance|immunotherapy|desensitization|corticosteroid|antihistamine|epinephrine|prevention\n      \u001b[90mpmid:\u001b[0m 34649404\n\n  \u001b[1m\u001b[93m[4] search_papers\u001b[0m\n      \u001b[90mboolean_query_text:\u001b[0m food allergy guidelines strict avoidance epin ... ector oral immunotherapy children anaphylaxis\n      \u001b[90mrelation_query:\u001b[0m None\n      \u001b[90mtask_name:\u001b[0m food allergy prevention\n      \u001b[90mtop_k:\u001b[0m 10\n\nPMID: 38108678\n================================================================================\nERROR: PubMed Fetch Error: 429 Client Error: Too Many Requests for url: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=38108678&retmode=xml\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_s6VPgUcg7I0p5NhJVFgDpYVQ",
+    "parent_tool_call_id": "call_kPiSFTLtIVAp5uJN1VAejsnZ",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "food allergen|avoidance|immunotherapy|corticosteroid|antihistamine|epinephrine|prevention",
+      "pmid": "35418863"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('35418863')\noutput = format_paper_content_output(result, filter_keywords='food allergen|avoidance|immunotherapy|corticosteroid|antihistamine|epinephrine|prevention')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 35418863 ===\n\nTitle: A Clinical Practice Guideline for the Emergency Management of Anaphylaxis (2020).\n\nJournal/Date: Frontiers in pharmacology (2022)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nBackground: For anaphylaxis, a life-threatening allergic reaction, the incidence rate was presented to have increased from the beginning of the 21st century. Underdiagnosis and undertreatment of anaphylaxis are public health concerns. Objective: This guideline aimed to provide high-quality and evidence-based recommendations for the emergency management of anaphylaxis. Method: The panel of health professionals from fifteen medical areas selected twenty-five clinical questions and formulated the recommendations with the supervision of four methodologists. We collected evidence by conducting systematic literature retrieval and using the Grading of Recommendations, Assessment, Development, and Evaluation (GRADE) approach. Results: This guideline made twenty-five recommendations that covered the diagnosis, preparation, emergency treatment, and post-emergency management of anaphylaxis. We recommended the use of a set of adapted diagnostic criteria from the American National Institute of Allergy and Infectious Diseases and the Food Allergy and Anaphylaxis Network (NIAID/FAAN), and developed a severity grading system that classified anaphylaxis into four grades. We recommended epinephrine as the first-line treatment, with specific doses and routes of administration for different severity of anaphylaxis or different conditions. Proper dosage is critical in the administration of epinephrine, and the monitor is important in the IV administration. Though there was only very low or low-quality evidence supported the use of glucocorticoids and H1 antagonists, we still weakly recommended them as second-line medications. We could not make a well-directed recommendation regarding premedication for preventing anaphylaxis since it is difficult to weigh the concerns and potential effects. Conclusion: For the emergency management of anaphylaxis we conclude that: • NIAID/FAAN diagnostic criteria and the four-tier grading system should be used for the diagnosis • Prompt and proper administration of epinephrine is critical.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nThis guideline addresses 25 clinical questions pertaining to the diagnosis, preparation, treatment, and management after emergency treatment of anaphylaxis. In the survey evaluating these recommendations, more than 90% of the 30 surveyed medical practitioners thought these recommendations were accurate, clearly stated and feasible (Supplementary Appendix S9).\n\nThe evidence was reported in three parts: (1) SoF tables in Supplementary Appendix S4 if original evidence is available, (2) recommendations of other guidelines in Supplementary Appendix S6; (3) summary of original studies, systematic reviews and recommendations from other guidelines is displayed after every recommendation. Four systematic reviews contributed substantial information to the sections on the diagnosis of anaphy...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_JnXTyD2aZbOZGhZwuqmRMBOF",
+    "parent_tool_call_id": "call_kPiSFTLtIVAp5uJN1VAejsnZ",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "food|avoidance|immunotherapy|desensitization|corticosteroid|antihistamine|epinephrine|prevention",
+      "pmid": "34649404"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('34649404')\noutput = format_paper_content_output(result, filter_keywords='food|avoidance|immunotherapy|desensitization|corticosteroid|antihistamine|epinephrine|prevention')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 34649404 ===\n\nTitle: Recent update on the management of anaphylaxis.\n\nJournal/Date: Clinical and experimental emergency medicine (2021)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nAnaphylaxis is a life-threatening systemic allergic reaction presenting various clinical manifestations. Its prevalence has increased in almost all age groups and both sexes. Food, venom, and drugs are major causes in both children and adults; a higher prevalence of food-induced anaphylaxis is noted in children, while a higher prevalence of drug-induced anaphylaxis is noted in adults. The pathogenic mechanism is mediated by immunologic and nonimmunologic mechanisms, where mast cells and basophils are key cells that release mediators. A diagnosis of anaphylaxis is mainly based on clinical symptoms and physical findings; however, an increased serum tryptase level is a useful biomarker. Epinephrine is the first-line drug to treat acute symptoms, and an epinephrine auto-injector should be prescribed for each patient. Antihistamines and systemic corticosteroids are used to relieve symptoms. This review updates current issues in the management of anaphylaxis as well as the new guidelines for proper diagnosis and treatment.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nDIAGNOSIS\n\nClassification\n\nAnaphylaxis is a severe form of hypersensitivity reactions, which are unpredictable and related to immunological (allergic) and non-allergic reactions. Clinically, hypersensitivity reactions are classified into two types: immediate (arising within 1 hour after exposure) and nonimmediate (delayed reactions arising more than 1 hour after exposure). Immediate reactions can be caused by either mast cells or basophil activation through type I IgE (allergy)/non-IgE (pseudo-allergy) mechanisms or direct complement activation, leading to the release of mediators (histamine and tryptase) to induce variable manifestations, ranging from pruritus to edema, urticaria, and anaphylactic shock. Meanwhile, T cell induced reactions (type IV) and rare events induced by antibodies (...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_ZbDdR1lzR6SKU1gkArLYdpLR",
+    "parent_tool_call_id": "call_kPiSFTLtIVAp5uJN1VAejsnZ",
+    "round": 2,
+    "tool_input": {
+      "boolean_query_text": "food allergy guidelines strict avoidance epinephrine autoinjector oral immunotherapy children anaphylaxis",
+      "relation_query": null,
+      "task_name": "food allergy prevention",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='food allergy guidelines strict avoidance epinephrine autoinjector oral immunotherapy children anaphylaxis',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='food allergy guidelines strict avoidance epinephrine autoinjector oral immunotherapy children anaphylaxis',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/food_allergy_prevention.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/food_allergy_prevention.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/food_allergy_prevention.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 39473345\nTitle: EAACI guidelines on the management of IgE-mediated food allergy\nSource: Allergy (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35502316\nTitle: The Economic Burden of Food Allergy: What We Know and What We Need to Learn\nSource: Curr Treat Options Allergy (2022)\nAbstract: @DISEASE_Food_Hypersensitivity @DISEASE_MESH:D005512 @@@<m>Food</m> <m>allergy</m>@@@ management requires <m>strict</m> allergen <m>avoidance</m>.\n--------------------------------------------------------------------------------\nPMID: 34150446\nTitle: Latest Developments in the Management of Nut Allergies\nSource: Curr Treat Options Allergy (2021)\nAbstract: The caregivers' QoL also improved in a trial of multi-allergen <m>food</m> <m>immunotherapy</m>. A recent manuscript reported that EPIT treatment was observed to be associated with significant global and domain-specific @DISEASE_Food_Hypersensitivity @DISEASE_MESH:D005512 @@@<m>food</m> <m>allergy</m>@@@ quality of life improvement largely driven by increases in eliciting dose, in <m>children</m> with @DISEASE_Peanut_Hypersensitivity @DISEASE_MESH:D021183 @@@peanut <m>allergy</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 35692059\nTitle: Patient selection for milk and egg ladders using a food ladder safety checklist\nSource: Allergy Asthma Clin Immunol (2022)\nAbstract: ...The <m>food</m> ladder should be administered by well-trained and experienced healthcare professionals with the necessary expertise and experience in @DISEASE_Food_Hypersensitivity @DISEASE_MESH:D005512 @@@<m>food</m> <m>allergy</m>@@@ and @DISEASE_Anaphylaxis @DISEASE_MESH:D000707 @@@<m>anaphylaxis</m>@@@ management, performance of <m>oral</m> <m>food</m> challenges, and careful selection of @SPECIES_9606 @@@patients@@@ for <m>food</m> <m>immunotherapy</m>.\n--------------------------------------------------------------------------------\nPMID: 39021855\nTitle: Optimal patient selection for oral immunotherapy\nSource: J Food Allergy (2024)\nAbstract: This manuscript is part of the Journal of <m>Food</m> <m>Allergy</m> collection of published works referred to as the \"<m>Oral</m> <m>Immunotherapy</m> Manual.\"\n--------------------------------------------------------------------------------\nPMID: 36200952\nTitle: Management of IgE-mediated food allergy in the 21st century\nSource: Clin Exp Allergy (2023)\nAbstract: ...<m>Oral</m> <m>immunotherapy</m> is the first treatment recommended for the active management of @DISEASE_Food_Hypersensitivity @DISEASE_MESH:D005512 @@@<m>food</m> <m>allergy</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 35387028\nTitle: Home-Based Peanut Oral Immunotherapy for Low-Risk Peanut-Allergic Preschoolers During the COVID-19 Pandemic and Beyond\nSource: Front Allergy (2021)\nAbstract: EC has received research support from DBV Technologies; has been a member of advisory boards for Pfizer, Pediapharm, Leo Pharma, Kaleo, DBV, AllerGenis, Sanofi Genzyme, Bausch Health, and Avir Pharma; is a member of the healthcare advisory board for <m>Food</m> <m>Allergy</m> Canada; and was co-lead of the CSACI <m>oral</m> <m>immunotherapy</m> <m>guidelines</m>.\n--------------------------------------------------------------------------------\nPMID: 33723499\nTitle: Management of Anaphylaxis During the SARS-CoV-2 Pandemic\nSource: Curr Treat Options Allergy (2021)\nAbstract: Many of the previous recommendations for @DISEASE_Food_Hypersensitivity @DISEASE_MESH:D005512 @@@<m>food</m> <m>allergy</m>@@@ management, particularly in schools remain unchanged despite the pandemic, with an emphasis on allergen <m>avoidance</m>, use of @DISEASE_Anaphylaxis @DISEASE_MESH:D000707 @@@<m>anaphylaxis</m>@@@ plans, and availability of and training on use of @CHEMICAL_Epinephrine @CHEMICAL_MESH:D004837 @@@<m>epinephrine</m>@@@ <m>autoinjector</m> devices.\n--------------------------------------------------------------------------------\nPMID: 39408205\nTitle: Peanut Allergy in Children:Is Prevention Better than Cure?\nSource: Nutrients (2024)\nAbstract: In recent years, specific <m>immunotherapy</m> has also played an important part in the management of @DISEASE_Food_Hypersensitivity @DISEASE_MESH:D005512 @@@<m>food</m> <m>allergy</m>@@@ (mainly <m>oral</m> <m>immunotherapy</m>, OIT).\n--------------------------------------------------------------------------------\nPMID: 36142932\nTitle: Pediatric Anaphylaxis: A 20-Year Retrospective Analysis\nSource: J Clin Med (2022)\nAbstract: In 123 @SPECIES_9606 @@@patients@@@, @DISEASE_Anaphylaxis @DISEASE_MESH:D000707 @@@<m>anaphylaxis</m>@@@ was induced by <m>foods</m>. In <m>children</m> younger than 6 months, <m>foods</m> were the only identified triggers.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_L59rjpDyhtiAp6tFKQCV8ctb",
+    "parent_tool_call_id": "call_ZbDdR1lzR6SKU1gkArLYdpLR",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "For a child with confirmed food-triggered anaphylaxis, the guideline-supported preventive strategy is to identify the culprit food (allergy evaluation with history/testing and, when appropriate, supervised challenge) and then institute strict allergen avoidance with an emergency action plan. Among the listed choices, allergen identification followed by avoidance is the best answer.",
+          "source_tools": [
+            {
+              "relevance": "EAACI food-allergy guideline search identifying management guidance and strict avoidance as core management",
+              "tool_call_id": "call_ZbDdR1lzR6SKU1gkArLYdpLR"
+            },
+            {
+              "relevance": "2023 anaphylaxis practice-parameter search emphasizing prevention planning and autoinjector counseling",
+              "tool_call_id": "call_kPiSFTLtIVAp5uJN1VAejsnZ"
+            }
+          ]
+        },
+        {
+          "finding": "An epinephrine autoinjector should be prescribed and caregivers trained to use it promptly for accidental re-exposure; it is essential for emergency treatment/risk mitigation but does not prevent recurrent reactions. Epinephrine is first-line treatment, whereas antihistamines and systemic corticosteroids are adjuncts and not reliable prophylaxis.",
+          "source_tools": [
+            {
+              "relevance": "Clinical practice guideline: epinephrine first-line; evidence for glucocorticoids/H1 antagonists low and they are second-line, with no directed recommendation for premedication",
+              "tool_call_id": "call_s6VPgUcg7I0p5NhJVFgDpYVQ"
+            },
+            {
+              "relevance": "Review stating every anaphylaxis patient should receive an epinephrine autoinjector and that antihistamines/corticosteroids only relieve symptoms",
+              "tool_call_id": "call_JnXTyD2aZbOZGhZwuqmRMBOF"
+            },
+            {
+              "relevance": "Practice-parameter abstract emphasizing autoinjector prescribing, counseling, and training",
+              "tool_call_id": "call_kPiSFTLtIVAp5uJN1VAejsnZ"
+            }
+          ]
+        },
+        {
+          "finding": "Desensitization/specific immunotherapy is not the default answer for an unspecified food trigger after anaphylaxis. Food oral immunotherapy can be considered selectively by an experienced allergy specialist for an identified food (notably peanut in eligible children) to raise the reaction threshold, but it requires ongoing dosing, carries reaction risk, and does not replace avoidance or rescue epinephrine.",
+          "source_tools": [
+            {
+              "relevance": "Food-allergy guideline search showing oral immunotherapy as an active/selective management option rather than universal prevention",
+              "tool_call_id": "call_ZbDdR1lzR6SKU1gkArLYdpLR"
+            },
+            {
+              "relevance": "Search result noting food immunotherapy requires careful patient selection and experienced professionals with anaphylaxis-management expertise",
+              "tool_call_id": "call_ZbDdR1lzR6SKU1gkArLYdpLR"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_KRNJKQEBAm2lmHqzqfzki2a5",
+    "parent_tool_call_id": "call_O4RGdzK5wzFoLtpaxD2U8KTV",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE / PHENOTYPE",
+          "name": "Food-triggered anaphylaxis",
+          "observations": [
+            "Acute urticaria, lip/tongue angioedema, respiratory distress, and hypotension resolved after intramuscular epinephrine in a 7-year-old.",
+            "Future prevention requires identifying the culprit food and implementing strict avoidance; an emergency action plan and epinephrine access are also recommended."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Supports diagnosis and prevention strategy",
+              "tool_call_id": "call_ZbDdR1lzR6SKU1gkArLYdpLR"
+            },
+            {
+              "relevance": "Supports guideline-based prevention",
+              "tool_call_id": "call_kPiSFTLtIVAp5uJN1VAejsnZ"
+            }
+          ]
+        },
+        {
+          "entity_type": "DRUG",
+          "name": "Epinephrine autoinjector",
+          "observations": [
+            "Should be prescribed and caregivers trained for prompt treatment of accidental re-exposure; it reduces risk from future reactions but does not prevent allergen exposure or recurrence."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Supports emergency preparedness distinction",
+              "tool_call_id": "call_s6VPgUcg7I0p5NhJVFgDpYVQ"
+            },
+            {
+              "relevance": "Supports first-line rescue role",
+              "tool_call_id": "call_JnXTyD2aZbOZGhZwuqmRMBOF"
+            }
+          ]
+        },
+        {
+          "entity_type": "THERAPY",
+          "name": "Allergen identification and avoidance",
+          "observations": [
+            "Allergy evaluation identifies the culprit food using history and targeted testing, with supervised challenge when appropriate, followed by strict avoidance and education about cross-contact."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Directly supports answer choice A",
+              "tool_call_id": "call_ZbDdR1lzR6SKU1gkArLYdpLR"
+            },
+            {
+              "relevance": "Directly supports answer choice A",
+              "tool_call_id": "call_kPiSFTLtIVAp5uJN1VAejsnZ"
+            }
+          ]
+        },
+        {
+          "entity_type": "THERAPY",
+          "name": "Food oral immunotherapy",
+          "observations": [
+            "May be considered selectively for an identified food such as peanut, but requires specialist supervision and ongoing dosing, carries reaction risk, and does not replace avoidance or epinephrine."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Explains why desensitization is not the best general answer",
+              "tool_call_id": "call_ZbDdR1lzR6SKU1gkArLYdpLR"
+            }
+          ]
+        },
+        {
+          "entity_type": "THERAPY",
+          "name": "Antihistamine or corticosteroid prophylaxis",
+          "observations": [
+            "Antihistamines and systemic corticosteroids are adjuncts or symptom-directed therapies and are not reliable strategies for preventing recurrent anaphylaxis."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Rules out prophylactic medication choices",
+              "tool_call_id": "call_s6VPgUcg7I0p5NhJVFgDpYVQ"
+            },
+            {
+              "relevance": "Rules out prophylactic medication choices",
+              "tool_call_id": "call_JnXTyD2aZbOZGhZwuqmRMBOF"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Allergen identification and avoidance",
+          "relation_type": "PREVENTS",
+          "to_entity": "Food-triggered anaphylaxis"
+        },
+        {
+          "from_entity": "Epinephrine autoinjector",
+          "relation_type": "TREATS",
+          "to_entity": "Food-triggered anaphylaxis"
+        },
+        {
+          "from_entity": "Food oral immunotherapy",
+          "relation_type": "MODIFIES_RISK_OF",
+          "to_entity": "Food-triggered anaphylaxis"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 5, \"entities\": [{\"name\": \"Food-triggered anaphylaxis\", \"entityType\": \"DISEASE / PHENOTYPE\", \"observations\": [\"Acute urticaria, lip/tongue angioedema, respiratory distress, and hypotension resolved after intramuscular epinephrine in a 7-year-old.\", \"Future prevention requires identifying the culprit food and implementing strict avoidance; an emergency action plan and epinephrine access are also recommended.\"]}, {\"name\": \"Epinephrine autoinjector\", \"entityType\": \"DRUG\", \"observations\": [\"Should be prescribed and caregivers trained for prompt treatment of accidental re-exposure; it reduces risk from future reactions but does not prevent allergen exposure or recurrence.\"]}, {\"name\": \"Allergen identification and avoidance\", \"entityType\": \"THERAPY\", \"observations\": [\"Allergy evaluation identifies the culprit food using history and targeted testing, with supervised challenge when appropriate, followed by strict avoidance and education about cross-contact.\"]}, {\"name\": \"Food oral immunotherapy\", \"entityType\": \"THERAPY\", \"observations\": [\"May be considered selectively for an identified food such as peanut, but requires specialist supervision and ongoing dosing, carries reaction risk, and does not replace avoidance or epinephrine.\"]}, {\"name\": \"Antihistamine or corticosteroid prophylaxis\", \"entityType\": \"THERAPY\", \"observations\": [\"Antihistamines and systemic corticosteroids are adjuncts or symptom-directed therapies and are not reliable strategies for preventing recurrent anaphylaxis.\"]}]}, \"relations_created\": {\"count\": 3, \"relations\": [{\"from\": \"Allergen identification and avoidance\", \"to\": \"Food-triggered anaphylaxis\", \"relationType\": \"PREVENTS\"}, {\"from\": \"Epinephrine autoinjector\", \"to\": \"Food-triggered anaphylaxis\", \"relationType\": \"TREATS\"}, {\"from\": \"Food oral immunotherapy\", \"to\": \"Food-triggered anaphylaxis\", \"relationType\": \"MODIFIES_RISK_OF\"}]}}, \"provenance\": {\"tool_call_id\": \"call_KRNJKQEBAm2lmHqzqfzki2a5\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_O4RGdzK5wzFoLtpaxD2U8KTV\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_SIqk4jFRKd4psrmK4c78Vz0F",
+    "parent_tool_call_id": "call_KRNJKQEBAm2lmHqzqfzki2a5",
+    "round": 3,
+    "tool_input": {
+      "entity_names": "[\"Food-triggered anaphylaxis\",\"Allergen identification and avoidance\",\"Epinephrine autoinjector\",\"Food oral immunotherapy\",\"Antihistamine or corticosteroid prophylaxis\"]",
+      "get_full_map": false,
+      "max_entities": 10,
+      "max_observations_per_entity": 5,
+      "query": null,
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"requested_entities\": [\"Food-triggered anaphylaxis\", \"Allergen identification and avoidance\", \"Epinephrine autoinjector\", \"Food oral immunotherapy\", \"Antihistamine or corticosteroid prophylaxis\"], \"results\": {\"entities\": [{\"name\": \"Food-triggered anaphylaxis\", \"entityType\": \"DISEASE / PHENOTYPE\", \"observations\": [\"Acute urticaria, lip/tongue angioedema, respiratory distress, and hypotension resolved after intramuscular epinephrine in a 7-year-old.\", \"Future prevention requires identifying the culprit food and implementing strict avoidance; an emergency action plan and epinephrine access are also recommended.\"]}, {\"name\": \"Epinephrine autoinjector\", \"entityType\": \"DRUG\", \"observations\": [\"Should be prescribed and caregivers trained for prompt treatment of accidental re-exposure; it reduces risk from future reactions but does not prevent allergen exposure or recurrence.\"]}, {\"name\": \"Allergen identification and avoidance\", \"entityType\": \"THERAPY\", \"observations\": [\"Allergy evaluation identifies the culprit food using history and targeted testing, with supervised challenge when appropriate, followed by strict avoidance and education about cross-contact.\"]}, {\"name\": \"Food oral immunotherapy\", \"entityType\": \"THERAPY\", \"observations\": [\"May be considered selectively for an identified food such as peanut, but requires specialist supervision and ongoing dosing, carries reaction risk, and does not replace avoidance or epinephrine.\"]}, {\"name\": \"Antihistamine or corticosteroid prophylaxis\", \"entityType\": \"THERAPY\", \"observations\": [\"Antihistamines and systemic corticosteroids are adjuncts or symptom-directed therapies and are not reliable strategies for preventing recurrent anaphylaxis.\"]}], \"relations\": [{\"from\": \"Allergen identification and avoidance\", \"to\": \"Food-triggered anaphylaxis\", \"relationType\": \"PREVENTS\"}, {\"from\": \"Epinephrine autoinjector\", \"to\": \"Food-triggered anaphylaxis\", \"relationType\": \"TREATS\"}, {\"from\": \"Food oral immunotherapy\", \"to\": \"Food-triggered anaphylaxis\", \"relationType\": \"MODIFIES_RISK_OF\"}]}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

@@ -1,0 +1,3 @@
+The sequence is a **48-amino-acid, very small and moderately hydrophobic protein**. It exactly matches reviewed UniProt protein **Ycf17 (P51355)** from *Porphyra purpurea*. The reference annotation suggests a **possible role in chlorophyll and/or carotenoid binding** and places it in the plastid/chloroplast; this is a proposed role, not definitive functional proof.
+
+A Pfam **HliA** domain is detected across residues 8–41, consistent with a small light-harvesting/stress-associated protein family. Sequence-derived estimates are **5.54 kDa** molecular mass and **pI 8.19**. Overall, the strongest identification is Ycf17, while its precise function remains uncertain.

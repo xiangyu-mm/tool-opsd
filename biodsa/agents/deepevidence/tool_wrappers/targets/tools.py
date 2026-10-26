@@ -107,6 +107,7 @@ class UnifiedTargetSearchTool(BaseTool):
         search_type: Optional[str] = None,
         limit_per_source: int = 10,
         sources: Optional[List[str]] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the unified target search."""
         
@@ -259,6 +260,7 @@ class UnifiedTargetDetailsFetchTool(BaseTool):
         id_type: Optional[str] = None,
         sources: Optional[List[str]] = None,
         include_associations: bool = True,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the unified target details fetch."""
         

@@ -1,0 +1,5 @@
+Positive tumor-tissue miR-361-5p expression is **associated with better prognosis, most clearly for disease-free survival**. In a 375-patient study, positive staining was associated with longer median DFS (95.52 vs 82.33 months; P=0.002), with the strongest association in triple-negative breast cancer (P=0.004) [PMID 27499968; source: `call_JPeo6pPGXU71t1fEGZ8aTwdQ`].
+
+The conclusion is less certain for overall survival: one TCGA analysis reported a favorable association, while another found no significant OS association [sources: `call_PvE46oSigkkWrlXdT4M82gYT`, `call_UMfDmgZgzjZQSMGxk5ascByr`]. Thus, positive expression is a promising favorable prognostic marker, but the evidence is not consistent enough to treat it as a definitive or clinically established predictor. These findings concern tumor tissue; they do not establish a prognostic role for circulating miR-361-5p.
+
+FINAL DECISION: YES

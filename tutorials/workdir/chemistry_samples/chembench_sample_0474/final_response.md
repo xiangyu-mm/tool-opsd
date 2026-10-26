@@ -1,0 +1,1 @@
+{"answer": "N-[2-[2-(4-benzylpiperazin-1-yl)ethyl]-1-methylbenzimidazol-5-yl]-4-methylbenzenesulfonamide"}

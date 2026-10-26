@@ -1,0 +1,3 @@
+The presentation is most consistent with an **estrogen-secreting adult granulosa cell tumor**: estrogen excess can cause irregular, heavy bleeding, breast tenderness/enlargement, and endometrial thickening. Its classic serum tumor marker is **inhibin B**, which is not among the answer choices. Of the listed options, **estrogen (C)** is the best match because granulosa cell tumors commonly secrete it. CA-125 is not the characteristic marker for this tumor.
+
+FINAL ANSWER: C

@@ -1,0 +1,1 @@
+{"answer": "4-[(4aR,11aS)-1,3,4,4a,5,6,11,11a-octahydropyrido[4,3-b]carbazol-2-yl]-1-(4-fluorophenyl)butan-1-one"}

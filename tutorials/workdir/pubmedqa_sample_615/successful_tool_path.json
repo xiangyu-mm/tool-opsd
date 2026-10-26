@@ -1,0 +1,199 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_uTBN8zJym17wx5FPlxioY0AD",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether QRS duration in patients with left bundle branch block (LBBB) and chronic systolic heart failure is associated with left ventricular twisting, torsion, or rotational mechanics. Find direct human studies using echocardiographic speckle tracking or cardiac MRI, report the direction of association and key quantitative results, and distinguish QRS duration from QRS morphology or CRT response."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_HttKEpIFJwk1nooszeHBwGJU",
+    "parent_tool_call_id": "call_uTBN8zJym17wx5FPlxioY0AD",
+    "round": 1,
+    "tool_input": {
+      "task_name": "LBBB twist echo",
+      "boolean_query_text": "left bundle branch block chronic systolic heart failure left ventricular twist rotation speckle tracking QRS",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='left bundle branch block chronic systolic heart failure left ventricular twist rotation speckle tracking QRS',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='left bundle branch block chronic systolic heart failure left ventricular twist rotation speckle tracking QRS',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/LBBB_twist_echo.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/LBBB_twist_echo.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/LBBB_twist_echo.csv'\nTotal results found: 20\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 34067703\nTitle: Left Ventricular Deformation and Vortex Analysis in Heart Failure: From Ultrasound Technique to Current Clinical Application\nSource: Diagnostics (Basel) (2021)\nAbstract: 2.3. Clinical Application of <m>Left</m> <m>Ventricular</m> <m>Speckle</m> <m>Tracking</m> Echocardiography to @DISEASE_Heart_Failure @DISEASE_MESH:D006333 @@@<m>Heart</m> <m>Failure</m>@@@ with Preserved Ejection Fraction\n--------------------------------------------------------------------------------\nPMID: 37374101\nTitle: The Rare Condition of Left Ventricular Non-Compaction and Reverse Remodeling\nSource: Life (Basel) (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35169612\nTitle: Two-dimensional strain derived parameters provide independent predictors of progression to Chagas cardiomyopathy and mortality in patients with Chagas disease\nSource: Int J Cardiol Heart Vasc (2022)\nAbstract: A, peak late wave diastolic filling velocity; A', peak late diastolic mitral annulus velocity; @GENE_AP2B1 @GENE_163 @@@ACE@@@, @GENE_ACE @GENE_1636 @@@angiotensin converting enzyme@@@; ARB, angiotensin receptor <m>blockers</m>; CRT, cardiac resynchronization therapy; E, peak early wave diastolic filling velocity; E', peak early diastolic mitral annulus velocity; ES, end-<m>systolic</m>; E, strain; GCS, global circumferential E; GLS, global longitudinal E; GRS, global radial E; LA, <m>left</m> atrial; ICD, implantable cardioverter-defibrillator; LAHB, @DISEASE_Anterior_Spinal_Artery_Syndrome @DISEASE_MESH:D020759 @@@<m>left</m> anterior hemiblock@@@; LASct, peak negative global LA epsilon; LAScd, peak positive global LA epsilon; LASr, total global LA epsilon; @DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@LBBB@@@, @DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@<m>left</m> <m>bundle</m> <m>branch</m> <m>block</m>@@@; LV, <m>left</m> <m>ventricular</m>; LVd, LV end-diastolic diameter; LVs, LV end-<m>systolic</m> diameter; @DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@RBBB@@@, @DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@right <m>bundle</m> <m>branch</m> ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 38232246\nTitle: Posicionamento do Departamento de Imagem Cardiovascular da Sociedade Brasileira de Cardiologia sobre o Uso do Strain Miocardico na Rotina do Cardiologista - 2023\nSource: Arq Bras Cardiol (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34206037\nTitle: Noncompaction Cardiomyopathy:History and Current Knowledge for Clinical Practice\nSource: J Clin Med (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37961897\nTitle: Early Systolic Lengthening Is Associated with SYNTAX Score in Patients with Non-ST-Elevation Acute Coronary Syndrome\nSource: Anatol J Cardiol (2023)\nAbstract: ...<m>Speckle</m> <m>tracking</m> echocardiography (STE) enables the analysis of <m>rotational</m> mechanics of the <m>heart</m> (<m>rotation</m>, torsion, and untwisting), regional and global deformation properties, and their contribution to contractility.\n--------------------------------------------------------------------------------\nPMID: 39510416\nTitle: Non-invasively measured myocardial torsional modulus: Comparison to invasive evaluation of diastolic function\nSource: J Cardiovasc Magn Reson (2024)\nAbstract: Analysis of the LV <m>rotational</m> deformation by tagged CMR and later using echocardiographic methods, including tissue-Doppler and <m>speckle</m>-<m>tracking</m> imaging, has been used to measure <m>twisting</m> and untwisting motion for assessing LV <m>systolic</m> and diastolic function, and may represent a means of quantifying <m>ventricular</m> relaxation and diastolic stiffness.\n--------------------------------------------------------------------------------\nPMID: 35344411\nTitle: Takotsubo Syndrome: Pathophysiology, Emerging Concepts and Clinical Implications\nSource: Circulation (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38848133\nTitle: Alcoholic cardiomyopathy: an update\nSource: Eur Heart J (2024)\nAbstract: @DISEASE_Cardiomyopathy_Dilated @DISEASE_MESH:D002311 @@@DCM@@@, @DISEASE_Cardiomyopathy_Dilated @DISEASE_MESH:D002311 @@@dilated cardiomyopathy@@@; HF, @DISEASE_Heart_Failure @DISEASE_MESH:D006333 @@@<m>heart</m> <m>failure</m>@@@; HFrEF, @DISEASE_Heart_Failure @DISEASE_MESH:D006333 @@@<m>heart</m> <m>failure</m>@@@ with reduced ejection fraction; HTx, <m>heart</m> transplant; LVEDD, <m>left</m> <m>ventricular</m> end-diastolic diameter; LVEF, <m>left</m> <m>ventricular</m> ejection fraction; SD, standard deviation.\n--------------------------------------------------------------------------------\nPMID: 36614928\nTitle: Broken Heart Syndrome: Evolving Molecular Mechanisms and Principles of Management\nSource: J Clin Med (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40564888\nTitle: Broad Electrocardiogram Syndromes Spectrum: From Common Emergencies to Particular Electrical Heart Disorders:Part II\nSource: Diagnostics (Basel) (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 28344217\nTitle: Left ventricular twist was decreased in isolated left bundle branch block with preserved ejection fraction\nSource: Anatol J Cardiol (2017)\nAbstract: <m>Left</m> @DISEASE_Ventricular_Fibrillation @DISEASE_MESH:D014693 @@@<m>ventricular</m>@@@ @GENE_TWIST1 @GENE_7291 @@@<m>twist</m>@@@ was decreased in isolated @DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@<m>left</m> <m>bundle</m> <m>branch</m> <m>block</m>@@@ with preserved ejection fraction\n--------------------------------------------------------------------------------\nPMID: 30499419\nTitle: Adverse Consequences of Right Ventricular Apical Pacing and Novel Strategies to Optimize Left Ventricular Systolic and Diastolic Function\nSource: Curr Cardiol Rev (2019)\nAbstract: Adverse Consequences of Right <m>Ventricular</m> Apical Pacing and Novel Strategies to Optimize <m>Left</m> <m>Ventricular</m> <m>Systolic</m> and Diastolic Function\n--------------------------------------------------------------------------------\nPMID: 24653734\nTitle: Functional Assessment for Congenital Heart Disease\nSource: Korean Circ J (2014)\nAbstract: Development of @DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@right <m>bundle</m> <m>branch</m> <m>block</m>@@@ and <m>QRS</m> prolongation after surgery may potentially lead to RV mechanical dyssynchrony.\n--------------------------------------------------------------------------------\nPMID: 33253242\nTitle: Early impairment of myocardial deformation assessed by regional speckle-tracking echocardiography in the indeterminate form of Chagas disease without fibrosis detected by cardiac magnetic resonance\nSource: PLoS Negl Trop Dis (2020)\nAbstract: All EKG abnormalities such as complete @DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@right <m>bundle</m> <m>branch</m> <m>block</m>@@@ (@DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@RBBB@@@), complete @DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@<m>left</m> <m>bundle</m> <m>branch</m> <m>block</m>@@@ (@DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@LBBB@@@) and @DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@<m>left</m> anterior fascicular <m>block</m>@@@ (@DISEASE_Bundle_Branch_Block @DISEASE_MESH:D002037 @@@LAFB@@@) were defined following previous published guidelines (20).\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_s4OaUn46rnZEz9k7unGL9yeI",
+    "parent_tool_call_id": "call_HttKEpIFJwk1nooszeHBwGJU",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "QRS duration|torsion|twist|twisting rate|untwisting|correlation|120|150|results|LBBB",
+      "pmid": "25077412"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25077412')\noutput = format_paper_content_output(result, filter_keywords='QRS duration|torsion|twist|twisting rate|untwisting|correlation|120|150|results|LBBB')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m QRS duration|torsion|twist|twisting rate|untwisting|correlation|120|150|results|LBBB\n      \u001b[90mpmid:\u001b[0m 25077412\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m QRS|twist|torsion|rotation|speckle|results|LBBB\n      \u001b[90mpmid:\u001b[0m 28344217\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m QRS|rotational|rotation|torsion|LBBB|CRT|results\n      \u001b[90mpmid:\u001b[0m 33547401\n\n=== PMID: 25077412 ===\n\nTitle: QRS duration in left bundle branch block does not affect left ventricular twisting in chronic systolic heart failure.\n\nJournal/Date: Clinical physiology and functional imaging (2015)\n\nMeSH Keywords: Aged, Bundle-Branch Block, Chronic Disease, Echocardiography, Electrocardiography, Female, Heart Conduction System, Heart Failure, Systolic\n\n\n--- ABSTRACT ---\n[PURPOSE]: Left ventricular (LV) torsion is an important parameter of LV performance and can be influenced by several factors. Aim of this investigation was to evaluate whether QRS prolongation in left bundle branch block (LBBB) may influence global LV twist and twisting/untwisting rate in chronic systolic heart failure (HF) patients.\n[METHODS]: We prospectively evaluated 30 healthy subjects (control group) and 100 chronic HF patients with severely impaired LV systolic function (ejection fraction ≤ 35%). Patients were divided into three groups according to QRS duration: A: QRS < 120 ms (n 49), B: 120 ≤ QRS ≤ 150 ms (n 28) and C: QRS > 150 ms (n 23). Patients in groups B and C presented LBBB. All subjects underwent standard trans-thoracic echocardiography and two-dimensional speckle-tracking echocardiography evaluation. Categorical variables were compared by the chi-square or the Fisher's exact test. Continuous variables were compared using the ANOVA test. Correlations between variables were analysed with linear regression.\n[RESULTS]: Control subjects presented higher torsion parameters, when compared with patients in any HF group. Among the three HF groups, no differences were detected in global twist (4.79 ± 3.54, 3.8 ± 3.0 and 4.15 ± 3.14 degrees, respectively), twist rate max (44.81 ± 25.03, 37.94 ± 19.09 and 37.61 ± 24.49 degrees s(-1), respectively) and untwist rate max (-36.31 ± 30.89, -27.68 ± 34.67 and -39.62 ± 26.27 degrees s(-1), respectively) (P>0.05 for all). At linear regression analysis, there was no relation between QRS duration and any torsion parameter (P>0.05 for all).\n[CONCLUSIONS]: In patients with chronic severe systolic heart failure, QRS duration and LBBB morphology do not affect LV twisting and untwisting.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_gsbejFxOmMkcCuYIJZYK3U6x",
+    "parent_tool_call_id": "call_HttKEpIFJwk1nooszeHBwGJU",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "QRS|rotational|rotation|torsion|LBBB|CRT|results",
+      "pmid": "33547401"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('33547401')\noutput = format_paper_content_output(result, filter_keywords='QRS|rotational|rotation|torsion|LBBB|CRT|results')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 33547401 ===\n\nTitle: Local electromechanical alterations determine the left ventricle rotational dynamics in CRT-eligible heart failure patients.\n\nJournal/Date: Scientific reports (2021)\n\nMeSH Keywords: Aged, Biomechanical Phenomena, Cardiac Resynchronization Therapy, Female, Heart Failure, Heart Ventricles, Humans, Male\n\n\n--- ABSTRACT ---\nLeft ventricle, LV wringing wall motion relies on physiological muscle fiber orientation, fibrotic status, and electromechanics (EM). The loss of proper EM activation can lead to rigid-body-type (RBT) LV rotation, which is associated with advanced heart failure (HF) and challenges in resynchronization. To describe the EM coupling and scar tissue burden with respect to rotational patterns observed on the LV in patients with ischemic heart failure with reduced ejection fraction (HFrEF) left bundle branch block (LBBB). Thirty patients with HFrEF/LBBB underwent EM analysis of the left ventricle using an invasive electro-mechanical catheter mapping system (NOGA XP, Biosense Webster). The following parameters were evaluated: rotation angle; rotation velocity; unipolar/bipolar voltage; local activation time, LAT; local electro-mechanical delay, LEMD; total electro-mechanical delay, TEMD. Patients underwent late-gadolinium enhancement cMRI when possible. The different LV rotation pattern served as sole parameter for patients' grouping into two categories: wringing rotation (Group A, n = 6) and RBT rotation (Group B, n = 24). All parameters were aggregated into a nine segment, three sector and whole LV models, and compared at multiple scales. Segmental statistical analysis in Group B revealed significant inhomogeneities, across the LV, regarding voltage level, scar burdening, and LEMD changes: correlation analysis showed correspondently a loss of synchronization between electrical (LAT) and mechanical activation (TEMD). On contrary, Group A (relatively low number of patients) did not present significant differences in LEMD across LV segments, therefore electrical (LAT) and mechanical (TEMD) activation were well synchronized. Fibrosis burden was in general associated with areas of low voltage. The rotational behavior of LV in HF/LBBB patients is determined by the local alteration of EM coupling. These findings serve as a strong basic groundwork for a hypothesis that EM analysis may predict CRT response.Clinical trial registration: SUM No. KNW/0022/KB1/17/15.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nPatients characteristics\n\nPatient baseline characteristics is presented in Table 1. Study population mean age was 65.4 ± 6.1 years with a numerically higher number of males among all participants (70%). All patients had LBBB morphology on the ECG with mean QRS duration 168 ± 17 ms. Using the 3D electro-mechanical NOGA XP system, a total of 8200 endocardial mapping points was evaluated in the 30 HFrEF patients (273 ± 47 mapping points per patient, around 30 min per patient) and EM parameters were calculated (Fig. 1a,b and “Methods”).\n\nBased on quantitative (clockwise [< − 3°]/counterclockwise [> 3°]) and qualitative (apex-base relative rotation) analysis of LV rotation at each endocardial mapping point, patients were classified as: wringing rotation (Group A, Fig. 2a, Supplementary...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_Jpprwh1USntuGlL8EJrYpBR3",
+    "parent_tool_call_id": "call_gsbejFxOmMkcCuYIJZYK3U6x",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "QRS duration|QRS width|QRS morphology|LBBB|torsion|twist|rotation|CRT response|responder",
+      "pmid": "25077412"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25077412')\noutput = format_paper_content_output(result, filter_keywords='QRS duration|QRS width|QRS morphology|LBBB|torsion|twist|rotation|CRT response|responder')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 25077412 ===\n\nTitle: QRS duration in left bundle branch block does not affect left ventricular twisting in chronic systolic heart failure.\n\nJournal/Date: Clinical physiology and functional imaging (2015)\n\nMeSH Keywords: Aged, Bundle-Branch Block, Chronic Disease, Echocardiography, Electrocardiography, Female, Heart Conduction System, Heart Failure, Systolic\n\n\n--- ABSTRACT ---\n[PURPOSE]: Left ventricular (LV) torsion is an important parameter of LV performance and can be influenced by several factors. Aim of this investigation was to evaluate whether QRS prolongation in left bundle branch block (LBBB) may influence global LV twist and twisting/untwisting rate in chronic systolic heart failure (HF) patients.\n[METHODS]: We prospectively evaluated 30 healthy subjects (control group) and 100 chronic HF patients with severely impaired LV systolic function (ejection fraction ≤ 35%). Patients were divided into three groups according to QRS duration: A: QRS < 120 ms (n 49), B: 120 ≤ QRS ≤ 150 ms (n 28) and C: QRS > 150 ms (n 23). Patients in groups B and C presented LBBB. All subjects underwent standard trans-thoracic echocardiography and two-dimensional speckle-tracking echocardiography evaluation. Categorical variables were compared by the chi-square or the Fisher's exact test. Continuous variables were compared using the ANOVA test. Correlations between variables were analysed with linear regression.\n[RESULTS]: Control subjects presented higher torsion parameters, when compared with patients in any HF group. Among the three HF groups, no differences were detected in global twist (4.79 ± 3.54, 3.8 ± 3.0 and 4.15 ± 3.14 degrees, respectively), twist rate max (44.81 ± 25.03, 37.94 ± 19.09 and 37.61 ± 24.49 degrees s(-1), respectively) and untwist rate max (-36.31 ± 30.89, -27.68 ± 34.67 and -39.62 ± 26.27 degrees s(-1), respectively) (P>0.05 for all). At linear regression analysis, there was no relation between QRS duration and any torsion parameter (P>0.05 for all).\n[CONCLUSIONS]: In patients with chronic severe systolic heart failure, QRS duration and LBBB morphology do not affect LV twisting and untwisting.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_QnEncMqEVrFOpNpUD3yqrJDo",
+    "parent_tool_call_id": "call_Jpprwh1USntuGlL8EJrYpBR3",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Direct evidence in chronic severe systolic HF supports no association between QRS duration and LV twisting/untwisting when assessed by 2-D speckle-tracking echocardiography. In a prospective study of 100 HF patients with LVEF ≤35% (49 with QRS <120 ms, 28 with 120–150 ms/LBBB, and 23 with >150 ms/LBBB), global twist was 4.79±3.54°, 3.80±3.00°, and 4.15±3.14°; maximal twist rate 44.81±25.03, 37.94±19.09, and 37.61±24.49°/s; and maximal untwist rate −36.31±30.89, −27.68±34.67, and −39.62±26.27°/s, respectively, with no between-group differences (all P>0.05) and no linear relation between QRS duration and any torsion parameter. The authors concluded that neither QRS duration nor LBBB morphology affected LV twisting/untwisting.",
+          "source_tools": [
+            {
+              "relevance": "Full abstract with study design, quantitative twist metrics, group comparisons, regression result, and conclusion",
+              "tool_call_id": "call_s4OaUn46rnZEz9k7unGL9yeI"
+            },
+            {
+              "relevance": "Independent search result identifying the direct study",
+              "tool_call_id": "call_56S4E9ZNQnCwU8byWfuPcKti"
+            }
+          ]
+        },
+        {
+          "finding": "A separate human speckle-tracking study shows that LBBB morphology itself can reduce rotational mechanics, but it does not establish a QRS-duration association and was not conducted in chronic systolic HF: among 34 patients with isolated LBBB and preserved EF, apical rotation was 2.5±1.9° versus 4.4±2.9° in 36 controls (P=0.002), basal rotation −2.9±2.3° versus −4.1±2.7° (P=0.05), and twist 5.4±3.0° versus 8.6±3.3° (P<0.001). Presence of LBBB independently predicted below-median twist (OR 6.25, 95% CI 2.215–17.632), illustrating why morphology should not be conflated with QRS duration.",
+          "source_tools": [
+            {
+              "relevance": "Full abstract with quantitative rotation/twist results and regression; population explicitly isolated LBBB with preserved EF",
+              "tool_call_id": "call_aiGNAMdJSKZW4X9DjqDMspim"
+            }
+          ]
+        },
+        {
+          "finding": "The identified CMR-related human studies do not provide a direct quantitative test of QRS duration versus LV twist/torsion in chronic LBBB systolic HF. A 2021 study of 30 ischemic HFrEF/LBBB patients used invasive electromechanical mapping (with CMR scar imaging when possible), found mean QRS 168±17 ms, and linked rotational pattern to local electromechanical coupling and scar burden; it did not report a QRS-duration/torsion correlation and therefore should not be used as evidence for one.",
+          "source_tools": [
+            {
+              "relevance": "Full abstract and results preview specify modality, sample, mean QRS, and mechanism but no QRS-duration association",
+              "tool_call_id": "call_gsbejFxOmMkcCuYIJZYK3U6x"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: in the narrowly defined population requested—patients with LBBB and chronic systolic HF—direct speckle-tracking evidence indicates no measurable association between QRS duration and global LV twist, twisting rate, or untwisting rate. The evidence base located is sparse; no qualifying cardiac-MRI study was found that directly quantifies this QRS-duration relationship. QRS duration should therefore be distinguished from LBBB morphology and from CRT response/prediction studies, which address different endpoints.",
+          "source_tools": [
+            {
+              "relevance": "Direct negative study and quantitative results",
+              "tool_call_id": "call_s4OaUn46rnZEz9k7unGL9yeI"
+            },
+            {
+              "relevance": "Search showing related CMR/CRT literature but no direct matching QRS-duration/torsion study",
+              "tool_call_id": "call_L4umw5k2JviCnnFgEVathxnT"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_vG35VZOJvOe0JNAERL276e8K",
+    "parent_tool_call_id": "call_ZMPRpXlAcZuWc30R2A1QHyvs",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25077412",
+          "observations": [
+            "Prospective 2-D speckle-tracking study of 100 chronic severe systolic HF patients (LVEF ≤35%); compared LV twist, peak twist rate, and peak untwist rate across QRS-duration groups."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary direct study relating QRS duration to LV twisting mechanics in systolic heart failure.",
+              "tool_call_id": "call_s4OaUn46rnZEz9k7unGL9yeI"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "QRS duration and LV twist",
+          "observations": [
+            "In 100 HF patients with LVEF ≤35%, no association was found between QRS duration and LV twist, peak twist rate, or peak untwist rate (all P>0.05); group means were similar across <120, 120–150, and >150 ms."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct quantitative evidence answering whether QRS duration affects LV twisting in chronic systolic HF.",
+              "tool_call_id": "call_s4OaUn46rnZEz9k7unGL9yeI"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:25077412",
+          "relation_type": "SUPPORTS",
+          "to_entity": "QRS duration and LV twist"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 2, \"entities\": [{\"name\": \"PMID:25077412\", \"entityType\": \"PAPER\", \"observations\": [\"Prospective 2-D speckle-tracking study of 100 chronic severe systolic HF patients (LVEF \\u226435%); compared LV twist, peak twist rate, and peak untwist rate across QRS-duration groups.\"]}, {\"name\": \"QRS duration and LV twist\", \"entityType\": \"FINDING\", \"observations\": [\"In 100 HF patients with LVEF \\u226435%, no association was found between QRS duration and LV twist, peak twist rate, or peak untwist rate (all P>0.05); group means were similar across <120, 120\\u2013150, and >150 ms.\"]}]}, \"relations_created\": {\"count\": 1, \"relations\": [{\"from\": \"PMID:25077412\", \"to\": \"QRS duration and LV twist\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_vG35VZOJvOe0JNAERL276e8K\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_ZMPRpXlAcZuWc30R2A1QHyvs\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

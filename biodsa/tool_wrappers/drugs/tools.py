@@ -93,6 +93,7 @@ class UnifiedDrugSearchTool(BaseTool):
         search_term: str,
         limit_per_source: int = 10,
         sources: Optional[List[str]] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the unified drug search."""
         
@@ -235,6 +236,7 @@ class UnifiedDrugDetailsFetchTool(BaseTool):
         drug_id: str,
         id_type: Optional[str] = None,
         sources: Optional[List[str]] = None,
+        context_tool_call_ids: Optional[List[str]] = None,
     ) -> str:
         """Execute the unified drug details fetch."""
         

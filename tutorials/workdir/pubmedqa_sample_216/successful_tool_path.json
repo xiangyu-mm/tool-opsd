@@ -1,0 +1,189 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_QXpecoJGuF3VuqUsMhxhfDk7",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease",
+        "drug"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether beta-blocker treatment worsens outcomes in patients with critical limb ischemia (also termed chronic limb-threatening ischemia) receiving endovascular revascularization. Find direct clinical studies and report population, comparison (beta-blocker use vs nonuse), endpoints (mortality, amputation, patency, wound healing), effect estimates, and limitations; distinguish observational association from causality."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_m6nE1g2IN8LBGLfKFKJBiL5i",
+    "parent_tool_call_id": "call_QXpecoJGuF3VuqUsMhxhfDk7",
+    "round": 1,
+    "tool_input": {
+      "task_name": "PAD beta blocker limb",
+      "boolean_query_text": "peripheral artery disease beta blocker lower extremity revascularization amputation wound healing patency",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='peripheral artery disease beta blocker lower extremity revascularization amputation wound healing patency',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='peripheral artery disease beta blocker lower extremity revascularization amputation wound healing patency',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/PAD_beta_blocker_limb.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/PAD_beta_blocker_limb.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/PAD_beta_blocker_limb.csv'\nTotal results found: 30\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 35737757\nTitle: Bioengineering Human Tissues and the Future of Vascular Replacement\nSource: Circ Res (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38898146\nTitle: The Utility of Sirolimus Eluting Balloons in the Setting of Chronic Limb Threatening Ischaemia in Asian Patients from Singapore - 12 Months Results of the PRISTINE Registry\nSource: Cardiovasc Intervent Radiol (2024)\nAbstract: It was associated with favorable 6 and 12-month primary <m>patencies</m>, freedom from clinical target lesion <m>revascularization</m> and foot <m>wound</m>-<m>healing</m> rates.\n--------------------------------------------------------------------------------\nPMID: 34078765\nTitle: Evidence-Experience Gap and Future Perspective on the Treatment of Peripheral Artery Disease\nSource: J Atheroscler Thromb (2021)\nAbstract: ACE inhibitors are firstly recommended as antihypertensive drugs, whereas <m>beta</m>-<m>blockers</m> are also effective in <m>lowering</m> blood pressure without worsening symptoms .\n--------------------------------------------------------------------------------\nPMID: 34278082\nTitle: Infrainguinal bypass under triple nerve block in patients with severely compromised left ventricular ejection fraction and chronic limb-threatening ischemia\nSource: J Vasc Surg Cases Innov Tech (2021)\nAbstract: ACEI, Angiotensin-converting enzyme inhibitor; ACS NSQIP, American College of Surgeons' National Surgical Quality Improvement Program; AF, @DISEASE_Atrial_Fibrillation @DISEASE_MESH:D001281 @@@atrial fibrillation@@@; ATA, anterior tibial <m>artery</m>; BB, <m>beta</m>-<m>blocker</m>; BMI, body mass index; CAD, @DISEASE_Coronary_Artery_Disease @DISEASE_MESH:D003324 @@@coronary <m>artery</m> <m>disease</m>@@@; CCB, calcium channel <m>blocker</m>; CFA, common femoral <m>artery</m>; @DISEASE_Heart_Failure @DISEASE_MESH:D006333 @@@CHF@@@, @DISEASE_Heart_Failure @DISEASE_MESH:D006333 @@@congestive heart failure@@@; @DISEASE_Chronic_Limb_Threatening_Ischemia @DISEASE_MESH:D000089802 @@@CLTI@@@, chronic @DISEASE_Chronic_Limb_Threatening_Ischemia @DISEASE_MESH:D000089802 @@@<m>limb</m>-threatening ischemia@@@; CTA, computed tomography angiography; CTO, @DISEASE_Arterial_Occlusive_Diseases @DISEASE_MESH:D001157 @@@chronic total occlusion@@@; @DISEASE_Myotonic_Dystrophy @DISEASE_MESH:D009223 @@@DM@@@, @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@diabetes mellitus@@@; DSA, digital subtraction angiography; HTN, @DISEASE_Hypertension @DISEASE_MESH:D006973 @@@hypertension@@@; LVEF, left ve ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 33670461\nTitle: Outcomes of Lower Extremity Endovascular Revascularization: Potential Predictors and Prevention Strategies\nSource: Int J Mol Sci (2021)\nAbstract: The use of <m>beta</m>-<m>blockers</m> is traditionally contraindicated in @SPECIES_9606 @@@patients@@@ with @DISEASE_Peripheral_Arterial_Disease @DISEASE_MESH:D058729 @@@PAD@@@ due to concerns regarding reduced <m>peripheral</m> perfusion.\n--------------------------------------------------------------------------------\nPMID: 36263383\nTitle: Effect of tibial cortex transverse transport in patients with recalcitrant diabetic foot ulcers: A prospective multicenter cohort study\nSource: J Orthop Translat (2022)\nAbstract: Although <m>revascularization</m> may restore the blood flow in the large <m>arteries</m> of the <m>lower</m> <m>extremity</m>, it fails to improve the foot microperfusion completely, leading to non-<m>healing</m> or delayed <m>healing</m> and major <m>amputation</m>.\n--------------------------------------------------------------------------------\nPMID: 33843364\nTitle: World's First Experience Treating TASC II C and D Tibial Occlusive Disease Using the Selution SLR Sirolimus-Eluting Balloon: Six-Month Results From the PRESTIGE Study\nSource: J Endovasc Ther (2021)\nAbstract: @DISEASE_Peripheral_Arterial_Disease @DISEASE_MESH:D058729 @@@<m>Peripheral</m> arterial <m>disease</m>@@@ (@DISEASE_Peripheral_Arterial_Disease @DISEASE_MESH:D058729 @@@PAD@@@) is the @DISEASE_Arterial_Occlusive_Diseases @DISEASE_MESH:D001157 @@@atherosclerotic occlusive <m>disease</m> of the@@@ <m>lower</m> <m>extremity</m> <m>arteries</m> and afflicts hundreds of millions of individuals worldwide.\n--------------------------------------------------------------------------------\nPMID: 38842587\nTitle: Anatomical and clinical factors associated with infrapopliteal arterial bypass outcomes in patients with chronic limb-threatening ischemia\nSource: Heart Vessels (2024)\nAbstract: Variable Patients n = 103 (%) Age, years 71.2 +- 8.8 Male gender 74 (71.8) Body mass index 22.4 +- 3.9 Preprocedural ABI 0.53 +- 0.19 Postprocedural ABI 0.79 +- 0.18 Ex or current smoker 47 (45.6) Diabetes mellitus 76 (73.8) Hypertension 90 (87.4) Hyperlipidemia 50 (48.5) Ejection fraction 60.6 +- 10.5 Coronary <m>artery</m> <m>disease</m> 29 (28.2) COPD 12 (11.7) Cerebrovascular <m>disease</m> 13 (12.6) Chronic renal insufficiency 83 (80.6) End-stage renal <m>disease</m> 56 (54.4) Nutritional status Malnutrition 10 (9.7) Functional status Non-ambulatory 16 (15.5) Preprocedural medication Antiplatelet 93 (90.3) Statin 43 (41.7) <m>beta</m>-<m>blocker</m> 48 (46.6)\n--------------------------------------------------------------------------------\nPMID: 36643723\nTitle: Principal predictors of major adverse limb events in diabetic peripheral artery disease: A narrative review\nSource: Atheroscler Plus (2021)\nAbstract: @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@Diabetes mellitus@@@ is often described as a clinical syndrome characterized by @DISEASE_Hyperglycemia @DISEASE_MESH:D006943 @@@hyperglycemia@@@ due to defective @GENE_INS @GENE_3630 @@@insulin@@@ secretion by pancreatic <m>beta</m>-cells and reduced sensitivity of target tissues (muscle, liver and adipose tissue) to its action (@DISEASE_Insulin_Resistance @DISEASE_MESH:D007333 @@@insulin resistance@@@) leading to the development of inappropriate @DISEASE_Hyperglycemia @DISEASE_MESH:D006943 @@@hyperglycemia@@@.\n--------------------------------------------------------------------------------\nPMID: 37818699\nTitle: The correlation between transcutaneous oxygen pressure (TcPO2 ) and forward-looking infrared (FLIR) thermography in the evaluation of lower extremity perfusion according to angiosome\nSource: Int Wound J (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37329412\nTitle: Endovascular Revascularization and Outcomes of Critical Limb-Threatening Ischemia in Trinidad and Tobago: The EVENT Pilot Study:Challenges in a Limited-Resource, Caribbean Setting\nSource: Cardiol Ther (2023)\nAbstract: @SPECIES_9606 @@@Patient@@@ variables Successful EVR (n = 112) Unsuccessful EVR (n = 25) p value Demographics Male 65 (58%) 8 (32%) 0.016 Mean age (SD) 67 64.4 0.216 Comorbidities Coronary <m>artery</m> <m>disease</m> (CAD) 48 (43%) 12 (48%) 0.401 Diabetes mellitus (DM) 92 (82%) 14 (56%) 0.303 Hypertension (HTN) 105 (94%) 23 (92%) 0.515 Dyslipidemia (HLD) 35 (31%) 10 (40%) 0.269 Cerebrovascular <m>disease</m> (CVE) 2 (2%) 1 (4%) 0.456 Chronic kidney <m>disease</m> (CKD) 7 (6%) 2 (8%) 0.670 Chronic obstructive pulmonary <m>disease</m> (COPD) 6 (5%) 1 (4%) 0.492 Tobacco use 50 (45%) 8 (32%) 0.176 Previous <m>amputation</m> Major 5 (5%) 5 (20%) 0.018 Minor 20 (18%) 5 (20%) 0.498 Medications Aspirin 107 (96%) 23 (92%) 0.546 Clopidogrel/ticagrelor 76 (68%) 18 (72%) 0.299 Angiotensin-converting enzyme inhibitor/angiotensin receptor <m>blocker</m> (ACEi/ARB) 74 (66%) 14 (56%) 0.833 <m>Beta</m> <m>blocker</m> (BB) 77 (69%) 17 (68%) 0.466 Statin 89 (79%) 18 (72%) 0.245 Calcium channel <m>blocker</m> (CCB) 28 (25%) 6 (24%) 0.741 Nitrates 48 (43%) 11 (44%) 0.609 Insulin 14 (13%) 4 (16%) 0.319 Oral hypoglycemics 82 (73%) 20 (80%) 0.442\n--------------------------------------------------------------------------------\nPMID: 34168731\nTitle: Diabetes and peripheral artery disease: A review\nSource: World J Diabetes (2021)\nAbstract: Care should be taken with the use of <m>beta</m>-<m>blockers</m> in @SPECIES_9606 @@@patients@@@ with chronic <m>limb</m>-threatening @DISEASE_Ischemia @DISEASE_MESH:D007511 @@@ischaemia@@@.\n--------------------------------------------------------------------------------\nPMID: 37568548\nTitle: Impact of Optimal Medical Therapy on Reintervention and Survival Rates after Endovascular Infrapopliteal Revascularization\nSource: J Clin Med (2023)\nAbstract: Although it has been postulated that <m>beta</m>-<m>blocker</m> therapy can potentially worsen <m>limb</m> perfusion, relevant comorbidities must be considered before discontinuation is contemplated.\n--------------------------------------------------------------------------------\nPMID: 39429407\nTitle: A Review of Peripheral Artery Disease in Diabetic Patients in Sub-Saharan Africa\nSource: Cureus (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37956128\nTitle: Randomized clinical trial to compare the efficacy of self-expanding bare metal nitinol stent and balloon angioplasty alone for below-the-knee lesions following successful balloon angioplasty: 1-year clinical outcomes\nSource: PLoS One (2023)\nAbstract: Variables, N (%) POBA group (n = 61) Stenting group (n = 58) P value Sex, male 54 (88.5) 46 (79.3) 0.170 Age, year 66.5 +- 9.6 68.8 +- 9.0 0.259 Body mass index, Kg/m2 22.9 +- 3.9 23.1 +- 3.6 0.690 Hypertension 42 (68.8) 35 (60.3) 0.332 Diabetes mellitus 49 (80.3) 49 (84.4) 0.552 Medication 39 (63.9) 37 (63.7) 0.987 Insulin 12 (19.6) 18 (31.0) 0.154 Chronic renal insufficiency 19 (31.1) 12 (20.6) 0.194 End-stage renal <m>disease</m> 12 (19.6) 9 (15.5) 0.552 Heart failure 4 (6.5) 2 (3.4) 0.680 Dyslipidemia 3 (4.9) 4 (6.8) 0.713 Previous use of statin 12 (19.6) 6 (10.3) 0.156 Tobacco 22 (36.0) 20 (34.4) 0.857 Currently 14 (22.9) 15 (25.8) 0.712 Quit 8 (13.1) 5 (8.6) 0.432 Coronary <m>artery</m> <m>disease</m> 17 (27.8) 14 (24.1) 0.643 Stroke 10 (16.3) 7 (12.0) 0.500 Hemorrhagic 1 (1.6) 1 (1.7) >0.999 Ischemic 8 (13.1) 3 (5.1) 0.135 TIA 1 (1.6) 3 (5.1) 0.356 Lab findings Hemoglobin (g/dL) 11.3 +- 2 11.5 +- 1.7 0.584 Hematocrit (%) 33.7 +- 5.9 34.2 +- 5.1 0.618 Glucose (mg/dL) 175 +- 108 186 +- 122 0.598 HbA1c (%) 7.4 +- 2.0 7.8 +- 2.1 0.377 Creatinine (mg/dL) 2.74 +- 3.05 1.98 +- 1.85 0.793 Total Cholesterol (mg/dL) 136 +- 36 143 +- 39 0.582 Triglyceride (mg/dL) 128 +- 57 133 +- 80 0. ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_Ys5DLShtPnnGermt816s0VPr",
+    "parent_tool_call_id": "call_m6nE1g2IN8LBGLfKFKJBiL5i",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "beta blocker|beta-blocker|mortality|amputation|patency|wound|odds ratio|hazard ratio|confidence interval|endovascular|CLI|MALE|MACE",
+      "pmid": "30598355"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('30598355')\noutput = format_paper_content_output(result, filter_keywords='beta blocker|beta-blocker|mortality|amputation|patency|wound|odds ratio|hazard ratio|confidence interval|endovascular|CLI|MALE|MACE')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (5):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m beta blocker|beta-blocker|mortality|amputatio ... onfidence interval|endovascular|CLI|MALE|MACE\n      \u001b[90mpmid:\u001b[0m 30598355\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m beta blocker|beta-blocker|mortality|amputatio ... io|confidence interval|endovascular|CLTI|MALE\n      \u001b[90mpmid:\u001b[0m 35723018\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m beta blocker|beta-blocker|mortality|amputatio ... d ratio|confidence interval|endovascular|CLTI\n      \u001b[90mpmid:\u001b[0m 36416475\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m beta blocker|beta-blocker|mortality|amputatio ... nfidence interval|endovascular|infrapopliteal\n      \u001b[90mpmid:\u001b[0m 37568548\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m beta blocker|beta-blocker|mortality|patency|m ... io|confidence interval|critical limb ischemia\n      \u001b[90mpmid:\u001b[0m 18381138\n\n=== PMID: 30598355 ===\n\nTitle: Preoperative beta blockade is associated with increased rates of 30-day major adverse cardiac events in critical limb ischemia patients undergoing infrainguinal revascularization.\n\nJournal/Date: Journal of vascular surgery (2019)\n\nMeSH Keywords: Adrenergic beta-Antagonists, Aged, Aged, 80 and over, Amputation, Surgical, Critical Illness, Databases, Factual, Drug Administration Schedule, Endovascular Procedures\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: The association between beta blockers and cardiovascular or limb-related outcomes after revascularization for critical limb ischemia (CLI) remains unclear. The objective of this study was to assess the impact of preoperative beta blockade on 30-day major adverse cardiac events (MACEs) and major adverse limb events (MALEs) in patients undergoing infrainguinal revascularization for CLI. We hypothesized that rates of MALEs and MACEs will be higher in patients not receiving preoperative beta blockade.\n[METHODS]: The National Surgical Quality Improvement Program vascular targeted file for 2011 to 2014 identified patients receiving beta blockade and undergoing infrainguinal endovascular intervention and open bypass for CLI. Primary outcomes including 30-day MACE (stroke, myocardial infarction [MI], or death) and MALE (untreated loss of patency, reintervention, or amputation) were compared between patients taking and not taking preoperative beta blockers. Multivariate logistic regression identified independent predictors of MACEs and MALEs.\n[RESULTS]: A total of 11,785 revascularizations were performed for CLI during the study period (7408 bypasses vs 4377 endovascular interventions). Preoperative beta blockers were used by 7365 patients, including 4541 (61.7%) in the open bypass cohort and 2824 (64.5%) in the endovascular group (P < .01). MACEs and MI were significantly higher in patients with preoperative beta blockers (MACEs, 5.8% vs 3.4% [P < .0001]; MI, 3.1% vs 1.8% [P < .0001]). After controlling for cardiac risk factors, beta blockers independently predicted MACEs (odds ratio [OR], 1.27; P = .03) and MI (OR, 1.36; P = .03) but not stroke (OR, 1.17; P = .58) or 30-day mortality (OR, 1.22; P = .19). Beta-blocker use did not have an effect on MALEs (OR, 0.99; P = .88).\n[CONCLUSIONS]: In patients with CLI, preoperative beta blockade was an independent predictor of 30-day MI and MACEs after controlling for other cardiovascular risk factors. Beta blockers did not have an impact on short-term limb-related outcomes. The association between beta blockade and revascularization for CLI deserves further investigation.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_mtxHiAoTscg0xVr6erjZvuQm",
+    "parent_tool_call_id": "call_m6nE1g2IN8LBGLfKFKJBiL5i",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "beta blocker|beta-blocker|mortality|patency|major adverse cardiovascular|hazard ratio|confidence interval|critical limb ischemia",
+      "pmid": "18381138"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('18381138')\noutput = format_paper_content_output(result, filter_keywords='beta blocker|beta-blocker|mortality|patency|major adverse cardiovascular|hazard ratio|confidence interval|critical limb ischemia')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 18381138 ===\n\nTitle: Statins are independently associated with reduced mortality in patients undergoing infrainguinal bypass graft surgery for critical limb ischemia.\n\nJournal/Date: Journal of vascular surgery (2008)\n\nMeSH Keywords: Adrenergic beta-Antagonists, Aged, Arteriosclerosis, Cardiotonic Agents, Cardiovascular Diseases, Female, Graft Survival, Humans\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: Evidence suggesting a beneficial effect of cardioprotective medications in patients with lower extremity atherosclerosis derives largely from secondary prevention studies of heterogeneous populations. Patients with critical limb ischemia (CLI) have a large atherosclerotic burden with related high mortality. The effect of such therapies in this population is largely inferred and unproven.\n[METHODS]: The Project of Ex-Vivo vein graft Engineering via Transfection III (PREVENT III) cohort comprised 1404 patients with CLI who underwent lower extremity bypass grafting in a multicenter, randomized prospective trial testing the efficacy of edifoligide for the prevention of graft failure. Propensity scores were used to evaluate the influence of statins, beta-blockers, and antiplatelet agents on outcomes while adjusting for demographics, comorbidities, medications, and surgical variables that may influence drug use. Primary outcomes were major adverse cardiovascular events < or =30 days, vein graft patency, and 1-year survival assessed by Kaplan-Meier method. Potential determinants of 1-year survival were modeled using a multivariate Cox regression.\n[RESULTS]: In this cohort, 636 patients (45%) were taking statins, 835 (59%) were taking beta-blockers, and 1121 (80%) were taking antiplatelet drugs. Perioperative major adverse cardiovascular events (7.8%) and early mortality (2.7%) were not measurably affected by the use of any drug class. Statin use was associated with a significant survival advantage at 1 year of 86% vs 81% (hazard ratio [HR], 0.71; 95% confidence interval [CI], 0.52-0.98; P = .03) by analysis of both unweighted and propensity score-weighted data. Use of beta-blockers and antiplatelet drugs had no appreciable impact on survival. None of the drug classes were associated with graft patency measures at 1 year. Significant predictors of 1-year mortality by Cox regression modeling were statin use (HR, 0.67; 95% CI, 0.51-0.90; P = .001), age >75 (HR, 2.1; 95% CI, 1.60-2.82; P = .001), coronary artery disease (HR, 1.5; 95% CI, 1.15-2.01; P = .001), chronic kidney disease stages 4 (HR, 2.0; 95% CI, 1.17-3.55; P = .001) and 5 (HR, 3.4; 95% CI, 2.39-4.73; P < .001), and tissue loss (HR, 1.9; 95% CI, 1.23-2.80; P = .003).\n[CONCLUSIONS]: Statin use is associated with improved survival in CLI patients 1 year after surgical revascularization. Further studies are indicated to determine optimal dosing in this population and to definitively address the question of relationship to graft patency. These data add to the growing literature supporting statin use in patients with advanced peripheral arterial disease.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_TSaiDw0BtJ5CsOuchLOHpnFb",
+    "parent_tool_call_id": "call_mtxHiAoTscg0xVr6erjZvuQm",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The most direct CLI revascularization study was a retrospective NSQIP vascular-targeted analysis (2011–2014; 11,785 infrainguinal revascularizations, including 4,377 endovascular procedures). Preoperative beta-blocker use was present in 2,824/4,377 (64.5%) endovascular cases versus nonuse. Across CLI revascularizations, beta-blocker users had higher unadjusted 30-day MACE (5.8% vs 3.4%) and MI (3.1% vs 1.8%); adjusted beta-blocker use remained associated with MACE (OR 1.27, p=0.03) and MI (OR 1.36, p=0.03), but not stroke (OR 1.17, p=0.58), 30-day mortality (OR 1.22, p=0.19), or MALE (OR 0.99, p=0.88). MALE included untreated loss of patency, reintervention, or amputation. Thus, this study does not show worsened short-term limb outcomes after revascularization, although it reports a modest association with cardiac events.",
+          "source_tools": [
+            {
+              "relevance": "Direct clinical CLI revascularization study with beta-blocker vs nonuse and effect estimates",
+              "tool_call_id": "call_Ys5DLShtPnnGermt816s0VPr"
+            }
+          ]
+        },
+        {
+          "finding": "A prospective ACC PVI Registry–Medicare-linked cohort of 1,758 patients aged ≥65 years undergoing CLTI peripheral vascular intervention reported high 1-year event rates—MACE 29.5% and MALE 34.0%—but the abstract's independent predictors were renal, cardiac, prior bypass, lung disease, and procedural factors; beta-blocker use was not identified as a predictor in the reported results. The available extract does not provide a beta-blocker-specific hazard ratio, so it cannot establish benefit or harm from beta-blockers.",
+          "source_tools": [
+            {
+              "relevance": "Direct CLTI endovascular cohort; establishes outcomes and absence of a reported beta-blocker-specific estimate in the extract",
+              "tool_call_id": "call_t8D4FjqmJyyoZAGYt1IqI49f"
+            }
+          ]
+        },
+        {
+          "finding": "A prospective multicenter observational EVT study (692 patients, 808 limbs; 21% CLTI) found 3-year MACE of 42.3% and reintervention of 46.8% in CLTI, but its reported independent predictors were D-dimer, age, functional status, ESRD, ESR, and infrainguinal intervention—not beta-blocker use. It therefore provides context for CLTI prognosis but no direct beta-blocker effect estimate; wound healing and patency were not reported as beta-blocker comparisons in the available abstract.",
+          "source_tools": [
+            {
+              "relevance": "Prospective endovascular CLTI outcomes study with medication covariates but no beta-blocker-specific result in the extract",
+              "tool_call_id": "call_o3YdkBBMbsEgPtEmt80k0E4R"
+            }
+          ]
+        },
+        {
+          "finding": "The best complementary medication analysis was not endovascular and therefore should not be generalized directly: in 1,404 CLI patients undergoing infrainguinal bypass, 835 (59%) used beta-blockers; perioperative MACE (7.8%), early mortality (2.7%), 1-year survival, and 1-year graft patency were not appreciably affected by beta-blocker use after propensity-score analyses. This supports lack of an obvious limb-patency or survival signal, but the intervention was open bypass rather than endovascular therapy.",
+          "source_tools": [
+            {
+              "relevance": "CLI beta-blocker comparison with propensity adjustment and mortality/patency endpoints, but open bypass population",
+              "tool_call_id": "call_mtxHiAoTscg0xVr6erjZvuQm"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: available direct evidence does not support the claim that beta-blockers worsen limb outcomes (mortality, amputation, patency/MALE) after endovascular revascularization for CLI/CLTI. One large observational study found higher adjusted short-term MACE/MI, but no increase in mortality or MALE; other endovascular cohorts do not report beta-blocker-specific harm estimates. Because treatment was nonrandomized, confounding by indication and comorbidity (e.g., coronary disease, heart failure, hypertension) and incomplete medication/dose/adherence information limit causal interpretation. The evidence supports association only, not causation, and is insufficient to recommend routine beta-blocker discontinuation when there is a compelling cardiac indication.",
+          "source_tools": [
+            {
+              "relevance": "Synthesis directly supported by the primary CLI revascularization comparison",
+              "tool_call_id": "call_Ys5DLShtPnnGermt816s0VPr"
+            },
+            {
+              "relevance": "Endovascular CLTI cohort context and lack of beta-blocker-specific predictors",
+              "tool_call_id": "call_t8D4FjqmJyyoZAGYt1IqI49f"
+            },
+            {
+              "relevance": "Propensity-adjusted complementary CLI medication evidence",
+              "tool_call_id": "call_mtxHiAoTscg0xVr6erjZvuQm"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_vRpr4mPlPUzvGWkqRZn5vU8J",
+    "parent_tool_call_id": "call_3CuG14wwhDQD5kmJ4VOwPYah",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "FINDING",
+          "name": "CLI beta-blocker outcomes",
+          "observations": [
+            "Retrospective NSQIP CLI revascularization cohort (2011–2014; 11,785 infrainguinal cases) associated beta-blocker use with adjusted 30-day MACE (OR 1.27, p=0.03) and MI (OR 1.36, p=0.03), but not mortality (OR 1.22, p=0.19) or MALE (OR 0.99, p=0.88); MALE included patency loss, reintervention, or amputation.",
+            "The analysis included 4,377 endovascular procedures, but adjusted estimates were reported across revascularization modalities; observational design and confounding limit causal inference."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct clinical study on beta-blocker use and CLI revascularization outcomes",
+              "tool_call_id": "call_Ys5DLShtPnnGermt816s0VPr"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "CLTI EVT evidence limits",
+          "observations": [
+            "Available CLTI endovascular cohorts did not report beta-blocker-specific limb outcome estimates; absence of a reported association is not proof of no effect.",
+            "Evidence does not justify routine beta-blocker discontinuation solely due to CLI or endovascular therapy; weigh cardiac indication and individual perioperative risks."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Synthesis of endovascular cohort findings and evidence limitations",
+              "tool_call_id": "call_Ys5DLShtPnnGermt816s0VPr"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": null
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 2, \"entities\": [{\"name\": \"CLI beta-blocker outcomes\", \"entityType\": \"FINDING\", \"observations\": [\"Retrospective NSQIP CLI revascularization cohort (2011\\u20132014; 11,785 infrainguinal cases) associated beta-blocker use with adjusted 30-day MACE (OR 1.27, p=0.03) and MI (OR 1.36, p=0.03), but not mortality (OR 1.22, p=0.19) or MALE (OR 0.99, p=0.88); MALE included patency loss, reintervention, or amputation.\", \"The analysis included 4,377 endovascular procedures, but adjusted estimates were reported across revascularization modalities; observational design and confounding limit causal inference.\"]}, {\"name\": \"CLTI EVT evidence limits\", \"entityType\": \"FINDING\", \"observations\": [\"Available CLTI endovascular cohorts did not report beta-blocker-specific limb outcome estimates; absence of a reported association is not proof of no effect.\", \"Evidence does not justify routine beta-blocker discontinuation solely due to CLI or endovascular therapy; weigh cardiac indication and individual perioperative risks.\"]}]}}, \"provenance\": {\"tool_call_id\": \"call_vRpr4mPlPUzvGWkqRZn5vU8J\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_3CuG14wwhDQD5kmJ4VOwPYah\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

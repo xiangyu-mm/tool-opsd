@@ -1,0 +1,1 @@
+{"answer": "(4R,5S)-5-(4-hydroxyphenyl)-4-(3-methyl-4-phenylmethoxybenzoyl)-1-(3-morpholin-4-ylpropyl)pyrrolidine-2,3-dione"}

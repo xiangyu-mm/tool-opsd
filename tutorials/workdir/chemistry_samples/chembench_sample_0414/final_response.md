@@ -1,0 +1,1 @@
+{"answer":"[(2S)-1-[4-[(2,6-dimethylpyrimidin-4-yl)sulfamoyl]anilino]-1-oxohexan-2-yl] 3,4-dimethylbenzoate"}

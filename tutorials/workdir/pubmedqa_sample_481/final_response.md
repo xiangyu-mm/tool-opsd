@@ -1,0 +1,5 @@
+The evidence supports the claim, with an important qualification. In the reported mouse and cardiomyocyte models, reduced AMPK activity protected against paraquat-induced cardiac contractile and calcium-handling dysfunction and reduced autophagy-pathway signaling. Pharmacologic autophagy inhibition also attenuated contractile injury, supporting autophagy’s role in the mechanism (PMID: 25092649; search evidence: `call_6bdShuQ6UDYeairmwOO4QOu0`).
+
+However, the evidence summarized here does not establish that autophagy is strictly necessary: it lacks reported genetic autophagy disruption or a definitive experiment reversing the protection by restoring autophagy. Thus, “autophagy-dependent” is supported by the study’s pharmacologic evidence but should be interpreted cautiously.
+
+FINAL DECISION: YES

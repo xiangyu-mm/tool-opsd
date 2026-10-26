@@ -1,0 +1,527 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_t2AQYIXkAxYhZfk2lN5DrNWq",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether nocturnal intermittent hypoxia, especially obstructive sleep apnea, promotes progression or greater severity of pediatric non-alcoholic fatty liver disease (NAFLD/MASLD) through oxidative stress. Find pediatric human studies linking OSA/nocturnal hypoxemia to liver steatosis, NASH, fibrosis, ALT/AST, or oxidative-stress biomarkers; summarize direction, strength, confounding by obesity, and mechanistic evidence. Include key PMID or study identifiers where available, and distinguish pediatric from adult evidence."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "unified_disease_search",
+    "tool_call_id": "call_R2ViOb9z19FW2ANoOMSdwJcg",
+    "parent_tool_call_id": "call_t2AQYIXkAxYhZfk2lN5DrNWq",
+    "round": 1,
+    "tool_input": {
+      "context_tool_call_ids": [],
+      "limit_per_source": 5,
+      "search_term": "pediatric nonalcoholic fatty liver disease MASLD",
+      "sources": [
+        "biothings",
+        "kegg",
+        "opentargets"
+      ],
+      "task_name": "pediatric NAFLD"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.diseases import search_diseases_unified\n\n# Perform unified disease search across multiple sources\nresults, output = search_diseases_unified(\n    search_term='pediatric nonalcoholic fatty liver disease MASLD',\n    limit_per_source=5,\n    sources=['biothings', 'kegg', 'opentargets'],\n    save_path='/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_NAFLD.json',\n)\n\n# Display formatted output\nprint(output)\n\n```\n\n### Output:\n# Unified Disease Search Results\n\n## Search Term: 'pediatric nonalcoholic fatty liver disease MASLD'\n\n**Total results:** 0 across 3 sources\n\n### Results by Source:\n- **BioThings (MyDisease.info):** Found 0 diseases in 1ms\n- **KEGG Disease:** Found 0 diseases\n- **Open Targets:** Found 0 diseases\n\n================================================================================\n\n\n================================================================================\n\n## Aggregated Information\n\n\n**Results saved to:** /home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_NAFLD.json\n\n\n*Executed locally (no sandbox)*",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_8w6pGosX36Go2g0TvFJBhLBJ",
+    "parent_tool_call_id": "call_t2AQYIXkAxYhZfk2lN5DrNWq",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "pediatric obstructive sleep apnea nonalcoholic fatty liver disease",
+      "task_name": "pediatric OSA NAFLD",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='pediatric obstructive sleep apnea nonalcoholic fatty liver disease',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='pediatric obstructive sleep apnea nonalcoholic fatty liver disease',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_OSA_NAFLD.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_OSA_NAFLD.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_OSA_NAFLD.csv'\nTotal results found: 40\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 35927921\nTitle: Childhood Obesity: An Updated Review.\nSource: Current pediatric reviews (2024)\nAbstract: BACKGROUND: Childhood obesity is an important and serious public health problem worldwide. OBJECTIVE: This article aims to familiarize physicians with the evaluation, management, and prevention of childhood. METHODS: A PubMed search was conducted in May, 2021, in Clinical Queries using the key terms \"obesity\" OR \"obese\". The search included clinical trials, randomized controlled trials, case-control studies, cohort studies, meta-analyses, observational studies, clinical guidelines, case reports, case series, and reviews. The search was restricted to English literature and children. The information retrieved from the above search was used in the compilation of the present article. RESULTS: Most obese children have exogenous obesity characterized by a growth rate for height above the 50th percentile, normal intelligence, normal genitalia, and lack of historical or physical evidence of an endocrine abnormality or a congenital syndrome. Obese children are at risk for dyslipidemia, hypertension, diabetes mellitus, non-alcoholic fatty liver disease, obstructive sleep apnea, psychosocial disturbances, impaired quality of life, and shorter life expectancy. The multitude of serious comorbid ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 39848671\nTitle: Metabolic dysfunction-associated steatotic liver disease in children.\nSource: Gut (2025)\nAbstract: Metabolic dysfunction-associated steatotic liver disease (MASLD), previously known as non-alcoholic fatty liver disease, is the most common cause of chronic liver disease in children. MASLD encompasses a spectrum of liver disease and can be severe, with 10% of affected children presenting with advanced fibrosis. While biopsy remains the most accurate method for diagnosing and staging the disease, MRI proton density fat fraction and magnetic resonance elastography are the most reliable non-invasive measures for assessing steatosis and fibrosis, respectively. MASLD is associated with multiple comorbidities including type 2 diabetes, hypertension, dyslipidaemia, decreased bone mineral density, obstructive sleep apnoea, anxiety and depression. Currently, there are no pharmacological treatments available for children, highlighting the urgent need for paediatric clinical trials. A diet low in free sugars is promising for reducing steatosis and decreasing alanine aminotransferase, a surrogate marker for hepatic inflammation. Emerging data indicate that steatosis can be present in children under 6 years of age, which was previously considered rare. The intricate interplay of genetics may i ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 26298775\nTitle: Evaluation of circulating markers of hepatic apoptosis and inflammation in obese children with and without obstructive sleep apnea.\nSource: Sleep medicine (2015)\nAbstract: OBJECTIVE: Hepatocyte apoptosis and macrophage activation contribute to the disease progression of nonalcoholic fatty liver disease (NAFLD). Obstructive sleep apnea (OSA) in obese children is associated with the severity of NAFLD. The aim of this study was to evaluate plasma levels of soluble Fas (sFas), soluble Fas ligand (sFasL), cytokeratin 18 (CK18) (markers of apoptosis), and soluble CD163 (sCD163) (marker of macrophage activation) in obese children with and without OSA. METHODS: Consecutive obese children who were evaluated for OSA were recruited. The diagnosis of OSA was made using overnight polysomnography (PSG). Fasting blood samples were used to determine plasma CK18, sFas, sFasL, and sCD163 levels using specific sandwich enzyme-linked immunosorbent assay (ELISA). RESULTS: Fifty-eight subjects were included in the analysis with a mean age of 8.9 ± 3.2 years and a mean body mass index (BMI) z-score of 2.4 ± 0.49. Circulating sFas and sFasL levels were significantly lower in subjects with mild and severe OSA compared with those without OSA (p < 0.005 for both). In addition, sCD163 levels increased with an increasing severity of OSA (no OSA = 1.6 ± 0.25 mg/L, mild OSA = 2.3  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 27324067\nTitle: Nonalcoholic fatty liver disease and obstructive sleep apnea.\nSource: Metabolism: clinical and experimental (2016)\nAbstract: Obstructive sleep apnea (OSA) and more importantly its hallmark, chronic intermittent hypoxia (CIH), are established factors in the pathogenesis and exacerbation of nonalcoholic fatty liver disease (NAFLD). This has been clearly demonstrated in rodent models exposed to intermittent hypoxia, and strong evidence now also exists in both paediatric and adult human populations. OSA and CIH induce insulin-resistance and dyslipidemia which are involved in NAFLD physiopathogenesis. CIH increases the expression of the hypoxia inducible transcription factor HIF1α and that of downstream genes involved in lipogenesis, thereby increasing β-oxidation and consequently exacerbating liver oxidative stress. OSA also disrupts the gut liver axis, increasing intestinal permeability and with a possible role of gut microbiota in the link between OSA and NAFLD. OSA patients should be screened for NAFLD and vice versa those with NAFLD for OSA. To date there is no evidence that treating OSA with continuous positive airway pressure (CPAP) will improve NAFLD but it might at least stabilize and slow its progression. Nevertheless, these multimorbid patients should be efficiently treated for all their metabolic  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 33511092\nTitle: Childhood and Adolescent Obesity: A Review.\nSource: Frontiers in pediatrics (2020)\nAbstract: Obesity is a complex condition that interweaves biological, developmental, environmental, behavioral, and genetic factors; it is a significant public health problem. The most common cause of obesity throughout childhood and adolescence is an inequity in energy balance; that is, excess caloric intake without appropriate caloric expenditure. Adiposity rebound (AR) in early childhood is a risk factor for obesity in adolescence and adulthood. The increasing prevalence of childhood and adolescent obesity is associated with a rise in comorbidities previously identified in the adult population, such as Type 2 Diabetes Mellitus, Hypertension, Non-alcoholic Fatty Liver disease (NAFLD), Obstructive Sleep Apnea (OSA), and Dyslipidemia. Due to the lack of a single treatment option to address obesity, clinicians have generally relied on counseling dietary changes and exercise. Due to psychosocial issues that may accompany adolescence regarding body habitus, this approach can have negative results. Teens can develop unhealthy eating habits that result in Bulimia Nervosa (BN), Binge- Eating Disorder (BED), or Night eating syndrome (NES). Others can develop Anorexia Nervosa (AN) as they attempt to ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 28065514\nTitle: Review of Childhood Obesity: From Epidemiology, Etiology, and Comorbidities to Clinical Assessment and Treatment.\nSource: Mayo Clinic proceedings (2017)\nAbstract: Childhood obesity has emerged as an important public health problem in the United States and other countries in the world. Currently 1 in 3 children in the United States is afflicted with overweight or obesity. The increasing prevalence of childhood obesity is associated with emergence of comorbidities previously considered to be \"adult\" diseases including type 2 diabetes mellitus, hypertension, nonalcoholic fatty liver disease, obstructive sleep apnea, and dyslipidemia. The most common cause of obesity in children is a positive energy balance due to caloric intake in excess of caloric expenditure combined with a genetic predisposition for weight gain. Most obese children do not have an underlying endocrine or single genetic cause for their weight gain. Evaluation of children with obesity is aimed at determining the cause of weight gain and assessing for comorbidities resulting from excess weight. Family-based lifestyle interventions, including dietary modifications and increased physical activity, are the cornerstone of weight management in children. A staged approach to pediatric weight management is recommended with consideration of the age of the child, severity of obesity, and ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 32416862\nTitle: The effect of sleep on gastrointestinal functioning in common digestive diseases.\nSource: The lancet. Gastroenterology & hepatology (2020)\nAbstract: Sleep quality and sleep disorders affect symptom manifestation and the pathogenesis of digestive diseases. Sleep is largely regulated by the light-dark cycle and associated circadian rhythms. These occurrences are closely regulated through several mechanisms with direct effects on the gastrointestinal tract. Misalignment of the circadian system is a common cause of sleep complaints, which play an important role in the presentation of many gastrointestinal disorders. This Review will focus on sleep disorders and how these alterations in sleep play an important role in many commonly encountered digestive diseases, such as gastro-oesophageal reflux disease, irritable bowel syndrome, inflammatory bowel disease, and non-alcoholic fatty liver disease. Therapeutic interventions focusing on resolving sleep disorders could optimise treatment and improve quality of life in these patients.\n--------------------------------------------------------------------------------\nPMID: 32881371\nTitle: Association between obstructive sleep apnea and non-alcoholic fatty liver disease in pediatric patients: a meta-analysis.\nSource: Pediatric obesity (2021)\nAbstract: BACKGROUND: Some studies have reported a relationship between obstructive sleep apnea (OSA) and non-alcoholic fatty liver disease (NAFLD) in pediatric population. However, this issue remains controversial. OBJECTIVES: The purpose of the present study was to investigate the association between OSA and NAFLD in pediatric population. METHODS: We systematically searched PubMed, Web of Science, Embase for eligible studies. The data involving markers of NAFLD including alanine aminotransferase (ALT), aspartate aminotransferase (AST), hepatic inflammation, hepatic fibrosis of both OSA group and control group were extracted. Pooled standardised mean difference (SMD) and weighted mean difference (WMD) were appropriately calculated through a fixed or random-effect model. RESULTS: Nine cross-sectional studies with 1133 children and adolescents were included. OSA was significantly associated with ALT, AST, and NAFLD fibrosis stage, but not NAFLD inflammation grade. Subgroup analysis indicated that both mild OSA and severe OSA were significantly associated with elevated ALT and AST. Furthermore, in the studies with all main confounding factors (age, gender, and BMI) matched, OSA group had highe ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 35465068\nTitle: Nonalcoholic Fatty Liver Disease in Children.\nSource: Gastroenterology & hepatology (2021)\nAbstract: Nonalcoholic fatty liver disease (NAFLD) is the most common chronic liver disease worldwide. It represents a spectrum of disease from simple hepatic steatosis to steatohepatitis that may develop into progressive hepatic fibrosis and even cirrhosis. NAFLD is the most rapidly increasing indication for liver transplantation in adults. In children, the incidence of NAFLD has also increased over the past decade. Although the majority of children with NAFLD are overweight or obese, there is an increasing subset of children with normal body mass index with so-called lean NAFLD. NAFLD in children is associated with several extrahepatic manifestations, including hyperlipidemia, insulin resistance, and obstructive sleep apnea. The pathogenesis of NAFLD in children involves a multifactorial interaction among genetics, in utero exposures, early childhood exposures, and ongoing nutritional exposures. Although there are some similarities between pediatric NAFLD and adult NAFLD, liver biopsies in children show histologic differences between the two. The current standard-of-care treatment of NAFLD in children is lifestyle change to decrease caloric intake and increase physical activity. There are  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 39744912\nTitle: The Rise of Type 2 Diabetes in Children and Adolescents: An Emerging Pandemic.\nSource: Diabetes/metabolism research and reviews (2025)\nAbstract: AIM: This review explores the increasing prevalence of Type 2 Diabetes Mellitus (T2DM) in children and adolescents, focusing on its etiology, risk factors, complications, and the importance of early detection and management. It also highlights the need for a multidisciplinary, family-centered approach in managing T2DM in pediatric populations, with an emphasis on nutrition, exercise, and lifestyle interventions. MATERIALS AND METHODS: A literature review was conducted using PubMed, Google Scholar, and Scopus to incorporate studies from 2015 to 2024 on T2DM in youths/adolescents/children, focusing on epidemiology, risk factors, and prevention strategies. Studies on Type 1 Diabetes Mellitus (T1DM) or adult populations were excluded. RESULTS: T2DM is a complex metabolic disorder with various societal, behavioral, environmental, and genetic risk factors. It accounts for one in three new childhood diabetes cases, with rising incidence among American Indian/Alaska Native, Black, and Hispanic/Latino children. The increase in T2DM incidence correlates with growing childhood obesity rates. Early onset significantly raises the risk of complications like retinopathy, nephropathy, neuropathy,  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 37495346\nTitle: Metabolic-Associated Fatty Liver Disease: A Disastrous Human Health Challenge.\nSource: Endocrinology and metabolism clinics of North America (2023)\nAbstract: The pathobiology of MAFLD is such a big puzzle, and many of the metabolic and other health consequences of the disease are not yet fully elucidated. In their review on \"Pathobiology of metabolic-associated fatty liver disease,\" Fouda and colleagues update the current evidence on the disease characteristics. The prevalence of MAFLD has reached epidemic proportions in children and young adults in the recent years, with figures reaching as high as 15% owing to the global obesity pandemic. Vespoli and colleagues in their review \"MAFLD in childhood and adolescence\" portray the latest updates and new emerging therapies for pediatric MAFLD. Gofton and colleagues update the association between metabolically unhealthy visceral adiposity and MAFLD in individuals with \"normal body weight\" in their review \"Lean MAFLD.\" The pathobiological link between dyslipidemia and MAFLD is elaborated by Anwar and colleagues with the therapeutic algorithms. Ren and colleagues summarize evidence surrounding cardiovascular disease and MAFLD and analyze management strategies focusing on prevention of cardiovascular disease in MAFLD. Another important review by Kapoor and Kalra discusses the hot topic of diabet ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 36694611\nTitle: Relationship between Obstructive Sleep Apnea and Liver Abnormalities in Older Patients: A Cross-Sectional Study.\nSource: International journal of clinical practice (2023)\nAbstract: BACKGROUND: Older age is a risk factor for obstructive sleep apnea (OSA), which is associated with the development of nonalcoholic fatty liver disease (NAFLD). We aimed to investigate the correlation between OSA and liver injury among older patients. Study Design. This is a cross-sectional study. METHODS: Consecutive older (≥60 years) snoring patients were included. Subjects were divided into no OSA, mild OSA, moderate OSA, and severe OSA groups according to the apnea-hypopnea index (AHI) and were also separated into liver injury and nonliver injury groups based on liver function. Logistic regression analysis was applied to analyze the independent risk factors for liver injury. RESULTS: We studied 227 patients (155 male, 72 female). The prevalence of liver injury exhibited an increasing trend among groups with mild-to-severe OSA. In addition, body mass index, AHI, and TG showed significant differences between the liver injury and nonliver injury groups. Logistic regression analysis revealed that AHI and TG were the major contributing factors for liver injury in older patients (adjusted odds ratio [OR] = 1.055, p=0.013, and OR = 1.485, p=0.039, respectively). CONCLUSIONS: Older pati ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 29377201\nTitle: Cardiometabolic risk in obese children.\nSource: Annals of the New York Academy of Sciences (2018)\nAbstract: Obesity in childhood remains a significant and prevalent public health concern. Excess adiposity in youth is a marker of increased cardiometabolic risk (CMR) in adolescents and adults. Several longitudinal studies confirm the strong association of pediatric obesity with the persistence of adult obesity and the future development of cardiovascular disease, diabetes, and increased risk of death. The economic and social impact of childhood obesity is further exacerbated by the early onset of the chronic disease burden in young adults during their peak productivity years. Furthermore, rising prevalence rates of severe obesity in youth from disadvantaged and/or minority backgrounds have prompted the creation of additional classification schemes for severe obesity to improve CMR stratification. Current guidelines focus on primary obesity prevention efforts, as well as screening for clustering of multiple CMR factors to target interventions. This review summarizes the scope of the pediatric obesity epidemic, the new severe obesity classification scheme, and examines the association of excess adiposity with cardiovascular and metabolic risk. We will also discuss potential questions for fut ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 29752170\nTitle: Treating Obstructive Sleep Apnea and Chronic Intermittent Hypoxia Improves the Severity of Nonalcoholic Fatty Liver Disease in Children.\nSource: The Journal of pediatrics (2018)\nAbstract: OBJECTIVE: To determine the effects of treating obstructive sleep apnea/nocturnal hypoxia on pediatric nonalcoholic fatty liver disease (NAFLD) severity and oxidative stress. STUDY DESIGN: Biopsy proven participants (n = 9) with NAFLD and obstructive sleep apnea/hypoxia were studied before and after treatment with continuous positive airway pressure (CPAP) for sleep disordered breathing, including laboratory testing and markers of oxidative stress, urine F(2)-isoprostanes. RESULTS: Adolescents (age 11.5 ± 1.2 years; body mass index, 29.5 ± 3.8 kg/m2) with significant NAFLD (mean histologic necroinflammation grade, 2.3 ± 0.9; fibrosis stage, 1.4 ± 1.3; NAFLD Activity Score summary, 4.8 ± 1.6) had obstructive sleep apnea/hypoxia by polysomnography. At baseline, they had severe obstructive sleep apnea/hypoxia, elevated aminotransferases, the metabolic syndrome, and significant oxidative stress (high F(2)-isoprostanes). Obstructive sleep apnea/hypoxia was treated with home CPAP for a mean 89 ± 62 days. Although body mass index increased, obstructive sleep apnea/hypoxia severity improved on CPAP and was accompanied by reduced alanine aminotransferase, metabolic syndrome markers, and F(2 ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 17033514\nTitle: Pediatric nonalcoholic fatty liver disease: a critical appraisal of current data and implications for future research.\nSource: Journal of pediatric gastroenterology and nutrition (2006)\nAbstract: Although population prevalence is very difficult to establish, nonalcoholic fatty liver disease (NAFLD) is probably the most common cause of liver disease in the preadolescent and adolescent age groups. There seems to be an increase in the prevalence of NAFLD, likely related to the dramatic rise in the incidence of obesity during the past 3 decades. Despite an increase in public awareness, overweight/obesity and related conditions, such as NAFLD, remain underdiagnosed by health care providers. Accurate diagnosis and staging of nonalcoholic steatohepatitis (NASH) requires liver biopsy. The development of noninvasive surrogate markers and the advancements in imaging technology will aid in the screening of large populations at risk for NAFLD. Two distinct histological patterns of NASH have been identified in the pediatric population, and discrete clinical and demographic features are observed in children with these 2 patterns. The propensity for NASH to develop in obese, insulin-resistant pubertal boys of Hispanic ethnicity or a non-Hispanic white race may provide clues to the pathogenesis of NAFLD in children. The natural history of pediatric NASH has yet to be defined, but most biop ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_llibrkjB1luf1OzWIhlZmbi5",
+    "parent_tool_call_id": "call_t2AQYIXkAxYhZfk2lN5DrNWq",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "children nocturnal hypoxemia fatty liver ALT AST NASH fibrosis",
+      "task_name": "pediatric hypoxemia liver",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='children nocturnal hypoxemia fatty liver ALT AST NASH fibrosis',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='children nocturnal hypoxemia fatty liver ALT AST NASH fibrosis',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_hypoxemia_liver.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_hypoxemia_liver.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_hypoxemia_liver.csv'\nTotal results found: 20\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 37696927\nTitle: Effects of obstructive sleep apnea on non-alcoholic fatty liver disease in patients with obesity: a systematic review\nSource: Int J Obes (Lond) (2023)\nAbstract: @DISEASE_Fatty_Liver @DISEASE_MESH:D005234 @@@<m>Fatty</m> <m>liver</m>@@@ index (FLI)\n--------------------------------------------------------------------------------\nPMID: 36483151\nTitle: Management of non-alcoholic fatty liver disease patients with sleep apnea syndrome\nSource: World J Gastroenterol (2022)\nAbstract: Among them, the @DISEASE_Fibrosis @DISEASE_MESH:D005355 @@@<m>fibrosis</m>@@@-4 index is the most widely studied and preferred simple noninvasive algorithm and it is used to evaluate the degree of @DISEASE_Liver_Cirrhosis @DISEASE_MESH:D008103 @@@<m>liver</m> <m>fibrosis</m>@@@ based on age and levels of platelet, @GENE_SLC17A5 @GENE_26503 @@@aspartate aminotransferase@@@ (@GENE_SLC17A5 @GENE_26503 @@@<m>AST</m>@@@) and @GENE_GPT @GENE_2875 @@@alanine aminotransferase@@@ (<m>ALT</m>).\n--------------------------------------------------------------------------------\nPMID: 33811619\nTitle: Association of obstructive sleep apnea with non-alcoholic fatty liver disease in patients with obesity: an observational study\nSource: Eat Weight Disord (2022)\nAbstract: Thus, meanSaO2% may represent a more precise parameter to describe and correlate @DISEASE_Sleep_Apnea_Obstructive @DISEASE_MESH:D020181 @@@OSA@@@ chronic intermittent @DISEASE_Hypoxia @DISEASE_MESH:D000860 @@@<m>hypoxia</m>@@@ to @DISEASE_Liver_Cirrhosis @DISEASE_MESH:D008103 @@@<m>liver</m> <m>fibrosis</m>@@@ scores.\n--------------------------------------------------------------------------------\nPMID: 38577533\nTitle: Non-alcoholic fatty liver disease and sleep disorders\nSource: World J Hepatol (2024)\nAbstract: After 3 months of treatment, both <m>ALT</m> and @GENE_SLC17A5 @GENE_26503 @@@<m>AST</m>@@@ levels decreased significantly.\n--------------------------------------------------------------------------------\nPMID: 37850091\nTitle: The impact of obstructive sleep apnea on nonalcoholic fatty liver disease\nSource: Front Endocrinol (Lausanne) (2023)\nAbstract: @GENE_HIF1A @GENE_3091 @@@HIF-1alpha@@@ is capable of regulating the release of @GENE_LOX @GENE_4015 @@@lysyl oxidase@@@ (@GENE_LOX @GENE_4015 @@@LOX@@@), an enzyme that crosslinks extracellular matrix proteins and promotes @DISEASE_Liver_Cirrhosis @DISEASE_MESH:D008103 @@@<m>liver</m> <m>fibrosis</m>@@@ in @DISEASE_Non_alcoholic_Fatty_Liver_Disease @DISEASE_MESH:D065626 @@@<m>NASH</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 33718398\nTitle: Oxidative Stress in Non-alcoholic Fatty Liver Disease. An Updated Mini Review\nSource: Front Med (Lausanne) (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39006248\nTitle: Association of Obstructive Sleep Apnea with Nonalcoholic Fatty Liver Disease: Evidence, Mechanism, and Treatment\nSource: Nat Sci Sleep (2024)\nAbstract: @DISEASE_Non_alcoholic_Fatty_Liver_Disease @DISEASE_MESH:D065626 @@@<m>NASH</m>@@@ may be followed by the development of @DISEASE_Fibrosis @DISEASE_MESH:D005355 @@@<m>fibrosis</m>@@@, @DISEASE_Liver_Cirrhosis @DISEASE_MESH:D008103 @@@<m>liver</m> cirrhosis@@@, @DISEASE_Liver_Failure @DISEASE_MESH:D017093 @@@<m>liver</m> failure@@@, and possibly @DISEASE_Carcinoma_Hepatocellular @DISEASE_MESH:D006528 @@@hepatocellular carcinoma@@@.\n--------------------------------------------------------------------------------\nPMID: 34769060\nTitle: Pathophysiological Molecular Mechanisms of Obesity: A Link between MAFLD and NASH with Cardiovascular Diseases\nSource: Int J Mol Sci (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40221799\nTitle: Special correlation between diet and MASLD: positive or negative?\nSource: Cell Biosci (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35967372\nTitle: Glycyrrhetinic acid regulates impaired macrophage autophagic flux in the treatment of non-alcoholic fatty liver disease\nSource: Front Immunol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37990723\nTitle: Metabolic, behavioral health, and disordered eating comorbidities associated with obesity in pediatric patients: An Obesity Medical Association (OMA) Clinical Practice Statement 2022\nSource: Obes Pillars (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39997697\nTitle: From Pathophysiology to Practice: Evolving Pharmacological Therapies, Clinical Complications, and Pharmacogenetic Considerations in Portal Hypertension\nSource: Metabolites (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 23087670\nTitle: Obstructive Sleep Apnea and Non-Alcoholic Fatty Liver Disease: Is the Liver Another Target?\nSource: Front Neurol (2012)\nAbstract: However, relationships between <m>nocturnal</m> @DISEASE_Hypoxia @DISEASE_MESH:D000860 @@@<m>hypoxemia</m>@@@ and @DISEASE_Fatty_Liver_Alcoholic @DISEASE_MESH:D005235 @@@<m>NASH</m>@@@ had not been examined.\n--------------------------------------------------------------------------------\nPMID: 24870112\nTitle: Association between nocturnal hypoxia and liver injury in the setting of nonalcoholic fatty liver disease\nSource: Sleep Breath (2015)\nAbstract: Association between <m>nocturnal</m> @DISEASE_Hypoxia @DISEASE_MESH:D000860 @@@<m>hypoxia</m>@@@ and @DISEASE_Liver_Failure @DISEASE_MESH:D017093 @@@<m>liver</m> injury@@@ in the setting of @DISEASE_Non_alcoholic_Fatty_Liver_Disease @DISEASE_MESH:D065626 @@@nonalcoholic <m>fatty</m> <m>liver</m> disease@@@\n--------------------------------------------------------------------------------\nPMID: 31334441\nTitle: Nocturnal Hypoxia Activation of the Hedgehog Signaling Pathway Affects Pediatric Nonalcoholic Fatty Liver Disease Severity\nSource: Hepatol Commun (2019)\nAbstract: <m>Nocturnal</m> @DISEASE_Hypoxia @DISEASE_MESH:D000860 @@@<m>Hypoxia</m>@@@ Activation of the Hedgehog Signaling Pathway Affects Pediatric @DISEASE_Non_alcoholic_Fatty_Liver_Disease @DISEASE_MESH:D065626 @@@Nonalcoholic <m>Fatty</m> <m>Liver</m> Disease@@@ Severity\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_bdVvKhTdXvy72eRmN3gqm4hG",
+    "parent_tool_call_id": "call_t2AQYIXkAxYhZfk2lN5DrNWq",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "children obstructive sleep apnea oxidative stress fatty liver",
+      "task_name": "pediatric OSA oxidative stress",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='children obstructive sleep apnea oxidative stress fatty liver',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='children obstructive sleep apnea oxidative stress fatty liver',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_OSA_oxidative_stress.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_OSA_oxidative_stress.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pediatric_OSA_oxidative_stress.csv'\nTotal results found: 27\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 32523319\nTitle: Association between non-alcoholic fatty liver disease and obstructive sleep apnea.\nSource: World journal of gastroenterology (2020)\nAbstract: BACKGROUND: Non-alcoholic fatty liver disease (NAFLD) is an emerging liver disease and currently the most common cause of incidental abnormal liver tests. The pathogenesis of NAFLD is multifactorial and many mechanisms that cause fatty liver infiltration, inflammation, oxidative stress and progressive fibrosis have been proposed. Obstructive sleep apnea (OSA) may be linked with the pathogenesis and the severity of NAFLD. AIM: To study the association between NAFLD and OSA considering also the efficacy of continuous positive airway pressure (CPAP) treatment. METHODS: A PubMed search was conducted using the terms \"non-alcoholic fatty liver disease AND (obstructive sleep apnea OR obstructive sleep disorders OR sleep apnea)\". Research was limited to title/abstract of articles published in English in the last 5 years; animal and child studies, case reports, commentaries, letters, editorials and meeting abstracts were not considered. Data were extracted on a standardized data collection table which included: First author, publication year, country, study design, number of patients involved, diagnosis and severity of OSA, diagnosis of NAFLD, patient characteristics, results of the study.  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 33718398\nTitle: Oxidative Stress in Non-alcoholic Fatty Liver Disease. An Updated Mini Review.\nSource: Frontiers in medicine (2021)\nAbstract: Non-alcoholic fatty liver disease (NAFLD) is a challenging disease caused by multiple factors, which may partly explain why it remains still orphan of an adequate therapeutic strategy. Herein we focus on the interplay between oxidative stress (OS) and the other causal pathogenetic factors. Different reactive oxygen species (ROS) generators contribute to NAFLD inflammatory and fibrotic progression, which is quite strictly linked to the lipotoxic liver injury from fatty acids and/or a wide variety of their biologically active metabolites in the context of either a two-hit or a (more recent) multiple parallel hits theory. An antioxidant defense system is usually able to protect hepatic cells from damaging effects caused by ROS, including those produced into the gastrointestinal tract, i.e., by-products generated by usual cellular metabolic processes, normal or dysbiotic microbiota, and/or diet through an enhanced gut-liver axis. Oxidative stress originating from the imbalance between ROS generation and antioxidant defenses is under the influence of individual genetic and epigenetic factors as well. Healthy diet and physical activity have been shown to be effective on NAFLD also with a ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 29752170\nTitle: Treating Obstructive Sleep Apnea and Chronic Intermittent Hypoxia Improves the Severity of Nonalcoholic Fatty Liver Disease in Children.\nSource: The Journal of pediatrics (2018)\nAbstract: OBJECTIVE: To determine the effects of treating obstructive sleep apnea/nocturnal hypoxia on pediatric nonalcoholic fatty liver disease (NAFLD) severity and oxidative stress. STUDY DESIGN: Biopsy proven participants (n = 9) with NAFLD and obstructive sleep apnea/hypoxia were studied before and after treatment with continuous positive airway pressure (CPAP) for sleep disordered breathing, including laboratory testing and markers of oxidative stress, urine F(2)-isoprostanes. RESULTS: Adolescents (age 11.5 ± 1.2 years; body mass index, 29.5 ± 3.8 kg/m2) with significant NAFLD (mean histologic necroinflammation grade, 2.3 ± 0.9; fibrosis stage, 1.4 ± 1.3; NAFLD Activity Score summary, 4.8 ± 1.6) had obstructive sleep apnea/hypoxia by polysomnography. At baseline, they had severe obstructive sleep apnea/hypoxia, elevated aminotransferases, the metabolic syndrome, and significant oxidative stress (high F(2)-isoprostanes). Obstructive sleep apnea/hypoxia was treated with home CPAP for a mean 89 ± 62 days. Although body mass index increased, obstructive sleep apnea/hypoxia severity improved on CPAP and was accompanied by reduced alanine aminotransferase, metabolic syndrome markers, and F(2 ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 27501737\nTitle: Nocturnal hypoxia in obese-related obstructive sleep apnea as a putative trigger of oxidative stress in pediatric NAFLD progression.\nSource: Journal of hepatology (2016)\nAbstract: \n--------------------------------------------------------------------------------\nPMID: 27501738\nTitle: Nocturnal hypoxia-induced oxidative stress promotes progression of pediatric non-alcoholic fatty liver disease.\nSource: Journal of hepatology (2016)\nAbstract: BACKGROUND & AIMS: Oxidative stress is proposed as a central mediator in NAFLD pathogenesis, but the specific trigger for reactive oxygen species generation has not been clearly delineated. In addition, emerging evidence shows that obesity related obstructive sleep apnea (OSA) and nocturnal hypoxia are associated with NAFLD progression in adults. The aim of this study was to determine if OSA/nocturnal hypoxia-induced oxidative stress promotes the progression of pediatric NAFLD. METHODS: Subjects with biopsy proven NAFLD and lean controls were studied. Subjects underwent polysomnograms, liver histology scoring, laboratory testing, urine F(2)-isoprostanes (measure of lipid peroxidation) and 4-hydroxynonenal liver immunohistochemistry (in situ hepatic lipid peroxidation). RESULTS: We studied 36 adolescents with NAFLD and 14 lean controls. The OSA/hypoxia group (69% of NAFLD subjects) had more severe fibrosis (64% stage 0-2; 36% stage 3) than those without OSA/hypoxia (100% stage 0-2), p=0.03. Higher F(2)-isoprostanes correlated with apnea/hypoxia index (r=0.39, p=0.03), % time SaO2 <90% (r=0.56, p=0.0008) and inversely with SaO2 nadir (r=-0.46, p=0.008). OSA/hypoxia was most severe in ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 42159625\nTitle: The triadic relationship between obesity, obstructive sleep apnea and metabolic dysfunction-associated steatotic liver disease in children: a scoping review.\nSource: Sleep & breathing = Schlaf & Atmung (2026)\nAbstract: PURPOSE: The aim of this scoping review is to provide a comprehensive overview of existing research exploring the potentially triadic relation between obesity, OSA, and MASLD in children. METHODS: A systematic literature search of PubMed and Web of Science was conducted in accordance with the PRISMA Extension for Scoping Review (PRISMA-ScR) guidelines. Following title and abstract screening, eligible studies were subjected to full-text assessment, resulting in the inclusion of 15 studies in the final review. RESULTS: The initial search identified 263 studies, of which 15 met the inclusion criteria following title and abstract screening and full-text review. Data extraction enabled a comprehensive synthesis of current evidence on the pairwise associations and the potential triadic relationship between obesity, OSA, and MASLD in children. The findings suggest that oxidative stress and inflammation are key underlying mechanisms contributing to this triadic interplay. CONCLUSION: Key causative factors identified for the triad between pediatric obesity, OSA, and MASLD encompass adipocyte dysfunction, hypoxia-induced IR, and inflammation. However, certain ambiguities remain. Future resea ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 28162008\nTitle: Clinical implications of understanding the association between oxidative stress and pediatric NAFLD.\nSource: Expert review of gastroenterology & hepatology (2017)\nAbstract: Oxidative stress is central to the pathogenesis of non-alcoholic steatohepatitis. The reactive oxygen species (ROS) that characterise oxidative stress are generated in several cellular sites and their production is influence by multi-organ interactions. Areas covered: Mitochondrial dysfunction is the main source of ROS in fatty liver and is closely related to endoplasmic reticulum stress. Both are caused by lipotoxicity and together these three factors form a cycle of progressive organelle damage, resulting in sterile inflammation and apoptosis. Adipose tissue inflammation and intestinal dysbiosis provide substrates for ROS formation and trigger immune activation. Obstructive sleep apnea and abnormal divalent metal metabolism may also play a role. Expert commentary: The majority of available high-quality data originates from studies in adults and there are fewer therapeutic trials performed in pediatric cohorts, therefore conclusions are generalised to children. Establishing the role of organelle interactions, and its relationship with oxidative stress in steatohepatitis, is a rapidly evolving area of research.\n--------------------------------------------------------------------------------\nPMID: 36483151\nTitle: Management of non-alcoholic fatty liver disease patients with sleep apnea syndrome\nSource: World J Gastroenterol (2022)\nAbstract: Management of @DISEASE_Non_alcoholic_Fatty_Liver_Disease @DISEASE_MESH:D065626 @@@non-alcoholic <m>fatty</m> <m>liver</m> disease@@@ @SPECIES_9606 @@@patients@@@ with @DISEASE_Sleep_Apnea_Syndromes @DISEASE_MESH:D012891 @@@<m>sleep</m> <m>apnea</m> syndrome@@@\n--------------------------------------------------------------------------------\nPMID: 39006248\nTitle: Association of Obstructive Sleep Apnea with Nonalcoholic Fatty Liver Disease: Evidence, Mechanism, and Treatment\nSource: Nat Sci Sleep (2024)\nAbstract: Association of @DISEASE_Sleep_Apnea_Obstructive @DISEASE_MESH:D020181 @@@<m>Obstructive</m> <m>Sleep</m> <m>Apnea</m>@@@ with @DISEASE_Non_alcoholic_Fatty_Liver_Disease @DISEASE_MESH:D065626 @@@Nonalcoholic <m>Fatty</m> <m>Liver</m> Disease@@@: Evidence, Mechanism, and Treatment\n--------------------------------------------------------------------------------\nPMID: 34828697\nTitle: Association between Hepatic Steatosis and Obstructive Sleep Apnea in Children and Adolescents with Obesity\nSource: Children (Basel) (2021)\nAbstract: Association between @DISEASE_Fatty_Liver @DISEASE_MESH:D005234 @@@Hepatic Steatosis@@@ and @DISEASE_Sleep_Apnea_Obstructive @DISEASE_MESH:D020181 @@@<m>Obstructive</m> <m>Sleep</m> <m>Apnea</m>@@@ in <m>Children</m> and Adolescents with @DISEASE_Obesity @DISEASE_MESH:D009765 @@@Obesity@@@\n--------------------------------------------------------------------------------\nPMID: 37850091\nTitle: The impact of obstructive sleep apnea on nonalcoholic fatty liver disease\nSource: Front Endocrinol (Lausanne) (2023)\nAbstract: The impact of @DISEASE_Sleep_Apnea_Obstructive @DISEASE_MESH:D020181 @@@<m>obstructive</m> <m>sleep</m> <m>apnea</m>@@@ on @DISEASE_Non_alcoholic_Fatty_Liver_Disease @DISEASE_MESH:D065626 @@@nonalcoholic <m>fatty</m> <m>liver</m> disease@@@\n--------------------------------------------------------------------------------\nPMID: 35204981\nTitle: You Cannot Hit Snooze on OSA: Sequelae of Pediatric Obstructive Sleep Apnea\nSource: Children (Basel) (2022)\nAbstract: You Cannot Hit Snooze on @DISEASE_Sleep_Apnea_Obstructive @DISEASE_MESH:D020181 @@@OSA@@@: Sequelae of Pediatric @DISEASE_Sleep_Apnea_Obstructive @DISEASE_MESH:D020181 @@@<m>Obstructive</m> <m>Sleep</m> <m>Apnea</m>@@@\n--------------------------------------------------------------------------------\nPMID: 34660454\nTitle: Association of Obstructive Sleep Apnea with Nocturnal Hypoxemia in Metabolic-Associated Fatty Liver Disease Patients: A Cross-sectional Analysis of Record-based Data\nSource: J Family Med Prim Care (2021)\nAbstract: Association of @DISEASE_Sleep_Apnea_Obstructive @DISEASE_MESH:D020181 @@@<m>Obstructive</m> <m>Sleep</m> <m>Apnea</m>@@@ with Nocturnal @DISEASE_Hypoxia @DISEASE_MESH:D000860 @@@Hypoxemia@@@ in @DISEASE_Fatty_Liver @DISEASE_MESH:D005234 @@@Metabolic-Associated <m>Fatty</m> <m>Liver</m> Disease@@@ @SPECIES_9606 @@@Patients@@@: A Cross-sectional Analysis of Record-based Data\n--------------------------------------------------------------------------------\nPMID: 39482698\nTitle: The European reference network for metabolic diseases (MetabERN) clinical pathway recommendations for Pompe disease (acid maltase deficiency, glycogen storage disease type II)\nSource: Orphanet J Rare Dis (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35132330\nTitle: Identifying Obstructive Sleep Apnea Syndrome-Associated Genes and Pathways through Weighted Gene Coexpression Network Analysis\nSource: Comput Math Methods Med (2022)\nAbstract: @DISEASE_Sleep_Apnea_Obstructive @DISEASE_MESH:D020181 @@@<m>Obstructive</m> <m>sleep</m> <m>apnea</m> syndrome@@@ (OSAS) is the most common type of @DISEASE_Sleep_Apnea_Syndromes @DISEASE_MESH:D012891 @@@<m>sleep</m> <m>apnea</m> disorder@@@.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_eC6yu57XLtBhqKpSiRZfRKsx",
+    "parent_tool_call_id": "call_bdVvKhTdXvy72eRmN3gqm4hG",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Methods|Results|fibrosis|F(2)-isoprostanes|apnea|hypoxia|obesity|ALT|AST|confound",
+      "pmid": "27501738"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27501738')\noutput = format_paper_content_output(result, filter_keywords='Methods|Results|fibrosis|F(2)-isoprostanes|apnea|hypoxia|obesity|ALT|AST|confound')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (6):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Methods|Results|fibrosis|F(2)-isoprostanes|apnea|hypoxia|obesity|ALT|AST|confound\n      \u001b[90mpmid:\u001b[0m 27501738\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Methods|Results|CPAP|F(2)-isoprostanes|ALT|AST|fibrosis|BMI|obesity\n      \u001b[90mpmid:\u001b[0m 29752170\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Methods|Results|ALT|AST|fibrosis|inflammation|BMI|matched|odds|heterogeneity\n      \u001b[90mpmid:\u001b[0m 32881371\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Methods|Results|steatosis|ultrasound|MRI|AHI|oxygen|BMI|ALT|AST\n      \u001b[90mpmid:\u001b[0m 34828697\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Methods|Results|Hedgehog|hypoxia|fibrosis|ALT|AST|BMI|oxidative\n      \u001b[90mpmid:\u001b[0m 31334441\n\n  \u001b[1m\u001b[93m[6] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Methods|Results|OSA|hypoxia|liver|oxidative stress|children|adolescents\n      \u001b[90mpmid:\u001b[0m 26298775\n\n=== PMID: 27501738 ===\n\nTitle: Nocturnal hypoxia-induced oxidative stress promotes progression of pediatric non-alcoholic fatty liver disease.\n\nJournal/Date: Journal of hepatology (2016)\n\nMeSH Keywords: Adolescent, Aldehydes, Child, F2-Isoprostanes, Humans, Hypoxia, Liver, Non-alcoholic Fatty Liver Disease\n\n\n--- ABSTRACT ---\n[BACKGROUND & AIMS]: Oxidative stress is proposed as a central mediator in NAFLD pathogenesis, but the specific trigger for reactive oxygen species generation has not been clearly delineated. In addition, emerging evidence shows that obesity related obstructive sleep apnea (OSA) and nocturnal hypoxia are associated with NAFLD progression in adults. The aim of this study was to determine if OSA/nocturnal hypoxia-induced oxidative stress promotes the progression of pediatric NAFLD.\n[METHODS]: Subjects with biopsy proven NAFLD and lean controls were studied. Subjects underwent polysomnograms, liver histology scoring, laboratory testing, urine F(2)-isoprostanes (measure of lipid peroxidation) and 4-hydroxynonenal liver immunohistochemistry (in situ hepatic lipid peroxidation).\n[RESULTS]: We studied 36 adolescents with NAFLD and 14 lean controls. The OSA/hypoxia group (69% of NAFLD subjects) had more severe fibrosis (64% stage 0-2; 36% stage 3) than those without OSA/hypoxia (100% stage 0-2), p=0.03. Higher F(2)-isoprostanes correlated with apnea/hypoxia index (r=0.39, p=0.03), % time SaO2 <90% (r=0.56, p=0.0008) and inversely with SaO2 nadir (r=-0.46, p=0.008). OSA/hypoxia was most severe in subjects with the greatest 4HNE staining (p=0.03). Increasing F(2)-isoprostanes(r=0.32, p=0.04) and 4HNE hepatic staining (r=0.47, p=0.007) were associated with worsening steatosis. Greater oxidative stress occurred in subjects with definite NASH as measured by F(2)-isoprostanes (p=0.06) and hepatic 4HNE (p=0.03) compared to those with borderline/not NASH.\n[CONCLUSIONS]: These data support the role of nocturnal hypoxia as a trigger for localized hepatic oxidative stress, an important factor associated with the progression of NASH and hepatic fibrosis in obese pediatric patients.\n[LAY SUMMARY]: Obstructive sleep apnea and low nighttime oxygen are associated with NAFLD progression in adults. In this study, we show that adolescents with NAFLD who have OSA and low oxygen have significant scar tissue in their livers. NAFLD subjects affected by OSA and low oxygen have a greater imbalance between the production of free radicals and their body's ability to counteract their harmful effects than subjects without OSA and low oxygen. This study shows that low oxygen levels may be an important trigger in the progression of pediatric NASH.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_sWf2LEkpdOqJRhlpcJLCvfqk",
+    "parent_tool_call_id": "call_bdVvKhTdXvy72eRmN3gqm4hG",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Methods|Results|CPAP|F(2)-isoprostanes|ALT|AST|fibrosis|BMI|obesity",
+      "pmid": "29752170"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('29752170')\noutput = format_paper_content_output(result, filter_keywords='Methods|Results|CPAP|F(2)-isoprostanes|ALT|AST|fibrosis|BMI|obesity')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 29752170 ===\n\nTitle: Treating Obstructive Sleep Apnea and Chronic Intermittent Hypoxia Improves the Severity of Nonalcoholic Fatty Liver Disease in Children.\n\nJournal/Date: The Journal of pediatrics (2018)\n\nMeSH Keywords: Adolescent, Biomarkers, Body Mass Index, Child, Chronic Disease, Cohort Studies, Continuous Positive Airway Pressure, F2-Isoprostanes\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: To determine the effects of treating obstructive sleep apnea/nocturnal hypoxia on pediatric nonalcoholic fatty liver disease (NAFLD) severity and oxidative stress.\n[STUDY DESIGN]: Biopsy proven participants (n = 9) with NAFLD and obstructive sleep apnea/hypoxia were studied before and after treatment with continuous positive airway pressure (CPAP) for sleep disordered breathing, including laboratory testing and markers of oxidative stress, urine F(2)-isoprostanes.\n[RESULTS]: Adolescents (age 11.5 ± 1.2 years; body mass index, 29.5 ± 3.8 kg/m2) with significant NAFLD (mean histologic necroinflammation grade, 2.3 ± 0.9; fibrosis stage, 1.4 ± 1.3; NAFLD Activity Score summary, 4.8 ± 1.6) had obstructive sleep apnea/hypoxia by polysomnography. At baseline, they had severe obstructive sleep apnea/hypoxia, elevated aminotransferases, the metabolic syndrome, and significant oxidative stress (high F(2)-isoprostanes). Obstructive sleep apnea/hypoxia was treated with home CPAP for a mean 89 ± 62 days. Although body mass index increased, obstructive sleep apnea/hypoxia severity improved on CPAP and was accompanied by reduced alanine aminotransferase, metabolic syndrome markers, and F(2)-isoprostanes.\n[CONCLUSIONS]: This study provides strong evidence that treatment of obstructive sleep apnea/nocturnal hypoxia with CPAP in children with NAFLD may reverse parameters of liver injury and reduce oxidative stress. These data also suggest CPAP as a new therapy to prevent progression of NAFLD in those children with obesity found to have obstructive sleep apnea/nocturnal hypoxia.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_Kwifg3PzngGVXjeHmKLLEVB4",
+    "parent_tool_call_id": "call_bdVvKhTdXvy72eRmN3gqm4hG",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Methods|Results|ALT|AST|fibrosis|inflammation|BMI|matched|odds|heterogeneity",
+      "pmid": "32881371"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('32881371')\noutput = format_paper_content_output(result, filter_keywords='Methods|Results|ALT|AST|fibrosis|inflammation|BMI|matched|odds|heterogeneity')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 32881371 ===\n\nTitle: Association between obstructive sleep apnea and non-alcoholic fatty liver disease in pediatric patients: a meta-analysis.\n\nJournal/Date: Pediatric obesity (2021)\n\nMeSH Keywords: Adolescent, Child, Cross-Sectional Studies, Humans, Non-alcoholic Fatty Liver Disease, Sleep Apnea, Obstructive\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Some studies have reported a relationship between obstructive sleep apnea (OSA) and non-alcoholic fatty liver disease (NAFLD) in pediatric population. However, this issue remains controversial.\n[OBJECTIVES]: The purpose of the present study was to investigate the association between OSA and NAFLD in pediatric population.\n[METHODS]: We systematically searched PubMed, Web of Science, Embase for eligible studies. The data involving markers of NAFLD including alanine aminotransferase (ALT), aspartate aminotransferase (AST), hepatic inflammation, hepatic fibrosis of both OSA group and control group were extracted. Pooled standardised mean difference (SMD) and weighted mean difference (WMD) were appropriately calculated through a fixed or random-effect model.\n[RESULTS]: Nine cross-sectional studies with 1133 children and adolescents were included. OSA was significantly associated with ALT, AST, and NAFLD fibrosis stage, but not NAFLD inflammation grade. Subgroup analysis indicated that both mild OSA and severe OSA were significantly associated with elevated ALT and AST. Furthermore, in the studies with all main confounding factors (age, gender, and BMI) matched, OSA group had higher ALT and AST levels than control group.\n[CONCLUSIONS]: This meta-analysis suggested that OSA was associated with NAFLD evidenced by elevated liver enzymes and progressive hepatic fibrosis in pediatric population. Screening and monitoring of NAFLD in pediatric patients with obesity-related OSA are necessary.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_isRlTANeKmlyEzP45gQPx7kz",
+    "parent_tool_call_id": "call_bdVvKhTdXvy72eRmN3gqm4hG",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Methods|Results|steatosis|ultrasound|MRI|AHI|oxygen|BMI|ALT|AST",
+      "pmid": "34828697"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('34828697')\noutput = format_paper_content_output(result, filter_keywords='Methods|Results|steatosis|ultrasound|MRI|AHI|oxygen|BMI|ALT|AST')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 34828697 ===\n\nTitle: Association between Hepatic Steatosis and Obstructive Sleep Apnea in Children and Adolescents with Obesity.\n\nJournal/Date: Children (Basel, Switzerland) (2021)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Owing to the increasing rate of pediatric obesity, its complications such as non-alcoholic fatty liver disease (NAFLD) and obstructive sleep apnea (OSA) have become prevalent already in childhood. We aimed to assess the relationship between these two diseases in a cohort of children with obesity.\n[METHODS]: We enrolled 153 children with obesity (mean age 10.5 ± 2.66, mean BMI 30.9 ± 5.1) showing OSA. Subjects underwent a laboratory evaluation, a cardio-respiratory polysomnography (PSG), and a liver ultrasound.\n[RESULTS]: All subjects had a clinical diagnosis of OSA based on the AHI > 1/h (mean AHI 8.0 ± 5.9; range 2.21-19.0). Of these, 69 showed hepatic steatosis (62.3% as mild, 20.3% as moderate, and 17.4% as severe degree). A strong association between ALT and apnea/hypopnea index (AHI) was observed (p = 0.0003). This association was not confirmed after adjusting for hepatic steatosis (p = 0.53). By subdividing our population according to the presence/absence of steatosis, this association was found only in the steatosis group (p = 0.009). As the severity of steatosis increased, the significance of its association with AHI compared to the absence of steatosis became progressively stronger (all p < 0.0001).\n[CONCLUSIONS]: Hepatic steatosis seems to drive the association between OSA and ALT levels, suggesting a potential pathogenic role of OSA in NAFLD.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\n3. Results\n\nAll studied subjects received a clinical OSA diagnosis on the basis of AHI > 1/h (mean AHI 8.0 ± 5.9; range 2.21–19.0). Out of the 153 subjects, 69 showed hepatic steatosis, and of them 43 were classified as stage 1 (mild), 14 as stage 2 (moderate), and 12 as stage 3 (severe). The main characteristics of the cohort are shown in Table 1.\n\nThere was a positive and significant association between ALT levels and AHI independent of age, gender, BMI-SDS, waist, and HOMA-IR (r2 = 0.10; p = 0.0003). Moreover, when the model was adjusted for hepatic steatosis, the association between AHI and ALT levels was not confirmed (p = 0.53). In fact, when the population was divided according to the presence/absence of hepatic steatosis, there was a significant association between AHI and ALT only...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_gRrMraAkBVSZRgLb8GnWMTIb",
+    "parent_tool_call_id": "call_bdVvKhTdXvy72eRmN3gqm4hG",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Methods|Results|Hedgehog|hypoxia|fibrosis|ALT|AST|BMI|oxidative",
+      "pmid": "31334441"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('31334441')\noutput = format_paper_content_output(result, filter_keywords='Methods|Results|Hedgehog|hypoxia|fibrosis|ALT|AST|BMI|oxidative')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 31334441 ===\n\nTitle: Nocturnal Hypoxia Activation of the Hedgehog Signaling Pathway Affects Pediatric Nonalcoholic Fatty Liver Disease Severity.\n\nJournal/Date: Hepatology communications (2019)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nChronic intermittent hypoxia and hedgehog (Hh) pathway dysregulation are associated with nonalcoholic fatty liver disease (NAFLD) progression. In this study, we determined the relationship between obstructive sleep apnea (OSA)/nocturnal hypoxia and Hh signaling in pediatric NAFLD. Adolescents with histologic NAFLD (n = 31) underwent polysomnogram testing, laboratory testing, and Sonic Hh (SHh), Indian hedgehog (IHh), glioblastoma-associated oncogene 2 (Gli2), keratin 7 (K7), α-smooth muscle actin (α-SMA), and hypoxia-inducible factor 1α (HIF-1α) immunohistochemistry. Aspartate aminotransferase (AST) correlated with SHh, r = 0.64; Gli2, r = 0.4; α-SMA, r = 0.55; and K7, r = 0.45 (P < 0.01), as did alanine aminotransferase (ALT) (SHh, r = 0.51; Gli2, r = 0.43; α-SMA, r = 0.51; P < 0.02). SHh correlated with NAFLD activity score (r = 0.39), whereas IHh correlated with inflammation (r = -0.478) and histologic grade (r = -0.43); P < 0.03. Subjects with OSA/hypoxia had higher SHh (4.0 ± 2.9 versus 2.0 ± 1.5), Gli2 (74.2 ± 28.0 versus 55.8 ± 11.8), and α-SMA (6.2 ± 3.3 versus 4.3 ± 1.2); compared to those without (P < 0.03). OSA severity correlated with SHh (r = 0.31; P = 0.09) and Gli2 (r = 0.37; P = 0.04) as did hypoxia severity, which was associated with increasing SHh (r = -0.53), Gli2 (r = -0.52), α-SMA (r = -0.61), and K7 (r = -0.42); P < 0.02. Prolonged O2 desaturations <90% also correlated with SHh (r = 0.55) and Gli2 (r = 0.61); P < 0.05. Conclusion: The Hh pathway is activated in pediatric patients with NAFLD with nocturnal hypoxia and relates to disease severity. Tissue hypoxia may allow for functional activation of HIF-1α, with induction of genes important in epithelial-mesenchymal transition, including SHh, and NAFLD progression.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nRelationship of OSA/Hypoxia to NAFLD\n\nA total of 31 subjects with liver biopsy‐confirmed NAFLD were studied. These adolescents (mean age, 13.0 ± 1.9 years) were 65% male subjects, 87% Hispanic, and had obesity (mean BMI z score, 2.2 ± 0.3). Twenty‐one subjects (68%) met our study criteria for OSA and/or hypoxia: 1 had isolated hypoxia, 12 had isolated OSA, and 8 had both OSA and hypoxia. Subjects with and without OSA/hypoxia had similarly elevated aminotransferases, inflammatory markers, triglycerides, and evidence of insulin resistance (Table 1). Although total serum cholesterol concentration was higher in those with OSA/hypoxia (P = 0.03), this did not impact NAFLD disease severity. In all subjects with NAFLD, polysomnograms were of adequate length with >12% total sleep time in ...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_E6xNT9Tsn1PSYO3BkFK9BjVU",
+    "parent_tool_call_id": "call_bdVvKhTdXvy72eRmN3gqm4hG",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Methods|Results|OSA|hypoxia|liver|oxidative stress|children|adolescents",
+      "pmid": "26298775"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('26298775')\noutput = format_paper_content_output(result, filter_keywords='Methods|Results|OSA|hypoxia|liver|oxidative stress|children|adolescents')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 26298775 ===\n\nTitle: Evaluation of circulating markers of hepatic apoptosis and inflammation in obese children with and without obstructive sleep apnea.\n\nJournal/Date: Sleep medicine (2015)\n\nMeSH Keywords: Antigens, CD, Antigens, Differentiation, Myelomonocytic, Apoptosis, Biomarkers, Case-Control Studies, Child, Fas Ligand Protein, Female\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: Hepatocyte apoptosis and macrophage activation contribute to the disease progression of nonalcoholic fatty liver disease (NAFLD). Obstructive sleep apnea (OSA) in obese children is associated with the severity of NAFLD. The aim of this study was to evaluate plasma levels of soluble Fas (sFas), soluble Fas ligand (sFasL), cytokeratin 18 (CK18) (markers of apoptosis), and soluble CD163 (sCD163) (marker of macrophage activation) in obese children with and without OSA.\n[METHODS]: Consecutive obese children who were evaluated for OSA were recruited. The diagnosis of OSA was made using overnight polysomnography (PSG). Fasting blood samples were used to determine plasma CK18, sFas, sFasL, and sCD163 levels using specific sandwich enzyme-linked immunosorbent assay (ELISA).\n[RESULTS]: Fifty-eight subjects were included in the analysis with a mean age of 8.9 ± 3.2 years and a mean body mass index (BMI) z-score of 2.4 ± 0.49. Circulating sFas and sFasL levels were significantly lower in subjects with mild and severe OSA compared with those without OSA (p < 0.005 for both). In addition, sCD163 levels increased with an increasing severity of OSA (no OSA = 1.6 ± 0.25 mg/L, mild OSA = 2.3 ± 0.45, and severe OSA = 3.0 ± 0.52; p < 0.001), and they correlated with the apnea-hypopnea index (AHI) [rho (95% confidence interval, CI) of 0.71 (0.41, 1.00), p-value <0.001]. In six patients with severe OSA from whom samples were taken before and after tonsillectomy, the sCD163 level decreased significantly after treatment, and there was a trend toward an increase in sFasL.\n[CONCLUSION]: Markers of apoptosis and macrophage activation are altered in obese children with OSA, indicating increased apoptotic and inflammatory pressures.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_KTBeajFe2dLntjUXVokTlOUQ",
+    "parent_tool_call_id": "call_E6xNT9Tsn1PSYO3BkFK9BjVU",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The strongest pediatric human evidence supports an association between nocturnal hypoxia/OSA and more advanced NAFLD. In a biopsy-based adolescent study (PMID 27501738; n=36 NAFLD, 14 lean controls), 69% had OSA/hypoxia; affected participants had more stage-3 fibrosis than those without OSA/hypoxia (36% vs 0%, p=0.03). Higher urinary F2-isoprostanes correlated with apnea/hypoxia index, time with SaO2 <90%, and lower oxygen nadir; hepatic 4-hydroxynonenal staining correlated with hypoxia severity and steatosis. Oxidative stress was greater in definite NASH. This directly supports nocturnal hypoxemia as a plausible oxidative-stress-linked promoter of pediatric NASH/fibrosis, but the study is observational and small.",
+          "source_tools": [
+            {
+              "relevance": "biopsy, polysomnography, oxidative-stress biomarkers, steatosis/NASH/fibrosis",
+              "tool_call_id": "call_eC6yu57XLtBhqKpSiRZfRKsx"
+            }
+          ]
+        },
+        {
+          "finding": "Pediatric aggregate evidence is directionally positive but largely cross-sectional. A meta-analysis of 9 cross-sectional studies including 1,133 children/adolescents (PMID 32881371) found OSA associated with higher ALT, AST, and NAFLD fibrosis stage, but not histologic inflammation grade; associations with ALT/AST persisted in studies matched for age, sex, and BMI. This strengthens the association beyond obesity alone, but does not establish progression or causality.",
+          "source_tools": [
+            {
+              "relevance": "pediatric meta-analysis and confounder-matched subgroup",
+              "tool_call_id": "call_Kwifg3PzngGVXjeHmKLLEVB4"
+            }
+          ]
+        },
+        {
+          "finding": "A pediatric obesity cohort (PMID 34828697; n=153, mean age 10.5 years, all with OSA) found hepatic steatosis in 69 children, with mild-to-severe grades. AHI correlated with ALT independent of age, sex, BMI-SDS, waist, and HOMA-IR (r²=0.10, p=0.0003), but the association disappeared after adjustment for hepatic steatosis; the relationship was confined to children with steatosis and strengthened with steatosis severity. Thus OSA appears linked primarily to liver injury in children who already have steatosis, while residual confounding and reverse directionality remain possible.",
+          "source_tools": [
+            {
+              "relevance": "pediatric obesity cohort, ultrasound steatosis, multivariable adjustment",
+              "tool_call_id": "call_IsRlTANeKmlyEzP45gQPx7kz"
+            }
+          ]
+        },
+        {
+          "finding": "The pediatric intervention signal is consistent with causality but is very preliminary. In 9 biopsy-proven pediatric NAFLD patients with OSA/hypoxia (PMID 29752170), approximately 89 days of CPAP improved sleep-disordered breathing despite BMI increasing and was accompanied by lower ALT, metabolic-syndrome markers, and urinary F2-isoprostanes. The uncontrolled, very small before-after design cannot separate CPAP effects from regression to the mean or other changes, and histologic reversal was not demonstrated.",
+          "source_tools": [
+            {
+              "relevance": "pediatric CPAP treatment, ALT and oxidative-stress biomarker response",
+              "tool_call_id": "call_sWf2LEkpdOqJRhlpcJLCvfqk"
+            }
+          ]
+        },
+        {
+          "finding": "A complementary pediatric biopsy study (PMID 31334441; n=31 adolescents with NAFLD, 68% with OSA and/or hypoxia) found nocturnal hypoxia associated with hepatic Sonic hedgehog/Gli2 and α-SMA activation, K7, and HIF-1α-related signaling; these markers correlated with AST/ALT, NAFLD activity, and hypoxia/desaturation measures. This supports a hypoxia-to-HIF/hedgehog/epithelial-mesenchymal-transition/fibrogenic mechanism, although it is not a direct oxidative-stress assay and the cohort was predominantly obese (mean BMI z-score 2.2), so obesity/metabolic disease remain important co-drivers.",
+          "source_tools": [
+            {
+              "relevance": "pediatric liver biopsy mechanistic study linking hypoxia to fibrogenic signaling and enzymes",
+              "tool_call_id": "call_gRrMraAkBVSZRgLb8GnWMTIb"
+            }
+          ]
+        },
+        {
+          "finding": "Additional pediatric biomarker evidence shows biologic plausibility but is less liver-specific: in 58 obese children (PMID 26298775), sCD163, a macrophage-activation marker relevant to NAFLD, increased stepwise with OSA severity and correlated strongly with AHI (rho 0.71, p<0.001); it decreased after tonsillectomy in six severe-OSA patients. The study did not directly stage steatosis/fibrosis or measure oxidative stress, so it supports inflammatory pressure rather than proving liver progression.",
+          "source_tools": [
+            {
+              "relevance": "pediatric OSA severity and macrophage-activation biomarker",
+              "tool_call_id": "call_E6xNT9Tsn1PSYO3BkFK9BjVU"
+            }
+          ]
+        },
+        {
+          "finding": "Obesity is a major confounder and shared substrate: the key pediatric cohorts were predominantly obese, and OSA, insulin resistance, dyslipidemia, and NAFLD cluster together. However, the biopsy oxidative-stress study linked F2-isoprostanes and 4-HNE specifically to hypoxemia metrics, and the meta-analysis found higher ALT/AST even in age/sex/BMI-matched comparisons. The most defensible conclusion is that OSA/nocturnal intermittent hypoxia likely adds an independent aggravating signal—especially for oxidative stress and fibrosis—on top of obesity-related NAFLD, but pediatric evidence remains small, observational, and insufficient to prove that OSA alone initiates MASLD.",
+          "source_tools": [
+            {
+              "relevance": "direct pediatric oxidative-stress/fibrosis evidence",
+              "tool_call_id": "call_eC6yu57XLtBhqKpSiRZfRKsx"
+            },
+            {
+              "relevance": "BMI-matched pediatric aggregate evidence",
+              "tool_call_id": "call_Kwifg3PzngGVXjeHmKLLEVB4"
+            },
+            {
+              "relevance": "pediatric obesity cohort adjustment",
+              "tool_call_id": "call_IsRlTANeKmlyEzP45gQPx7kz"
+            }
+          ]
+        },
+        {
+          "finding": "Adult evidence is broader and more mechanistically developed, but should not be substituted for pediatric evidence. The adult-focused review (PMID 27324067) summarizes chronic intermittent hypoxia effects on insulin resistance, dyslipidemia, HIF-1α/lipogenesis, β-oxidation and hepatic oxidative stress, while noting no definitive proof that CPAP improves NAFLD. Pediatric studies provide direct human links to fibrosis, ALT/AST, F2-isoprostanes/4-HNE, and hypoxia-related fibrogenic signaling, but lack large longitudinal cohorts and randomized CPAP trials.",
+          "source_tools": [
+            {
+              "relevance": "adult-vs-pediatric context and mechanism review",
+              "tool_call_id": "call_8w6pGosX36Go2g0TvFJBhLBJ"
+            },
+            {
+              "relevance": "adult mechanistic/hypoxia literature surfaced in focused search",
+              "tool_call_id": "call_llibrkjB1luf1OzWIhlZmbi5"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_2xHfJh9vf2SBEtbR6UKPhVr0",
+    "parent_tool_call_id": "call_t2AQYIXkAxYhZfk2lN5DrNWq",
+    "round": 2,
+    "tool_input": {
+      "entity_names": null,
+      "get_full_map": false,
+      "max_entities": null,
+      "max_observations_per_entity": 5,
+      "query": "pediatric NAFLD or MASLD obstructive sleep apnea nocturnal hypoxia oxidative stress F2-isoprostanes 4-HNE fibrosis",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"search_query\": \"pediatric NAFLD or MASLD obstructive sleep apnea nocturnal hypoxia oxidative stress F2-isoprostanes 4-HNE fibrosis\", \"results\": {\"entities\": [], \"relations\": []}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_wf8RGxUpaW3FBy388xY5F3nq",
+    "parent_tool_call_id": "call_2xHfJh9vf2SBEtbR6UKPhVr0",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE",
+          "name": "Pediatric NAFLD",
+          "observations": [
+            "Pediatric non-alcoholic fatty liver disease; biopsy cohorts include steatosis, NASH, and fibrosis phenotypes."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Target disease context",
+              "tool_call_id": "call_eC6yu57XLtBhqKpSiRZfRKsx"
+            }
+          ]
+        },
+        {
+          "entity_type": "PHENOTYPE",
+          "name": "Nocturnal hypoxia",
+          "observations": [
+            "Nocturnal obstructive sleep apnea/intermittent hypoxemia is associated with pediatric NAFLD severity and hypoxia-linked liver injury markers."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Exposure associated with pediatric NAFLD severity",
+              "tool_call_id": "call_eC6yu57XLtBhqKpSiRZfRKsx"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Oxidative stress in pediatric NAFLD",
+          "observations": [
+            "In biopsy-proven adolescents, urinary F2-isoprostanes tracked apnea/hypoxia severity, time with SaO2 below 90%, and lower oxygen nadir; hepatic 4-hydroxynonenal correlated with hypoxia severity and steatosis. OSA/hypoxia was associated with stage-3 fibrosis in 36% versus 0% without OSA/hypoxia (PMID 27501738; n=36 NAFLD)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct pediatric oxidative-stress and fibrosis evidence",
+              "tool_call_id": "call_eC6yu57XLtBhqKpSiRZfRKsx"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Pediatric OSA liver association",
+          "observations": [
+            "A meta-analysis of 9 cross-sectional studies involving 1,133 children/adolescents found OSA associated with higher ALT, AST, and NAFLD fibrosis stage; ALT/AST associations persisted in age-, sex-, and BMI-matched analyses, but causality was not established (PMID 32881371)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Aggregate pediatric evidence",
+              "tool_call_id": "call_Kwifg3PzngGVXjeHmKLLEVB4"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "CPAP oxidative-stress signal",
+          "observations": [
+            "In 9 children/adolescents with biopsy-proven NAFLD and OSA/hypoxia, about 89 days of CPAP reduced ALT and urinary F2-isoprostanes despite increasing BMI; the uncontrolled before-after design did not demonstrate histologic reversal (PMID 29752170)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Preliminary reversibility evidence",
+              "tool_call_id": "call_sWf2LEkpdOqJRhlpcJLCvfqk"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Hypoxia fibrogenic signaling",
+          "observations": [
+            "In adolescents with biopsy-confirmed NAFLD, OSA/hypoxia was associated with hepatic Sonic hedgehog/Gli2, alpha-SMA, K7, and HIF-1alpha-related signaling that correlated with liver enzymes, NAFLD activity, and desaturation measures (PMID 31334441)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Mechanistic fibrosis evidence",
+              "tool_call_id": "call_gRrMraAkBVSZRgLb8GnWMTIb"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:27501738",
+          "observations": [
+            "Biopsy-based pediatric study of nocturnal hypoxia, oxidative stress, and NAFLD progression."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary study identifier",
+              "tool_call_id": "call_eC6yu57XLtBhqKpSiRZfRKsx"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:32881371",
+          "observations": [
+            "Meta-analysis of pediatric OSA and NAFLD-related liver outcomes."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Evidence synthesis identifier",
+              "tool_call_id": "call_Kwifg3PzngGVXjeHmKLLEVB4"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:29752170",
+          "observations": [
+            "Small pediatric CPAP before-after study measuring ALT and urinary F2-isoprostanes."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Intervention study identifier",
+              "tool_call_id": "call_sWf2LEkpdOqJRhlpcJLCvfqk"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:31334441",
+          "observations": [
+            "Pediatric biopsy study of nocturnal hypoxia and hypoxia-related hepatic fibrogenic signaling."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Mechanistic study identifier",
+              "tool_call_id": "call_gRrMraAkBVSZRgLb8GnWMTIb"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Nocturnal hypoxia",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Pediatric NAFLD"
+        },
+        {
+          "from_entity": "Oxidative stress in pediatric NAFLD",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Nocturnal hypoxia"
+        },
+        {
+          "from_entity": "CPAP oxidative-stress signal",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Nocturnal hypoxia"
+        },
+        {
+          "from_entity": "Hypoxia fibrogenic signaling",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Nocturnal hypoxia"
+        },
+        {
+          "from_entity": "Oxidative stress in pediatric NAFLD",
+          "relation_type": "DERIVED_FROM_KG:pubmed_papers",
+          "to_entity": "PMID:27501738"
+        },
+        {
+          "from_entity": "Pediatric OSA liver association",
+          "relation_type": "DERIVED_FROM_KG:pubmed_papers",
+          "to_entity": "PMID:32881371"
+        },
+        {
+          "from_entity": "CPAP oxidative-stress signal",
+          "relation_type": "DERIVED_FROM_KG:pubmed_papers",
+          "to_entity": "PMID:29752170"
+        },
+        {
+          "from_entity": "Hypoxia fibrogenic signaling",
+          "relation_type": "DERIVED_FROM_KG:pubmed_papers",
+          "to_entity": "PMID:31334441"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 10, \"entities\": [{\"name\": \"Pediatric NAFLD\", \"entityType\": \"DISEASE\", \"observations\": [\"Pediatric non-alcoholic fatty liver disease; biopsy cohorts include steatosis, NASH, and fibrosis phenotypes.\"]}, {\"name\": \"Nocturnal hypoxia\", \"entityType\": \"PHENOTYPE\", \"observations\": [\"Nocturnal obstructive sleep apnea/intermittent hypoxemia is associated with pediatric NAFLD severity and hypoxia-linked liver injury markers.\"]}, {\"name\": \"Oxidative stress in pediatric NAFLD\", \"entityType\": \"FINDING\", \"observations\": [\"In biopsy-proven adolescents, urinary F2-isoprostanes tracked apnea/hypoxia severity, time with SaO2 below 90%, and lower oxygen nadir; hepatic 4-hydroxynonenal correlated with hypoxia severity and steatosis. OSA/hypoxia was associated with stage-3 fibrosis in 36% versus 0% without OSA/hypoxia (PMID 27501738; n=36 NAFLD).\"]}, {\"name\": \"Pediatric OSA liver association\", \"entityType\": \"FINDING\", \"observations\": [\"A meta-analysis of 9 cross-sectional studies involving 1,133 children/adolescents found OSA associated with higher ALT, AST, and NAFLD fibrosis stage; ALT/AST associations persisted in age-, sex-, and BMI-matched analyses, but causality was not established (PMID 32881371).\"]}, {\"name\": \"CPAP oxidative-stress signal\", \"entityType\": \"FINDING\", \"observations\": [\"In 9 children/adolescents with biopsy-proven NAFLD and OSA/hypoxia, about 89 days of CPAP reduced ALT and urinary F2-isoprostanes despite increasing BMI; the uncontrolled before-after design did not demonstrate histologic reversal (PMID 29752170).\"]}, {\"name\": \"Hypoxia fibrogenic signaling\", \"entityType\": \"FINDING\", \"observations\": [\"In adolescents with biopsy-confirmed NAFLD, OSA/hypoxia was associated with hepatic Sonic hedgehog/Gli2, alpha-SMA, K7, and HIF-1alpha-related signaling that correlated with liver enzymes, NAFLD activity, and desaturation measures (PMID 31334441).\"]}, {\"name\": \"PMID:27501738\", \"entityType\": \"PAPER\", \"observations\": [\"Biopsy-based pediatric study of nocturnal hypoxia, oxidative stress, and NAFLD progression.\"]}, {\"name\": \"PMID:32881371\", \"entityType\": \"PAPER\", \"observations\": [\"Meta-analysis of pediatric OSA and NAFLD-related liver outcomes.\"]}, {\"name\": \"PMID:29752170\", \"entityType\": \"PAPER\", \"observations\": [\"Small pediatric CPAP before-after study measuring ALT and urinary F2-isoprostanes.\"]}, {\"name\": \"PMID:31334441\", \"entityType\": \"PAPER\", \"observations\": [\"Pediatric biopsy study of nocturnal hypoxia and hypoxia-related hepatic fibrogenic signaling.\"]}]}, \"relations_created\": {\"count\": 8, \"relations\": [{\"from\": \"Nocturnal hypoxia\", \"to\": \"Pediatric NAFLD\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Oxidative stress in pediatric NAFLD\", \"to\": \"Nocturnal hypoxia\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"CPAP oxidative-stress signal\", \"to\": \"Nocturnal hypoxia\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Hypoxia fibrogenic signaling\", \"to\": \"Nocturnal hypoxia\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Oxidative stress in pediatric NAFLD\", \"to\": \"PMID:27501738\", \"relationType\": \"DERIVED_FROM_KG:pubmed_papers\"}, {\"from\": \"Pediatric OSA liver association\", \"to\": \"PMID:32881371\", \"relationType\": \"DERIVED_FROM_KG:pubmed_papers\"}, {\"from\": \"CPAP oxidative-stress signal\", \"to\": \"PMID:29752170\", \"relationType\": \"DERIVED_FROM_KG:pubmed_papers\"}, {\"from\": \"Hypoxia fibrogenic signaling\", \"to\": \"PMID:31334441\", \"relationType\": \"DERIVED_FROM_KG:pubmed_papers\"}]}}, \"provenance\": {\"tool_call_id\": \"call_wf8RGxUpaW3FBy388xY5F3nq\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_2xHfJh9vf2SBEtbR6UKPhVr0\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_sH0KiBD5JGqPycAcKWQWTgDW",
+    "parent_tool_call_id": "call_wf8RGxUpaW3FBy388xY5F3nq",
+    "round": 4,
+    "tool_input": {
+      "entity_names": "[\"Pediatric NAFLD\",\"Nocturnal hypoxia\",\"Oxidative stress in pediatric NAFLD\",\"Pediatric OSA liver association\",\"CPAP oxidative-stress signal\",\"Hypoxia fibrogenic signaling\"]",
+      "get_full_map": false,
+      "max_entities": null,
+      "max_observations_per_entity": 5,
+      "query": null,
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"requested_entities\": [\"Pediatric NAFLD\", \"Nocturnal hypoxia\", \"Oxidative stress in pediatric NAFLD\", \"Pediatric OSA liver association\", \"CPAP oxidative-stress signal\", \"Hypoxia fibrogenic signaling\"], \"results\": {\"entities\": [{\"name\": \"Pediatric NAFLD\", \"entityType\": \"DISEASE\", \"observations\": [\"Pediatric non-alcoholic fatty liver disease; biopsy cohorts include steatosis, NASH, and fibrosis phenotypes.\"]}, {\"name\": \"Nocturnal hypoxia\", \"entityType\": \"PHENOTYPE\", \"observations\": [\"Nocturnal obstructive sleep apnea/intermittent hypoxemia is associated with pediatric NAFLD severity and hypoxia-linked liver injury markers.\"]}, {\"name\": \"Oxidative stress in pediatric NAFLD\", \"entityType\": \"FINDING\", \"observations\": [\"In biopsy-proven adolescents, urinary F2-isoprostanes tracked apnea/hypoxia severity, time with SaO2 below 90%, and lower oxygen nadir; hepatic 4-hydroxynonenal correlated with hypoxia severity and steatosis. OSA/hypoxia was associated with stage-3 fibrosis in 36% versus 0% without OSA/hypoxia (PMID 27501738; n=36 NAFLD).\"]}, {\"name\": \"Pediatric OSA liver association\", \"entityType\": \"FINDING\", \"observations\": [\"A meta-analysis of 9 cross-sectional studies involving 1,133 children/adolescents found OSA associated with higher ALT, AST, and NAFLD fibrosis stage; ALT/AST associations persisted in age-, sex-, and BMI-matched analyses, but causality was not established (PMID 32881371).\"]}, {\"name\": \"CPAP oxidative-stress signal\", \"entityType\": \"FINDING\", \"observations\": [\"In 9 children/adolescents with biopsy-proven NAFLD and OSA/hypoxia, about 89 days of CPAP reduced ALT and urinary F2-isoprostanes despite increasing BMI; the uncontrolled before-after design did not demonstrate histologic reversal (PMID 29752170).\"]}, {\"name\": \"Hypoxia fibrogenic signaling\", \"entityType\": \"FINDING\", \"observations\": [\"In adolescents with biopsy-confirmed NAFLD, OSA/hypoxia was associated with hepatic Sonic hedgehog/Gli2, alpha-SMA, K7, and HIF-1alpha-related signaling that correlated with liver enzymes, NAFLD activity, and desaturation measures (PMID 31334441).\"]}], \"relations\": [{\"from\": \"Nocturnal hypoxia\", \"to\": \"Pediatric NAFLD\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Oxidative stress in pediatric NAFLD\", \"to\": \"Nocturnal hypoxia\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"CPAP oxidative-stress signal\", \"to\": \"Nocturnal hypoxia\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Hypoxia fibrogenic signaling\", \"to\": \"Nocturnal hypoxia\", \"relationType\": \"SUPPORTS\"}]}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

@@ -1,4 +1,4 @@
-from typing import Literal, Type, Optional
+from typing import Literal, Type, Optional, List
 from pydantic import BaseModel, Field
 from langchain_core.tools import BaseTool
 import json
@@ -62,7 +62,7 @@ class GetPathwayForGeneSetTool(BaseTool):
         super().__init__()
         self.sandbox = sandbox
     
-    def _run(self, gene_set: str) -> str:
+    def _run(self, gene_set: str, context_tool_call_ids: Optional[List[str]] = None,) -> str:
         """Execute the tool to get pathway annotations."""
         
         # Generate Python code template
@@ -131,7 +131,7 @@ class GetEnrichmentForGeneSetTool(BaseTool):
         super().__init__()
         self.sandbox = sandbox
     
-    def _run(self, gene_set: str) -> str:
+    def _run(self, gene_set: str, context_tool_call_ids: Optional[List[str]] = None,) -> str:
         """Execute the tool to get enrichment analysis."""
         
         # Generate Python code template
@@ -200,7 +200,7 @@ class GetInteractionsForGeneSetTool(BaseTool):
         super().__init__()
         self.sandbox = sandbox
     
-    def _run(self, gene_set: str) -> str:
+    def _run(self, gene_set: str, context_tool_call_ids: Optional[List[str]] = None,) -> str:
         """Execute the tool to get gene interactions."""
         
         # Generate Python code template
@@ -269,7 +269,7 @@ class GetComplexForGeneSetTool(BaseTool):
         super().__init__()
         self.sandbox = sandbox
     
-    def _run(self, gene_set: str) -> str:
+    def _run(self, gene_set: str, context_tool_call_ids: Optional[List[str]] = None,) -> str:
         """Execute the tool to get protein complex information."""
         
         # Generate Python code template
@@ -342,7 +342,7 @@ class GetGeneSummaryForSingleGeneTool(BaseTool):
         super().__init__()
         self.sandbox = sandbox
     
-    def _run(self, gene_name: str, specie: Literal["Homo", "Mus"]) -> str:
+    def _run(self, gene_name: str, specie: Literal["Homo", "Mus"], context_tool_call_ids: Optional[List[str]] = None,) -> str:
         """Execute the tool to get gene summary."""
         
         # Generate Python code template
@@ -415,7 +415,7 @@ class GetDiseaseForSingleGeneTool(BaseTool):
         super().__init__()
         self.sandbox = sandbox
     
-    def _run(self, gene_name: str) -> str:
+    def _run(self, gene_name: str, context_tool_call_ids: Optional[List[str]] = None,) -> str:
         """Execute the tool to get disease associations."""
         
         # Generate Python code template
@@ -484,7 +484,7 @@ class GetDomainForSingleGeneTool(BaseTool):
         super().__init__()
         self.sandbox = sandbox
     
-    def _run(self, gene_name: str) -> str:
+    def _run(self, gene_name: str, context_tool_call_ids: Optional[List[str]] = None,) -> str:
         """Execute the tool to get protein domain information."""
         
         # Generate Python code template

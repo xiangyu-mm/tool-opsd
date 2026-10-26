@@ -1,0 +1,3 @@
+Yes. In the in-vitro PVR model, trichostatin A (0.1 μM) reduced RPE activation-associated responses, including TGFβ2-induced collagen-matrix contraction and migration; the study also reported reduced proliferation and α-SMA in wounded iPS-derived RPE. The experiments included ARPE-19, primary porcine RPE, and iPS-derived RPE. This supports an inhibitory effect in vitro, not clinical efficacy. (2016; PMID: 27494828)
+
+FINAL DECISION: YES

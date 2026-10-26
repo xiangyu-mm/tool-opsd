@@ -1,0 +1,3 @@
+Yes. A 2016 study using ^13C-glucose tracing in cultured primary hippocampal neurons and hippocampal preparations reported glycerol-3-phosphate biosynthesis becoming active in response to LTP, while it was absent or silenced at baseline (PMID: 27499721; evidence: `call_DLXNHgdi0XF9wxNLsTk1WNEN`, `call_X9tupwjiBasYU58Y30fOEdJ0`). This supports an association with LTP-related activity, but does not show that glycerol-phosphate biosynthesis causes or is necessary for potentiation. A separate study linked the neuronal glycerol-3-phosphate shuttle to energy support during electrical activity, not directly to LTP (PMID: 35999055; evidence: `call_f591pmByX5PoTr9xlVARQ2oS`).
+
+FINAL DECISION: YES

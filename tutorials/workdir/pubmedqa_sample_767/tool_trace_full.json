@@ -1,0 +1,317 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_bxaDbsRFejdhUAZQzq0hdyqj",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease",
+        "drug"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine whether intravenous pantoprazole rapidly controls gastric acid hypersecretion in patients with Zollinger-Ellison syndrome (ZES). Find human clinical evidence, including time to achieve acid control, magnitude of acid suppression, dosing/infusion regimen, and whether conclusions support rapid effective control. Investigate pantoprazole and Zollinger-Ellison syndrome/gastrinoma, prioritizing clinical trials, case series, and pharmacodynamic studies."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_yU2z6WOHZQrtjppBkMcX85jf",
+    "parent_tool_call_id": "call_bxaDbsRFejdhUAZQzq0hdyqj",
+    "round": 1,
+    "tool_input": {
+      "task_name": "IV pantoprazole ZES",
+      "boolean_query_text": "intravenous pantoprazole Zollinger-Ellison syndrome gastric acid control clinical trial",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='intravenous pantoprazole Zollinger-Ellison syndrome gastric acid control clinical trial',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='intravenous pantoprazole Zollinger-Ellison syndrome gastric acid control clinical trial',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/IV_pantoprazole_ZES.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/IV_pantoprazole_ZES.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/IV_pantoprazole_ZES.csv'\nTotal results found: 24\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 10734021\nTitle: Intravenous pantoprazole rapidly controls gastric acid hypersecretion in patients with Zollinger-Ellison syndrome.\nSource: Gastroenterology (2000)\nAbstract: BACKGROUND & AIMS: Parenteral control of gastric acid hypersecretion in conditions such as Zollinger-Ellison syndrome (ZES) or idiopathic gastric acid hypersecretion is necessary perioperatively or when oral medications cannot be taken for other reasons (e.g., during chemotherapy, acute upper gastrointestinal bleeding, or in intensive care unit settings). METHODS: We evaluated the efficacy and safety of 15-minute infusions of the proton pump inhibitor pantoprazole (80-120 mg every 8-12 hours) in controlling acid output for up to 7 days. Effective control was defined as acid output >10 milliequivalents per hour (mEq/h) (<5 mEq/h in patients with prior acid-reducing surgery) for 24 hours. RESULTS: The 21 patients enrolled had a mean age of 51.9 years (range, 29-75) and a mean disease duration of 8.1 years (range, <0.5-21); 13 were male, 7 had multiple endocrine neoplasia syndrome type I, 4 had undergone acid-reducing surgery, 2 had received chemotherapy, and 13 had undergone gastrinoma resections without cure. Basal acid output (mean +/- SD) was 40.2 +/- 27.9 mEq/h (range, 11.2-117.9). In all patients, acid output was controlled within the first hour (mean onset of effective control, ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 12072661\nTitle: Pharmacology of acid suppression in the hospital setting: focus on proton pump inhibition.\nSource: Critical care medicine (2002)\nAbstract: The more potent and longer-lasting inhibition of gastric acid secretion provided by proton pump inhibitors (PPIs) as compared with histamine-2-receptor antagonists is caused in large part by differences in their mechanism of action. PPIs block histamine-2-, gastrin-, and cholinergic-mediated sources of acid production and inhibit gastric secretion at the final common pathway of the H+/K+ adenosine triphosphatase proton pump. In contrast, histamine-2-receptor antagonists cannot block receptor sites other than those mediated by histamine. It seems that the rapid loss of acid suppression activity by the histamine-2-receptor antagonists may be attributed to tolerance. Such tolerance has not occurred in patients receiving PPIs because these agents are irreversible inhibitors of the H+/K+ adenosine triphosphatase proton pump. For these reasons, patients who have acid-related disorders that require high levels of acid suppression do not respond well to intravenous histamine-2-receptor antagonists and would be excellent candidates for intravenous PPI therapy. Candidates for intravenous PPIs also include patients who cannot receive oral PPIs and those who may need the higher acid suppressio ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 14587962\nTitle: Treating patients with acute gastrointestinal bleeding or rebleeding.\nSource: Pharmacotherapy (2003)\nAbstract: Despite advances in medical management, gastrointestinal bleeding remains a substantial cause of morbidity and mortality. At risk are patients with history of the event, those taking nonsteroidal antiinflammatory agents, and those with active peptic ulcer disease. Endoscopy may be performed for diagnosis and treatment. Antisecretory therapy may be employed to control gastric acid secretion, treat active peptic ulcer disease, and control symptoms such as diarrhea and abdominal pain. Options for antisecretory therapy include histamine2-receptor antagonists (H2RAs) that target the histamine pathway, and proton pump inhibitors (PPIs) that target the final step in acid secretion. The H2RAs generally are ineffective at reaching a target pH of 6 in patients with gastrointestinal bleeding because of tachyphylaxis. The PPIs are more effective and do not lead to tachyphylaxis. With the availability of an intravenous PPI, pantoprazole, options for managing hospitalized patients with gastrointestinal bleeding are expanding.\n--------------------------------------------------------------------------------\nPMID: 11475787\nTitle: [Efficacy and safety of intravenously administered pantoprazole in the treatment of gastrinoma].\nSource: Recenti progressi in medicina (2001)\nAbstract: The efficacy and safety of the proton pump inhibitor pantoprazole (P) in patients with Zollinger-Ellison syndrome (ZES) is well documented. We treated 21 patients with ZES with intravenous P; 13 of these patients were treated surgically in advance. The effect of P was very rapid, with reduction of the acid output within 15 min and its normalization within 60 min. The control of gastric acid secretion was maintained for a mean of 10.9 hours after the infusion of P. We conclude that the use of intravenous P allows a safe and efficient control of the acid ipersecretion in patients with ZES.\n--------------------------------------------------------------------------------\nPMID: 34629807\nTitle: Gastrinoma and Zollinger Ellison syndrome: A roadmap for the management between new and old therapies\nSource: World J Gastroenterol (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37781635\nTitle: Development of Peptic Ulcer following Second Shot of Sputnik V Vaccine: A Case Report and Literature Review of Rare Side Effects of Sputnik V Vaccine\nSource: Case Rep Infect Dis (2023)\nAbstract: Moreover, its rare causes include @DISEASE_Zollinger_Ellison_Syndrome @DISEASE_MESH:D015043 @@@<m>Zollinger</m>-<m>Ellison</m> <m>syndrome</m>@@@, @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@malignancies@@@, and stress.\n--------------------------------------------------------------------------------\nPMID: 40771914\nTitle: Pharmacodynamics, pharmacokinetics, interactions with other drugs, toxicity and clinical effectiveness of proton pump inhibitors\nSource: Front Pharmacol (2025)\nAbstract: In contrast to the short half-life of PPIs the <m>clinical</m> effect of @DISEASE_Gastroesophageal_Reflux @DISEASE_MESH:D005764 @@@<m>gastric</m> <m>acid</m>@@@ suppression persists longer.\n--------------------------------------------------------------------------------\nPMID: 38910681\nTitle: An Updated Review and a Case Report: Stress Ulcer Prophylaxis\nSource: Cureus (2024)\nAbstract: He was given @CHEMICAL_Pantoprazole @CHEMICAL_MESH:D000077402 @@@<m>pantoprazole</m>@@@ 80 mg IV bolus, followed by @CHEMICAL_Pantoprazole @CHEMICAL_MESH:D000077402 @@@<m>pantoprazole</m>@@@ IV infusion.\n--------------------------------------------------------------------------------\nPMID: 39507107\nTitle: Clinical Implications of Proton Pump Inhibitors and Vonoprazan Micro/Nano Drug Delivery Systems for Gastric Acid-Related Disorders and Imaging\nSource: Nanotheranostics (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38516446\nTitle: A Case of Severe Proton Pump Inhibitor-Induced Hypomagnesemia Refractory to Continuous Oral and Intravenous Magnesium Replenishment\nSource: Cureus (2024)\nAbstract: Proton pump inhibitors (PPIs) constitute a class of drugs used to suppress the production of <m>gastric</m> <m>acid</m>. As of 2015, the United States Food and Drug Administration (FDA) recognizes six PPIs: @CHEMICAL_Omeprazole @CHEMICAL_MESH:D009853 @@@omeprazole@@@, @CHEMICAL_Esomeprazole @CHEMICAL_MESH:D064098 @@@esomeprazole@@@, @CHEMICAL_Lansoprazole @CHEMICAL_MESH:D064747 @@@lansoprazole@@@, @CHEMICAL_Dexlansoprazole @CHEMICAL_MESH:D064748 @@@dexlansoprazole@@@, @CHEMICAL_Pantoprazole @CHEMICAL_MESH:D000077402 @@@<m>pantoprazole</m>@@@, and @CHEMICAL_Rabeprazole @CHEMICAL_MESH:D064750 @@@rabeprazole@@@.\n--------------------------------------------------------------------------------\nPMID: 39253108\nTitle: Turn over the new leaf of the treatment in peptic ulcer bleeding: a review of the literature\nSource: Therap Adv Gastroenterol (2024)\nAbstract: The current guideline suggests <m>intravenous</m> proton pump inhibitor (PPI) as the first choice for @DISEASE_Gastroesophageal_Reflux @DISEASE_MESH:D005764 @@@<m>gastric</m> <m>acid</m>@@@ suppression, and the dose and duration depend on the endoscopic findings.\n--------------------------------------------------------------------------------\nPMID: 37968012\nTitle: REVISE: Re-Evaluating the Inhibition of Stress Erosions in the ICU: a randomised trial protocol\nSource: BMJ Open (2023)\nAbstract: This 4800-@SPECIES_9606 @@@patient@@@ randomised <m>clinical</m> <m>trial</m> at low risk of bias will evaluate the effect of @CHEMICAL_Pantoprazole @CHEMICAL_MESH:D000077402 @@@<m>pantoprazole</m>@@@ versus placebo on <m>clinically</m> important @DISEASE_Gastrointestinal_Hemorrhage @DISEASE_MESH:D006471 @@@gastrointestinal bleeding@@@ (primary efficacy outcome), 90-day mortality (primary safety outcome) and other relevant endpoints.\n--------------------------------------------------------------------------------\nPMID: 33804279\nTitle: Accelerating Development of Benziamidazole-Class Proton Pump Inhibitors: A Mechanism-Based PK/PD Model to Optimize Study Design with Ilaprazole as a Case Drug\nSource: Pharmaceutics (2021)\nAbstract: According to the simulation based on developed model, a dose ceiling effect was observed in agreement with hypothesis and <m>trial</m> data. The inhibition of @CHEMICAL_ilaprazole @CHEMICAL_MESH:C119615 @@@ilaprazole@@@ on <m>gastric</m> <m>acid</m> reached the maximum effect at a single dose of 20 mg, which was completely consistent with the observation results of <m>clinical</m> <m>trials</m>.\n--------------------------------------------------------------------------------\nPMID: 37082451\nTitle: Current management of gastro-oesophageal reflux disease:treatment costs, safety profile, and effectiveness: a narrative review\nSource: Gastroenterol Rep (Oxf) (2023)\nAbstract: This was a large, multi-centre, double-blind, randomized, placebo-<m>controlled</m> <m>trial</m> of 40 mg/day of @CHEMICAL_Pantoprazole @CHEMICAL_MESH:D000077402 @@@<m>pantoprazole</m>@@@ combined with @CHEMICAL_Aspirin @CHEMICAL_MESH:D001241 @@@aspirin@@@/@CHEMICAL_Rivaroxaban @CHEMICAL_MESH:D000069552 @@@rivaroxaban@@@ in 17,598 @SPECIES_9606 @@@patients@@@ with stable @DISEASE_Cardiovascular_Diseases @DISEASE_MESH:D002318 @@@cardiovascular disease@@@ who were followed for a median of 3 years.\n--------------------------------------------------------------------------------\nPMID: 35359844\nTitle: Proton Pump Inhibitors and Cancer: Current State of Play\nSource: Front Pharmacol (2022)\nAbstract: The US Food and Drug Administration (FDA) has approved PPIs for a variety of <m>gastric</m> <m>acid</m>-related conditions, including @DISEASE_Gastroesophageal_Reflux @DISEASE_MESH:D005764 @@@gastroesophageal reflux disease@@@ (@DISEASE_Gastroesophageal_Reflux @DISEASE_MESH:D005764 @@@GERD@@@), @DISEASE_Stomach_Ulcer @DISEASE_MESH:D013276 @@@duodenal or <m>gastric</m> ulcers@@@, Helicobacter pylori infections, and @DISEASE_Zollinger_Ellison_Syndrome @DISEASE_MESH:D015043 @@@<m>Zollinger</m>-<m>Ellison</m> <m>syndrome</m>@@@ as well as the prevention of nonsteroidal anti-inflammatory drug (NSAID)-associated @DISEASE_Gastrointestinal_Diseases @DISEASE_MESH:D005767 @@@gastrointestinal lesions@@@ in at-risk @SPECIES_9606 @@@patients@@@ (aged > 65 years, with a history of @DISEASE_Ulcer @DISEASE_MESH:D014456 @@@gastrointestinal ulcer@@@ or with concomitant antiplatelet, anticoagulant, or corticosteroid therapy).\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_HrBwoEdbP3lx4o3dnYLKKIja",
+    "parent_tool_call_id": "call_bxaDbsRFejdhUAZQzq0hdyqj",
+    "round": 1,
+    "tool_input": {
+      "task_name": "pantoprazole gastrinoma",
+      "boolean_query_text": "pantoprazole gastrinoma intravenous acid secretion human",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='pantoprazole gastrinoma intravenous acid secretion human',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='pantoprazole gastrinoma intravenous acid secretion human',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/pantoprazole_gastrinoma.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pantoprazole_gastrinoma.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pantoprazole_gastrinoma.csv'\nTotal results found: 14\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 10734021\nTitle: Intravenous pantoprazole rapidly controls gastric acid hypersecretion in patients with Zollinger-Ellison syndrome.\nSource: Gastroenterology (2000)\nAbstract: BACKGROUND & AIMS: Parenteral control of gastric acid hypersecretion in conditions such as Zollinger-Ellison syndrome (ZES) or idiopathic gastric acid hypersecretion is necessary perioperatively or when oral medications cannot be taken for other reasons (e.g., during chemotherapy, acute upper gastrointestinal bleeding, or in intensive care unit settings). METHODS: We evaluated the efficacy and safety of 15-minute infusions of the proton pump inhibitor pantoprazole (80-120 mg every 8-12 hours) in controlling acid output for up to 7 days. Effective control was defined as acid output >10 milliequivalents per hour (mEq/h) (<5 mEq/h in patients with prior acid-reducing surgery) for 24 hours. RESULTS: The 21 patients enrolled had a mean age of 51.9 years (range, 29-75) and a mean disease duration of 8.1 years (range, <0.5-21); 13 were male, 7 had multiple endocrine neoplasia syndrome type I, 4 had undergone acid-reducing surgery, 2 had received chemotherapy, and 13 had undergone gastrinoma resections without cure. Basal acid output (mean +/- SD) was 40.2 +/- 27.9 mEq/h (range, 11.2-117.9). In all patients, acid output was controlled within the first hour (mean onset of effective control, ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 10980995\nTitle: The effect of Zollinger-Ellison syndrome and neuropeptide-secreting tumors on the stomach.\nSource: Current gastroenterology reports (1999)\nAbstract: Zollinger-Ellison syndrome (ZES) is caused by a tumor that secretes gastrin and is the most common of the malignant islet cell tumors. ZES leads to hypergastrinemia, which, in turn, causes an overproduction of gastric acid and results in complications of peptic ulcer disease. Of all the islet cell tumors, gastrinoma tumors have undergone the most extensive study, providing a model of tumor management. Increased awareness and improved biochemical and radiologic techniques mean that these disorders are being recognized in more patients. Advances in the management of gastric acid secretion and new localization methods have significantly reduced the morbidity and mortality associated with ZES. The use of intravenous proton pump inhibitors such as pantoprazole will make surgical and perioperative management more favorable for patients. Radiologic and nuclear medicine studies permit the detection of the majority of islet cell tumors and improve the ability for surgical resection. With the recent cloning of the gene for multiple endocrine neoplasia type I (MEN-I) and the recognition of tumor markers associated with the development of islet cell tumors, early detection of these tumors may  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 11475787\nTitle: [Efficacy and safety of intravenously administered pantoprazole in the treatment of gastrinoma].\nSource: Recenti progressi in medicina (2001)\nAbstract: The efficacy and safety of the proton pump inhibitor pantoprazole (P) in patients with Zollinger-Ellison syndrome (ZES) is well documented. We treated 21 patients with ZES with intravenous P; 13 of these patients were treated surgically in advance. The effect of P was very rapid, with reduction of the acid output within 15 min and its normalization within 60 min. The control of gastric acid secretion was maintained for a mean of 10.9 hours after the infusion of P. We conclude that the use of intravenous P allows a safe and efficient control of the acid ipersecretion in patients with ZES.\n--------------------------------------------------------------------------------\nPMID: 40458720\nTitle: Case Report: PRRT in a patient with Zollinger-Ellison syndrome. The management of gastrointestinal complications\nSource: Front Oncol (2025)\nAbstract: In our case, while oral home therapy with 40 mg @CHEMICAL_Pantoprazole @CHEMICAL_MESH:D000077402 @@@<m>pantoprazole</m>@@@ was sufficient to control symptoms prior to PRRT, the use of <m>intravenous</m> high dose PPIs as preparation and during each PRRT administration was crucial for the successful mitigation of symptoms throughout the entire treatment course.\n--------------------------------------------------------------------------------\nPMID: 37575785\nTitle: Gastrinoma With Relatively Low Gastrin Levels: A Case Report\nSource: Cureus (2023)\nAbstract: The excess <m>secretion</m> of gastric <m>acid</m> can cause a multitude of effects and problems in the @SPECIES_9606 @@@<m>human</m>@@@ body.\n--------------------------------------------------------------------------------\nPMID: 37090344\nTitle: Closed-Loop Gastric Outlet Obstruction Secondary to Duodenal Ulcer in a Patient With Esophageal Stricture\nSource: Cureus (2023)\nAbstract: The @DISEASE_Zollinger_Ellison_Syndrome @DISEASE_MESH:D015043 @@@ZES@@@ is a group of symptoms caused by increased gastric <m>acid</m> <m>secretion</m> due to @DISEASE_Gastrinoma @DISEASE_MESH:D015408 @@@gastrin-secreting tumors@@@, and @DISEASE_Gastrinoma @DISEASE_MESH:D015408 @@@<m>gastrinomas</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 39840110\nTitle: Appropriateness and inappropriate medication predictors of stress ulcer prophylaxis in the intensive care unit\nSource: Front Pharmacol (2025)\nAbstract: On the other hand, @CHEMICAL_Esomeprazole @CHEMICAL_MESH:D064098 @@@esomeprazole@@@ is characterized by a relatively sluggish metabolic process, negligible impact on normal gastric <m>acid</m> <m>secretion</m>, and a reduced first-pass effect, thereby yielding favorable outcomes in terms of ameliorating clinical symptoms for @SPECIES_9606 @@@patients@@@.In an international randomized trial, @CHEMICAL_Pantoprazole @CHEMICAL_MESH:D000077402 @@@<m>pantoprazole</m>@@@ use was associated with a reduction in clinically important @DISEASE_Hemorrhage @DISEASE_MESH:D006470 @@@bleeding@@@ among @SPECIES_9606 @@@patients@@@ receiving invasive ventilation.\n--------------------------------------------------------------------------------\nPMID: 34908809\nTitle: Proton pump inhibitors and colorectal cancer: A systematic review\nSource: World J Gastroenterol (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 28491421\nTitle: Medical management of gastrinoma in a cat\nSource: JFMS Open Rep (2016)\nAbstract: The @SPECIES_9685 @@@cat@@@ was initially stabilized with <m>intravenous</m> crystalloid fluid therapy, @CHEMICAL_maropitant @CHEMICAL_MESH:C518176 @@@maropitant@@@, @CHEMICAL_Pantoprazole @CHEMICAL_MESH:D000077402 @@@<m>pantoprazole</m>@@@ and @CHEMICAL_Octreotide @CHEMICAL_MESH:D015282 @@@octreotide@@@.\n--------------------------------------------------------------------------------\nPMID: 22261919\nTitle: ENETS Consensus Guidelines for the Management of Patients with Digestive Neuroendocrine Neoplasms: Functional Pancreatic Endocrine Tumor Syndromes\nSource: Neuroendocrinology (2012)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 27825371\nTitle: Effective and safe proton pump inhibitor therapy in acid-related diseases - A position paper addressing benefits and potential harms of acid suppression\nSource: BMC Med (2016)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 30378711\nTitle: ACVIM consensus statement: Support for rational administration of gastrointestinal protectants to dogs and cats\nSource: J Vet Intern Med (2018)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 31555796\nTitle: Advances in the Diagnosis and Management of Well-Differentiated Neuroendocrine Neoplasms\nSource: Endocr Rev (2020)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 20700836\nTitle: Common Pancreatic Disease\nSource: Adv Exp Med Biol (2010)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_ABiw41Zpks2RDP4rAwwzmrkt",
+    "parent_tool_call_id": "call_bxaDbsRFejdhUAZQzq0hdyqj",
+    "round": 1,
+    "tool_input": {
+      "task_name": "PPI infusion ZES",
+      "boolean_query_text": "pantoprazole infusion Zollinger Ellison acid output time control",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='pantoprazole infusion Zollinger Ellison acid output time control',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='pantoprazole infusion Zollinger Ellison acid output time control',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/PPI_infusion_ZES.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/PPI_infusion_ZES.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/PPI_infusion_ZES.csv'\nTotal results found: 12\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 11475787\nTitle: [Efficacy and safety of intravenously administered pantoprazole in the treatment of gastrinoma].\nSource: Recenti progressi in medicina (2001)\nAbstract: The efficacy and safety of the proton pump inhibitor pantoprazole (P) in patients with Zollinger-Ellison syndrome (ZES) is well documented. We treated 21 patients with ZES with intravenous P; 13 of these patients were treated surgically in advance. The effect of P was very rapid, with reduction of the acid output within 15 min and its normalization within 60 min. The control of gastric acid secretion was maintained for a mean of 10.9 hours after the infusion of P. We conclude that the use of intravenous P allows a safe and efficient control of the acid ipersecretion in patients with ZES.\n--------------------------------------------------------------------------------\nPMID: 34629807\nTitle: Gastrinoma and Zollinger Ellison syndrome: A roadmap for the management between new and old therapies\nSource: World J Gastroenterol (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37103745\nTitle: Management of Functional Pancreatic Neuroendocrine Neoplasms\nSource: Curr Treat Options Oncol (2023)\nAbstract: A starting dose of 80 mg of @CHEMICAL_Pantoprazole @CHEMICAL_MESH:D000077402 @@@<m>pantoprazole</m>@@@ administered via 15-min <m>infusions</m> every 8 h is recommended.\n--------------------------------------------------------------------------------\nPMID: 34128346\nTitle: European guideline on indications, performance and clinical impact of 13C-breath tests in adult and pediatric patients: An EAGEN, ESNM, and ESPGHAN consensus, supported by EPC\nSource: United European Gastroenterol J (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 24213225\nTitle: Diagnosis and Treatment of Gastrinomas in Multiple Endocrine Neoplasia Type 1 (MEN-1)\nSource: Cancers (Basel) (2012)\nAbstract: @GENE_GAST @GENE_2520 @@@Gastrin@@@ circulates not as a single molecule but as several peptides of various lengths and amino <m>acid</m> modifications. Moreover circulating gastrins in @DISEASE_Zollinger_Ellison_Syndrome @DISEASE_MESH:D015043 @@@<m>Zollinger</m>-<m>Ellison</m> syndrome@@@ may deviate from that in healthy <m>controls</m>.\n--------------------------------------------------------------------------------\nPMID: 19587828\nTitle: Duodenal Bulb Mucosa with Hypertrophic Gastric Oxyntic Heterotopia in Patients with Zollinger Ellison Syndrome\nSource: Diagn Ther Endosc (2009)\nAbstract: The major symptoms of @DISEASE_Zollinger_Ellison_Syndrome @DISEASE_MESH:D015043 @@@<m>Zollinger</m> <m>Ellison</m> syndrome@@@ (related to excessive gastric <m>acid</m> secretion) can now be well <m>controlled</m> with the use of proton pump inhibitors.\n--------------------------------------------------------------------------------\nPMID: 27795892\nTitle: Audit of IV pantoprazole: pattern of administration and compliance with guideline in a teaching hospital\nSource: Springerplus (2016)\nAbstract: @DISEASE_Job_Syndrome @DISEASE_MESH:D007589 @@@Hyper secretary disorders@@@ (including @DISEASE_Zollinger_Ellison_Syndrome @DISEASE_MESH:D015043 @@@<m>Zollinger</m>-<m>Ellison</m>@@@): 80 mg every 12 h; adjust dose based on <m>acid</m> <m>output</m> measurements; 160-240 mg daily in divided doses were used for a limited period (Barkun et al.).\n--------------------------------------------------------------------------------\nPMID: 27840364\nTitle: 25 Years of Proton Pump Inhibitors: A Comprehensive Review\nSource: Gut Liver (2017)\nAbstract: Most @SPECIES_9606 @@@patients@@@ in the study were able to have their <m>acid</m> <m>output</m> <m>controlled</m> with a once daily PPI dose, though nine required 60 mg twice daily for <m>acid</m> reduction.\n--------------------------------------------------------------------------------\nPMID: 27825371\nTitle: Effective and safe proton pump inhibitor therapy in acid-related diseases - A position paper addressing benefits and potential harms of acid suppression\nSource: BMC Med (2016)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 31623145\nTitle: Insights into Effects/Risks of Chronic Hypergastrinemia and Lifelong PPI Treatment in Man Based on Studies of Patients with Zollinger-Ellison Syndrome\nSource: Int J Mol Sci (2019)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 30378711\nTitle: ACVIM consensus statement: Support for rational administration of gastrointestinal protectants to dogs and cats\nSource: J Vet Intern Med (2018)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 22261919\nTitle: ENETS Consensus Guidelines for the Management of Patients with Digestive Neuroendocrine Neoplasms: Functional Pancreatic Endocrine Tumor Syndromes\nSource: Neuroendocrinology (2012)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_sTCpDF2OYl9Gnm5XTCzlKVbC",
+    "parent_tool_call_id": "call_ABiw41Zpks2RDP4rAwwzmrkt",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|acid output|effective control|within the first hour|mean onset|percent|dose|infusion|adverse|conclusion",
+      "pmid": "10734021"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('10734021')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|acid output|effective control|within the first hour|mean onset|percent|dose|infusion|adverse|conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|acid output|effective control|within  ... nset|percent|dose|infusion|adverse|conclusion\n      \u001b[90mpmid:\u001b[0m 10734021\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Methods|15-minute|80|120|8|12|hours|acid output|normalization|maintained\n      \u001b[90mpmid:\u001b[0m 11475787\n\n  \u001b[1m\u001b[93m[3] get_paper_references\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 20\n      \u001b[90mmax_workers:\u001b[0m 2\n      \u001b[90mmini_batch_size:\u001b[0m 10\n      \u001b[90mpmids:\u001b[0m ['10734021', '11475787']\n      \u001b[90mrate_limit:\u001b[0m 3\n      \u001b[90mtask_name:\u001b[0m ZES pantoprazole references\n\n=== PMID: 10734021 ===\n\nTitle: Intravenous pantoprazole rapidly controls gastric acid hypersecretion in patients with Zollinger-Ellison syndrome.\n\nJournal/Date: Gastroenterology (2000)\n\nMeSH Keywords: 2-Pyridinylmethylsulfinylbenzimidazoles, Adult, Aged, Anti-Ulcer Agents, Benzimidazoles, Female, Gastric Acid, Humans\n\n\n--- ABSTRACT ---\n[BACKGROUND & AIMS]: Parenteral control of gastric acid hypersecretion in conditions such as Zollinger-Ellison syndrome (ZES) or idiopathic gastric acid hypersecretion is necessary perioperatively or when oral medications cannot be taken for other reasons (e.g., during chemotherapy, acute upper gastrointestinal bleeding, or in intensive care unit settings).\n[METHODS]: We evaluated the efficacy and safety of 15-minute infusions of the proton pump inhibitor pantoprazole (80-120 mg every 8-12 hours) in controlling acid output for up to 7 days. Effective control was defined as acid output >10 milliequivalents per hour (mEq/h) (<5 mEq/h in patients with prior acid-reducing surgery) for 24 hours.\n[RESULTS]: The 21 patients enrolled had a mean age of 51.9 years (range, 29-75) and a mean disease duration of 8.1 years (range, <0.5-21); 13 were male, 7 had multiple endocrine neoplasia syndrome type I, 4 had undergone acid-reducing surgery, 2 had received chemotherapy, and 13 had undergone gastrinoma resections without cure. Basal acid output (mean +/- SD) was 40.2 +/- 27.9 mEq/h (range, 11.2-117.9). In all patients, acid output was controlled within the first hour (mean onset of effective control, 41 minutes) after an initial 80-mg intravenous pantoprazole dose. Pantoprazole, 80 mg every 12 hours, was effective in 17 of 21 patients (81%) for up to 7 days. Four patients required upward dose titration, 2 required 120 mg pantoprazole every 12 hours, and 2 required 80 mg every 8 hours. At study end, acid output remained controlled for 6 hours beyond the next expected dose in 71% of patients (n = 15); mean acid output increased to 4.0 mEq/h (range, 0-9.7). No serious or unexpected adverse events were observed.\n[CONCLUSIONS]: Intravenous pantoprazole, 160-240 mg/day administered in divided doses by 15-minute infusion, rapidly and effectively controlled acid output within 1 hour and maintained control for up to 7 days in all ZES patients.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_97ECtJfQnQGWqEVN9lNaYeUj",
+    "parent_tool_call_id": "call_ABiw41Zpks2RDP4rAwwzmrkt",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Methods|15-minute|80|120|8|12|hours|acid output|normalization|maintained",
+      "pmid": "11475787"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('11475787')\noutput = format_paper_content_output(result, filter_keywords='Methods|15-minute|80|120|8|12|hours|acid output|normalization|maintained')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 11475787 ===\n\nTitle: [Efficacy and safety of intravenously administered pantoprazole in the treatment of gastrinoma].\n\nJournal/Date: Recenti progressi in medicina (2001)\n\nMeSH Keywords: 2-Pyridinylmethylsulfinylbenzimidazoles, Adult, Aged, Anti-Ulcer Agents, Benzimidazoles, Enzyme Inhibitors, Female, Gastric Acid\n\n\n--- ABSTRACT ---\nThe efficacy and safety of the proton pump inhibitor pantoprazole (P) in patients with Zollinger-Ellison syndrome (ZES) is well documented. We treated 21 patients with ZES with intravenous P; 13 of these patients were treated surgically in advance. The effect of P was very rapid, with reduction of the acid output within 15 min and its normalization within 60 min. The control of gastric acid secretion was maintained for a mean of 10.9 hours after the infusion of P. We conclude that the use of intravenous P allows a safe and efficient control of the acid ipersecretion in patients with ZES.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "get_paper_references",
+    "tool_call_id": "call_3KYYakvbTZpBV6i9QXNyLEMJ",
+    "parent_tool_call_id": "call_ABiw41Zpks2RDP4rAwwzmrkt",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 20,
+      "max_workers": 2,
+      "mini_batch_size": 10,
+      "pmids": [
+        "10734021",
+        "11475787"
+      ],
+      "rate_limit": 3,
+      "task_name": "ZES pantoprazole references"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_get_paper_references\nimport pandas as pd\n\nsearch_results = pubmed_api_get_paper_references(\n    pmids=['10734021', '11475787'], batch_size=20, mini_batch_size=10,\n    max_workers=2, rate_limit=3\n)\n\nsearch_results_df = pd.DataFrame(search_results)\nsearch_results_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ZES_pantoprazole_references.csv', index=False)\nprint(\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ZES_pantoprazole_references.csv'\")\nprint(search_results_df.head().to_markdown())\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ZES_pantoprazole_references.csv'\n|    |   source_pmid |   target_pmid | relation_type   | target_title                                                                                                  |   target_year |\n|---:|--------------:|--------------:|:----------------|:--------------------------------------------------------------------------------------------------------------|--------------:|\n|  0 |      10734021 |      13259432 | cites           | Primary peptic ulcerations of the jejunum associated with islet cell tumors of the pancreas.                  |          1955 |\n|  1 |      10734021 |      10562300 | cites           | PACAP type I receptor activation regulates ECL cells and gastric acid secretion.                              |          1999 |\n|  2 |      10734021 |      10520836 | cites           | Inhibition of pentagastrin-induced gastric acid secretion by intravenous pantoprazole: a dose-response study. |          1999 |\n|  3 |      10734021 |       9798809 | cites           | Equipotent inhibition of gastric acid secretion by equal doses of oral or intravenous pantoprazole.           |          1998 |\n|  4 |      10734021 |       9451277 | cites           | Omeprazole (correction of omepraxole) and ocular damage. Lack of causality holds true.                        |          1998 |\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_OAtoLBQQ0m5AiHQR8anjWZRX",
+    "parent_tool_call_id": "call_3KYYakvbTZpBV6i9QXNyLEMJ",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "In the main human clinical study (21 patients with Zollinger–Ellison syndrome, Gastroenterology 2000; PMID 10734021), a single initial 80-mg intravenous pantoprazole dose given as a 15-minute infusion controlled acid output in every patient within the first hour; mean onset of effective control was 41 minutes. Baseline acid output averaged 40.2 ± 27.9 mEq/h (range 11.2–117.9).",
+          "source_tools": [
+            {
+              "relevance": "Primary clinical study abstract and extracted results",
+              "tool_call_id": "call_sTCpDF2OYl9Gnm5XTCzlKVbC"
+            }
+          ]
+        },
+        {
+          "finding": "The regimen used in the clinical study was pantoprazole 80–120 mg every 8–12 hours by 15-minute infusion (160–240 mg/day). Pantoprazole 80 mg every 12 hours maintained control for up to 7 days in 17/21 patients (81%); 4 required escalation—2 to 120 mg every 12 hours and 2 to 80 mg every 8 hours.",
+          "source_tools": [
+            {
+              "relevance": "Dose, titration, duration, and maintenance results",
+              "tool_call_id": "call_sTCpDF2OYl9Gnm5XTCzlKVbC"
+            }
+          ]
+        },
+        {
+          "finding": "Magnitude/durability of suppression: at study end, acid output remained controlled for 6 hours beyond the next scheduled dose in 15/21 patients (71%), with mean acid output 4.0 mEq/h (range 0–9.7). No serious or unexpected adverse events were observed; the study concluded that divided-dose IV pantoprazole rapidly and effectively controlled hypersecretion for up to 7 days.",
+          "source_tools": [
+            {
+              "relevance": "Primary study pharmacodynamic outcome and safety conclusion",
+              "tool_call_id": "call_sTCpDF2OYl9Gnm5XTCzlKVbC"
+            }
+          ]
+        },
+        {
+          "finding": "A separate report of the same-sized ZES cohort (21 patients; PMID 11475787) describes acid-output reduction within 15 minutes, normalization within 60 minutes, and control maintained for a mean of 10.9 hours after infusion, supporting rapid onset and clinically useful duration.",
+          "source_tools": [
+            {
+              "relevance": "Independent PubMed abstract report of human ZES experience",
+              "tool_call_id": "call_97ECtJfQnQGWqEVN9lNaYeUj"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: available human evidence supports rapid, effective control of ZES-related gastric acid hypersecretion with IV pantoprazole—typically measurable within 15 minutes and normalized/clinically controlled within 1 hour—using intermittent 15-minute infusions. Evidence is persuasive but based mainly on a small, open clinical cohort rather than a randomized comparative trial; some patients require dose escalation.",
+          "source_tools": [
+            {
+              "relevance": "Primary clinical trial evidence",
+              "tool_call_id": "call_sTCpDF2OYl9Gnm5XTCzlKVbC"
+            },
+            {
+              "relevance": "Corroborating human cohort abstract",
+              "tool_call_id": "call_97ECtJfQnQGWqEVN9lNaYeUj"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_1WZSwkycOuCfyZe0JlNlJMVP",
+    "parent_tool_call_id": "call_bxaDbsRFejdhUAZQzq0hdyqj",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DRUG",
+          "name": "Pantoprazole",
+          "observations": [
+            "An 80-mg intravenous dose infused over 15 minutes controlled acid output in all 21 patients with Zollinger–Ellison syndrome within 1 hour; mean onset was 41 minutes.",
+            "Intermittent intravenous dosing was 80–120 mg every 8–12 hours; 80 mg every 12 hours maintained control for up to 7 days in 17/21 patients, while 4 required escalation.",
+            "At study end, mean acid output was 4.0 mEq/h (range 0–9.7) in the reported follow-up assessment; no serious or unexpected adverse events were observed."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Rapid onset and clinical efficacy in ZES",
+              "tool_call_id": "call_sTCpDF2OYl9Gnm5XTCzlKVbC"
+            },
+            {
+              "relevance": "Rapid onset and duration of acid control",
+              "tool_call_id": "call_97ECtJfQnQGWqEVN9lNaYeUj"
+            }
+          ]
+        },
+        {
+          "entity_type": "DISEASE",
+          "name": "Zollinger-Ellison syndrome",
+          "observations": [
+            "In a 21-patient human cohort, baseline gastric acid output averaged 40.2 ± 27.9 mEq/h (range 11.2–117.9) before intravenous pantoprazole treatment.",
+            "Acid-output reduction was reported within 15 minutes, normalization within 60 minutes, and control lasted a mean of 10.9 hours after infusion in a separate report."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Baseline hypersecretion and response to IV pantoprazole",
+              "tool_call_id": "call_sTCpDF2OYl9Gnm5XTCzlKVbC"
+            },
+            {
+              "relevance": "Time to normalization and duration",
+              "tool_call_id": "call_97ECtJfQnQGWqEVN9lNaYeUj"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:10734021 Pantoprazole ZES",
+          "observations": [
+            "Clinical study of 21 patients with Zollinger–Ellison syndrome evaluating intravenous pantoprazole for gastric acid hypersecretion; all patients achieved control within the first hour, with mean onset of 41 minutes."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary human clinical evidence",
+              "tool_call_id": "call_sTCpDF2OYl9Gnm5XTCzlKVbC"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:11475787 IV pantoprazole ZES",
+          "observations": [
+            "Report in 21 patients describing acid-output reduction within 15 minutes, normalization within 60 minutes, and mean control duration of 10.9 hours after infusion."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Independent/closely related human report supporting rapid control",
+              "tool_call_id": "call_97ECtJfQnQGWqEVN9lNaYeUj"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Pantoprazole",
+          "relation_type": "INHIBITS",
+          "to_entity": "Zollinger-Ellison syndrome"
+        },
+        {
+          "from_entity": "PMID:10734021 Pantoprazole ZES",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Pantoprazole"
+        },
+        {
+          "from_entity": "PMID:11475787 IV pantoprazole ZES",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Pantoprazole"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 4, \"entities\": [{\"name\": \"Pantoprazole\", \"entityType\": \"DRUG\", \"observations\": [\"An 80-mg intravenous dose infused over 15 minutes controlled acid output in all 21 patients with Zollinger\\u2013Ellison syndrome within 1 hour; mean onset was 41 minutes.\", \"Intermittent intravenous dosing was 80\\u2013120 mg every 8\\u201312 hours; 80 mg every 12 hours maintained control for up to 7 days in 17/21 patients, while 4 required escalation.\", \"At study end, mean acid output was 4.0 mEq/h (range 0\\u20139.7) in the reported follow-up assessment; no serious or unexpected adverse events were observed.\"]}, {\"name\": \"Zollinger-Ellison syndrome\", \"entityType\": \"DISEASE\", \"observations\": [\"In a 21-patient human cohort, baseline gastric acid output averaged 40.2 \\u00b1 27.9 mEq/h (range 11.2\\u2013117.9) before intravenous pantoprazole treatment.\", \"Acid-output reduction was reported within 15 minutes, normalization within 60 minutes, and control lasted a mean of 10.9 hours after infusion in a separate report.\"]}, {\"name\": \"PMID:10734021 Pantoprazole ZES\", \"entityType\": \"PAPER\", \"observations\": [\"Clinical study of 21 patients with Zollinger\\u2013Ellison syndrome evaluating intravenous pantoprazole for gastric acid hypersecretion; all patients achieved control within the first hour, with mean onset of 41 minutes.\"]}, {\"name\": \"PMID:11475787 IV pantoprazole ZES\", \"entityType\": \"PAPER\", \"observations\": [\"Report in 21 patients describing acid-output reduction within 15 minutes, normalization within 60 minutes, and mean control duration of 10.9 hours after infusion.\"]}]}, \"relations_created\": {\"count\": 3, \"relations\": [{\"from\": \"Pantoprazole\", \"to\": \"Zollinger-Ellison syndrome\", \"relationType\": \"INHIBITS\"}, {\"from\": \"PMID:10734021 Pantoprazole ZES\", \"to\": \"Pantoprazole\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:11475787 IV pantoprazole ZES\", \"to\": \"Pantoprazole\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_1WZSwkycOuCfyZe0JlNlJMVP\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_bxaDbsRFejdhUAZQzq0hdyqj\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_twzEfPm4jnGOGSepythBrwWV",
+    "parent_tool_call_id": "call_1WZSwkycOuCfyZe0JlNlJMVP",
+    "round": 3,
+    "tool_input": {
+      "entity_names": "[\"Pantoprazole\",\"Zollinger-Ellison syndrome\",\"PMID:10734021 Pantoprazole ZES\",\"PMID:11475787 IV pantoprazole ZES\"]",
+      "get_full_map": false,
+      "max_entities": null,
+      "max_observations_per_entity": 5,
+      "query": null,
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"requested_entities\": [\"Pantoprazole\", \"Zollinger-Ellison syndrome\", \"PMID:10734021 Pantoprazole ZES\", \"PMID:11475787 IV pantoprazole ZES\"], \"results\": {\"entities\": [{\"name\": \"Pantoprazole\", \"entityType\": \"DRUG\", \"observations\": [\"An 80-mg intravenous dose infused over 15 minutes controlled acid output in all 21 patients with Zollinger\\u2013Ellison syndrome within 1 hour; mean onset was 41 minutes.\", \"Intermittent intravenous dosing was 80\\u2013120 mg every 8\\u201312 hours; 80 mg every 12 hours maintained control for up to 7 days in 17/21 patients, while 4 required escalation.\", \"At study end, mean acid output was 4.0 mEq/h (range 0\\u20139.7) in the reported follow-up assessment; no serious or unexpected adverse events were observed.\"]}, {\"name\": \"Zollinger-Ellison syndrome\", \"entityType\": \"DISEASE\", \"observations\": [\"In a 21-patient human cohort, baseline gastric acid output averaged 40.2 \\u00b1 27.9 mEq/h (range 11.2\\u2013117.9) before intravenous pantoprazole treatment.\", \"Acid-output reduction was reported within 15 minutes, normalization within 60 minutes, and control lasted a mean of 10.9 hours after infusion in a separate report.\"]}, {\"name\": \"PMID:10734021 Pantoprazole ZES\", \"entityType\": \"PAPER\", \"observations\": [\"Clinical study of 21 patients with Zollinger\\u2013Ellison syndrome evaluating intravenous pantoprazole for gastric acid hypersecretion; all patients achieved control within the first hour, with mean onset of 41 minutes.\"]}, {\"name\": \"PMID:11475787 IV pantoprazole ZES\", \"entityType\": \"PAPER\", \"observations\": [\"Report in 21 patients describing acid-output reduction within 15 minutes, normalization within 60 minutes, and mean control duration of 10.9 hours after infusion.\"]}], \"relations\": [{\"from\": \"Pantoprazole\", \"to\": \"Zollinger-Ellison syndrome\", \"relationType\": \"INHIBITS\"}, {\"from\": \"PMID:10734021 Pantoprazole ZES\", \"to\": \"Pantoprazole\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:11475787 IV pantoprazole ZES\", \"to\": \"Pantoprazole\", \"relationType\": \"SUPPORTS\"}]}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

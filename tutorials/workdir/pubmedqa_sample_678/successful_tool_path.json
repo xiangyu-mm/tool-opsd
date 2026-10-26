@@ -1,0 +1,223 @@
+[
+  {
+    "step": 6,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_UQyQG6tewPAj7AvLZl81xu5P",
+    "parent_tool_call_id": null,
+    "round": 2,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 4,
+      "search_target": "Identify the PubMed paper on factors influencing polyp miss rate in tandem colonoscopy. Search exact and variant phrases: “factors influencing the miss rate of polyps”, “tandem colonoscopy”, “polyp miss rate”. Return the paper title, PMID, authors/year, tandem colonoscopy protocol, number of patients and lesions, overall miss rates, and all statistically significant factors associated with missed polyps, including odds ratios or P values when available."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_JLjdm9EaPAenBFvHHm7mrgqo",
+    "parent_tool_call_id": "call_UQyQG6tewPAj7AvLZl81xu5P",
+    "round": 1,
+    "tool_input": {
+      "task_name": "miss rate phrase",
+      "boolean_query_text": "\"polyp miss rate\" colonoscopy factors",
+      "top_k": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='\"polyp miss rate\" colonoscopy factors',\n        top_k=50,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 5 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='\"polyp miss rate\" colonoscopy factors',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/miss_rate_phrase.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/miss_rate_phrase.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/miss_rate_phrase.csv'\nTotal results found: 57\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 37017819\nTitle: Risk Factors Related to Polyp Miss Rate of Short-Term Repeated Colonoscopy.\nSource: Digestive diseases and sciences (2023)\nAbstract: BACKGROUND: Colonoscopy is regarded as the gold standard for colorectal cancer screening and surveillance. However, previous studies have reported large numbers of polyps were missed during routine colonoscopy. AIMS: To evaluate polyp miss rate in short-term repeated colonoscopy and explore the related risk factors. METHODS: A total of 3695 patients and 12,412 polyps were included in our studies. We calculated the miss rate for polyps of different sizes, pathologies, morphologies and locations, and patients of different characteristics. Univariate and multivariate logistic regression analyses were performed to evaluate risk factors related to miss rate. RESULTS: The polyp miss rate was 26.3% and the adenoma miss rate was 22.4% in our study. The advanced adenoma miss rate was 11.0% and the proportion of missed advanced adenomas in missed adenomas sized > 5 mm was up to 22.8%. Polyps sized < 5 mm had a significantly higher miss rate. The miss rate of pedunculated polyps was lower than that of flat or sessile polyps. Polyps in the right colon were prone to be missed than that in the left colon. For older men, current smokers, individuals with multiple polyps detected in the first colo ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 33556255\nTitle: Risk factors associated with missed colorectal lesions in colonoscopy and impact of colonoscopy with anesthesia on miss rate.\nSource: Scandinavian journal of gastroenterology (2021)\nAbstract: OBJECTIVES: To systematically determine the miss rate and risk factors for polyps, adenomas and advanced adenomas in the same population, and to further analyze the impact of colonoscopy with anesthesia on miss rate. METHODS: We retrospectively analyzed the information of the patients undergoing the second colonoscopy within 1 year after their first. The patient and lesion miss rate were calculated. The patient and lesion features of missed lesion were compared with non-missed lesion. Finally, the patients were divided into anesthesia group and without anesthesia group, and the impact of colonoscopy with anesthesia on missed lesions was further analyzed. RESULTS: The patient miss rate of polyps, adenomas and advanced adenomas was 32.8, 25.6 and 10.4%, and the lesions miss rate was 19.6, 15.8 and 7.2%. In multivariable logistic regression analysis, lesion-related factors (large number of lesions, small lesion size, flat shape and location at the right colon) and patient-related factors (male, elder, abdominal symptoms, surgical history, diverticulum, colonoscopy without anesthesia and suboptimal bowel preparation) were found to be independently associated with missed polyps and aden ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 41638419\nTitle: Impact of Narrow-Band Imaging on Sessile Serrated Lesion Miss Rate: A Multicenter Randomized Tandem Colonoscopy Trial.\nSource: Clinical gastroenterology and hepatology : the official clinical practice journal of the American Gastroenterological Association (2026)\nAbstract: BACKGROUND & AIMS: Sessile serrated lesions (SSLs) are precursors to post-colonoscopy colorectal cancer but are frequently missed because of their subtle morphology. Previous studies have reported the effectiveness of narrow-band imaging (NBI) for detecting colorectal adenomas, but its value for detecting SSLs remains unclear. This study aimed to determine whether NBI reduces the SSL miss rate (SSLMR). METHODS: This multicenter, randomized tandem trial was conducted in a colorectal cancer screening population across 15 endoscopy centers. The participants were randomly assigned to NBI-first or white light imaging-first (WLI-first) colonoscopy, followed by a second examination using the alternate modality. The primary outcome was the SSLMR, and secondary outcomes included the proximal serrated polyp miss rate, adenoma miss rate, and changes in surveillance intervals. RESULTS: NBI significantly reduced the SSLMR compared with WLI (17.5% vs 43.6%; P = .003), with consistent decreasing trends in subgroups stratified by location, sex, age, and other variables. The NBI-first group also had lower miss rates for proximal serrated lesions (19.3% vs 40.7%; P < .001) and adenomas (20.1% vs 29. ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 30568383\nTitle: Methodology to develop machine learning algorithms to improve performance in gastrointestinal endoscopy.\nSource: World journal of gastroenterology (2018)\nAbstract: Assisted diagnosis using artificial intelligence has been a holy grail in medical research for many years, and recent developments in computer hardware have enabled the narrower area of machine learning to equip clinicians with potentially useful tools for computer assisted diagnosis (CAD) systems. However, training and assessing a computer's ability to diagnose like a human are complex tasks, and successful outcomes depend on various factors. We have focused our work on gastrointestinal (GI) endoscopy because it is a cornerstone for diagnosis and treatment of diseases of the GI tract. About 2.8 million luminal GI (esophageal, stomach, colorectal) cancers are detected globally every year, and although substantial technical improvements in endoscopes have been made over the last 10-15 years, a major limitation of endoscopic examinations remains operator variation. This translates into a substantial inter-observer variation in the detection and assessment of mucosal lesions, causing among other things an average polyp miss-rate of 20% in the colon and thus the subsequent development of a number of post-colonoscopy colorectal cancers. CAD systems might eliminate this variation and lea ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 39303447\nTitle: Validating polyp and instrument segmentation methods in colonoscopy through Medico 2020 and MedAI 2021 Challenges.\nSource: Medical image analysis (2025)\nAbstract: Automatic analysis of colonoscopy images has been an active field of research motivated by the importance of early detection of precancerous polyps. However, detecting polyps during the live examination can be challenging due to various factors such as variation of skills and experience among the endoscopists, lack of attentiveness, and fatigue leading to a high polyp miss-rate. Therefore, there is a need for an automated system that can flag missed polyps during the examination and improve patient care. Deep learning has emerged as a promising solution to this challenge as it can assist endoscopists in detecting and classifying overlooked polyps and abnormalities in real time, improving the accuracy of diagnosis and enhancing treatment. In addition to the algorithm's accuracy, transparency and interpretability are crucial to explaining the whys and hows of the algorithm's prediction. Further, conclusions based on incorrect decisions may be fatal, especially in medicine. Despite these pitfalls, most algorithms are developed in private data, closed source, or proprietary software, and methods lack reproducibility. Therefore, to promote the development of efficient and transparent me ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 41803701\nTitle: Clinical value of rectal retroflexion during colonoscopy: a retrospective analysis.\nSource: BMC gastroenterology (2026)\nAbstract: BACKGROUND & AIMS: Conventional forward-viewing colonoscopy may overlook lesions in the distal rectum, increasing the risk of missed colorectal neoplasia. Rectal retroflexion can improve visualization, but its diagnostic value remains debated. This study evaluated the diagnostic yield and safety of rectal retroflexion for detecting rectal polyps. METHODS: A total of 1,330 colonoscopy cases were retrospectively analyzed. Demographic characteristics, procedural success rate, and findings from both forward and retroflexed views were reviewed. The primary endpoints were the success rate of retroflexion, the per-patient polyp detection rate (PDR), and the per-patient polyp miss rate (PMR). Logistic regression was used to identify factors associated with retroflexion failure and additional polyp detection. RESULTS: Rectal retroflexion was successfully completed in 98.7% of cases, with no procedure-related adverse events. Rectal edema was the only independent predictor of retroflexion failure (OR = 54.8, P = 0.008). Retroflexion identified additional polyps in 76 patients (PMR = 5.7%), resulting in an overall PDR of 37.3% compared with 31.6% by forward view alone. Male sex (OR = 1.64), in ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 24466539\nTitle: Importance of Early Follow-up Colonoscopy in Patients at High Risk for Colorectal Polyps.\nSource: Annals of coloproctology (2013)\nAbstract: PURPOSE: Minimizing the polyp miss rate during colonoscopy is important for patients at high risk for colorectal polyps. We investigated the polyp miss rate and the factors associated with it in high-risk patients. METHODS: The medical records of 163 patients who underwent follow-up colonoscopy between January 2001 and April 2010, which was within 9 months after a polypectomy, because the index colonoscopy had shown multiple (more than 3) adenomas or advanced adenoma were retrospectively reviewed. Miss rates were calculated for all polyps, for neoplastic polyps and for advanced adenomas. Factors associated with the miss rates in these patients, such as the location, shape and size of the polyp, were analyzed. RESULTS: The miss rates for polyps, adenomas, adenomas <5 mm, adenomas ≥5 mm and advanced adenomas were 32.6%, 20.9%, 17.7%, 3.2%, and 0.9%, respectively. No carcinoma, except for one small carcinoid tumor, was missed. Flat shape and small size (<5 mm) were significantly associated with adenoma miss rate. The miss rate was significantly higher for flat-type advanced adenomas than for protruded-type advanced adenomas (27.7% vs 4.1%). CONCLUSION: The polyp miss rate in patients  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 37017819\nTitle: Risk Factors Related to Polyp Miss Rate of Short-Term Repeated Colonoscopy.\nSource: Dig Dis Sci (2023)\nAbstract: Risk <m>Factors</m> Related to @DISEASE_Polyps @DISEASE_MESH:D011127 @@@<m>Polyp@@@ Miss Rate</m> of Short-Term Repeated <m>Colonoscopy</m>.\n--------------------------------------------------------------------------------\nPMID: 40722509\nTitle: An Additional 30-s Observation of the Right-Sided Colon Using a Novel Endoscopic System with Texture and Color Enhancement Imaging Decreases Polyp Miss Rates: A Multicenter Study.\nSource: Diagnostics (Basel) (2025)\nAbstract: An Additional 30-s Observation of the Right-Sided Colon Using a Novel Endoscopic System with Texture and Color Enhancement Imaging Decreases <m>Polyp Miss Rates</m>: A Multicenter Study.\n--------------------------------------------------------------------------------\nPMID: 33556255\nTitle: Risk factors associated with missed colorectal lesions in colonoscopy and impact of colonoscopy with anesthesia on miss rate.\nSource: Scand J Gastroenterol (2021)\nAbstract: Risk <m>factors</m> associated with missed @DISEASE_Colorectal_Neoplasms @DISEASE_MESH:D015179 @@@colorectal lesions@@@ in <m>colonoscopy</m> and impact of <m>colonoscopy</m> with anesthesia on miss rate.\n--------------------------------------------------------------------------------\nPMID: 41638419\nTitle: Impact of Narrow-Band Imaging on Sessile Serrated Lesion Miss Rate: A Multicenter Randomized Tandem Colonoscopy Trial.\nSource: Clin Gastroenterol Hepatol (2026)\nAbstract: Impact of Narrow-Band Imaging on Sessile Serrated Lesion Miss Rate: A Multicenter Randomized Tandem <m>Colonoscopy</m> Trial.\n--------------------------------------------------------------------------------\nPMID: 39583395\nTitle: Significant Missed Polyps in the UK Bowel Cancer Screening Programme (BCSP): A Retrospective Analysis of Prevalence and Contributing Factors\nSource: Cureus (2024)\nAbstract: However, Leufkens et al., in their study, also reported that more than two @DISEASE_Polyps @DISEASE_MESH:D011127 @@@polyps@@@ during <m>colonoscopy</m> and localisation in the left colon are the main <m>factors</m> that increased the risk of missed @DISEASE_Polyps @DISEASE_MESH:D011127 @@@polyps@@@.\n--------------------------------------------------------------------------------\nPMID: 41226043\nTitle: Clinical Evaluation of PolyDeep, A Computer-Aided Detection System: A Multicenter Randomized Tandem Colonoscopy Trial\nSource: Diagnostics (Basel) (2025)\nAbstract: Collectively, these <m>factors</m> contribute to the risk of missed lesions during <m>colonoscopy</m>, which may subsequently lead to the development of post-<m>colonoscopy</m> @DISEASE_Colorectal_Neoplasms @DISEASE_MESH:D015179 @@@colorectal cancer@@@ (@DISEASE_Colorectal_Neoplasms @DISEASE_MESH:D015179 @@@PCCRC@@@).\n--------------------------------------------------------------------------------\nPMID: 37190122\nTitle: Artificial Intelligence Applied to Colonoscopy: Is It Time to Take a Step Forward?\nSource: Cancers (Basel) (2023)\nAbstract: First, the amount of colonic surface area examined is a crucial <m>factor</m> in determining <m>colonoscopy</m> quality. Although AI devices only provide information of lesions within the field of view, they could potentially help to improve mucosal exposure.\n--------------------------------------------------------------------------------\nPMID: 39303447\nTitle: Validating polyp and instrument segmentation methods in colonoscopy through Medico 2020 and MedAI 2021 Challenges.\nSource: Med Image Anal (2024)\nAbstract: However, detecting @DISEASE_Polyps @DISEASE_MESH:D011127 @@@polyps@@@ during the live examination can be challenging due to various <m>factors</m> such as variation of skills and experience among the endoscopists, lack of attentiveness, and fatigue leading to a high @DISEASE_Polyps @DISEASE_MESH:D011127 @@@<m>polyp@@@ miss-rate</m>.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_qn4xv6OQQVx52SOEQF5akXsD",
+    "parent_tool_call_id": "call_JLjdm9EaPAenBFvHHm7mrgqo",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "author|Methods|RESULTS|miss rate|odds ratio|OR|p=|p <|afternoon|size|flat|sessile|left colon|location|experience|patient|procedure",
+      "pmid": "25073668"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25073668')\noutput = format_paper_content_output(result, filter_keywords='author|Methods|RESULTS|miss rate|odds ratio|OR|p=|p <|afternoon|size|flat|sessile|left colon|location|experience|patient|procedure')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m author|Methods|RESULTS|miss rate|odds ratio|O ... t colon|location|experience|patient|procedure\n      \u001b[90mpmid:\u001b[0m 25073668\n\n  \u001b[1m\u001b[93m[2] fetch_paper_annotations\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 10\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mpmids:\u001b[0m ['25073668']\n\n  \u001b[1m\u001b[93m[3] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m target paper details\n      \u001b[90mboolean_query_text:\u001b[0m 25073668\n      \u001b[90mtop_k:\u001b[0m 5\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n=== PMID: 25073668 ===\n\nTitle: [Factors influencing the miss rate of polyps in a tandem colonoscopy study].\n\nJournal/Date: The Korean journal of gastroenterology = Taehan Sohwagi Hakhoe chi (2014)\n\nMeSH Keywords: Adenoma, Aged, Body Mass Index, Clinical Competence, Colonic Neoplasms, Colonic Polyps, Colonoscopy, Diagnostic Errors\n\n\n--- ABSTRACT ---\n[BACKGROUND/AIMS]: The miss rate of colon polyps and its related factors have not been clearly identified yet. This study aims to review the miss rate of polyps both on the patient-level and on the polyp-level and to analyze the factors affecting the miss rate such as those related to the endoscopist, procedure, patient, and polyp.\n[METHODS]: From August 2011 to August 2013, patients who underwent elective second colonoscopy for resection of polyps, the sizes of which were not small enough to be resected by biopsy forceps alone at first colonoscopy, were enrolled retrospectively.\n[RESULTS]: The miss rate on the patient-level was 59.2% (234/395) and on the polyp-level was 27.9% (578/2,068). There was no significant difference in the miss rate depending on the experience of the endoscopists or characteristics of the patients. In terms of the procedure, the miss rate was higher when the colonoscopy was performed in the afternoon (OR 1.632, p=0.046). It was found that the miss rate of polyps increased when the polyps were small (OR 4.595, p<0.001 in <5 mm/OR 3.447, p<0.001 in 5-10 mm), flat or sessile (OR 2.406, p<0.001 in flat/OR 1.768, p=0.002 in sessile), and located in the left colon (OR 1.391, p=0.007).\n[CONCLUSIONS]: The experience of endoscopists did not have influence on the accuracy of polyp detection. However, the fatigue of endoscopists in the afternoon is considered to render polyp detection less accurate. Also, the large curves and folds of the sigmoid colon are regarded as a reason for the higher miss rate of polyps in the left colon.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_LgadfaJSss1Go4TdkyCQ9NIO",
+    "parent_tool_call_id": "call_JLjdm9EaPAenBFvHHm7mrgqo",
+    "round": 2,
+    "tool_input": {
+      "task_name": "target paper details",
+      "boolean_query_text": "25073668",
+      "top_k": 5,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='25073668',\n        top_k=5,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='25073668',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/target_paper_details.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/target_paper_details.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nUnexpected error (attempt 1/3): \"['pmcid'] not in index\"\nRetry attempt 2 after 0.3333333333333333 seconds...\nUnexpected error (attempt 2/3): \"['pmcid'] not in index\"\nRetry attempt 3 after 0.6666666666666666 seconds...\nUnexpected error (attempt 3/3): \"['pmcid'] not in index\"\nUnexpected error after 3 attempts\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/target_paper_details.csv'\nTotal results found: 1\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 25073668\nTitle: [Factors influencing the miss rate of polyps in a tandem colonoscopy study].\nSource: The Korean journal of gastroenterology = Taehan Sohwagi Hakhoe chi (2014)\nAbstract: BACKGROUND/AIMS: The miss rate of colon polyps and its related factors have not been clearly identified yet. This study aims to review the miss rate of polyps both on the patient-level and on the polyp-level and to analyze the factors affecting the miss rate such as those related to the endoscopist, procedure, patient, and polyp. METHODS: From August 2011 to August 2013, patients who underwent elective second colonoscopy for resection of polyps, the sizes of which were not small enough to be resected by biopsy forceps alone at first colonoscopy, were enrolled retrospectively. RESULTS: The miss rate on the patient-level was 59.2% (234/395) and on the polyp-level was 27.9% (578/2,068). There was no significant difference in the miss rate depending on the experience of the endoscopists or characteristics of the patients. In terms of the procedure, the miss rate was higher when the colonoscopy was performed in the afternoon (OR 1.632, p=0.046). It was found that the miss rate of polyps increased when the polyps were small (OR 4.595, p<0.001 in <5 mm/OR 3.447, p<0.001 in 5-10 mm), flat or sessile (OR 2.406, p<0.001 in flat/OR 1.768, p=0.002 in sessile), and located in the left colon (OR ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "code_execution",
+    "tool_call_id": "call_kS0sfgtRFstSGstnAZ94HKJV",
+    "parent_tool_call_id": "call_LgadfaJSss1Go4TdkyCQ9NIO",
+    "round": 3,
+    "tool_input": {
+      "code": "import requests, xml.etree.ElementTree as ET\npmid='25073668'\nu=f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={pmid}&retmode=xml'\nr=requests.get(u,timeout=20)\nprint(r.status_code)\nroot=ET.fromstring(r.text)\nart=root.find('.//PubmedArticle')\nauth=[]\nfor x in art.findall('.//AuthorList/Author'):\n    coll=x.findtext('CollectiveName')\n    if coll: auth.append(coll)\n    else:\n        ln=x.findtext('LastName') or ''; ini=x.findtext('Initials') or ''\n        if ln: auth.append(f'{ln} {ini}'.strip())\nprint('AUTHORS:', '; '.join(auth))\nprint('DATE:', art.findtext('.//PubDate/Year') or art.findtext('.//PubDate/MedlineDate'))\nprint('JOURNAL:', art.findtext('.//Journal/Title'))\nprint('TITLE:', ' '.join((art.findtext('.//ArticleTitle') or '').split()))",
+      "language": "python"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\nimport requests, xml.etree.ElementTree as ET\npmid='25073668'\nu=f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={pmid}&retmode=xml'\nr=requests.get(u,timeout=20)\nprint(r.status_code)\nroot=ET.fromstring(r.text)\nart=root.find('.//PubmedArticle')\nauth=[]\nfor x in art.findall('.//AuthorList/Author'):\n    coll=x.findtext('CollectiveName')\n    if coll: auth.append(coll)\n    else:\n        ln=x.findtext('LastName') or ''; ini=x.findtext('Initials') or ''\n        if ln: auth.append(f'{ln} {ini}'.strip())\nprint('AUTHORS:', '; '.join(auth))\nprint('DATE:', art.findtext('.//PubDate/Year') or art.findtext('.//PubDate/MedlineDate'))\nprint('JOURNAL:', art.findtext('.//Journal/Title'))\nprint('TITLE:', ' '.join((art.findtext('.//ArticleTitle') or '').split()))\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] code_execution\u001b[0m\n      \u001b[90mcode:\u001b[0m import requests, xml.etree.ElementTree as ET\n ... .findtext('.//ArticleTitle') or '').split()))\n      \u001b[90mlanguage:\u001b[0m python\n\n200\nAUTHORS: Choi HN; Kim HH; Oh JS; Jang HS; Hwang HS; Kim EY; Kwon JG; Jung JT\nDATE: 2014\nJOURNAL: The Korean journal of gastroenterology = Taehan Sohwagi Hakhoe chi\nTITLE: [Factors influencing the miss rate of polyps in a tandem colonoscopy study].\n\n```",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_AaYDdxA0pfHCUNf3dsru3lqF",
+    "parent_tool_call_id": "call_kS0sfgtRFstSGstnAZ94HKJV",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The target paper is titled “[Factors influencing the miss rate of polyps in a tandem colonoscopy study]” (The Korean Journal of Gastroenterology, 2014), PMID 25073668; authors are HN Choi, HH Kim, JS Oh, HS Jang, HS Hwang, EY Kim, JG Kwon, and JT Jung.",
+          "source_tools": [
+            {
+              "relevance": "PubMed XML supplied the complete author list, year, journal, and title.",
+              "tool_call_id": "call_kS0sfgtRFstSGstnAZ94HKJV"
+            },
+            {
+              "relevance": "PubMed search identified the target PMID and abstract.",
+              "tool_call_id": "call_Ctx1CqQmIeb71iRvGvbnBMLN"
+            }
+          ]
+        },
+        {
+          "finding": "The study was a retrospective tandem-colonoscopy design: patients underwent an elective second colonoscopy from August 2011 through August 2013 for resection of polyps that were not small enough to be removed by biopsy forceps alone at the first examination. It included 395 patients and 2,068 polyps/lesions.",
+          "source_tools": [
+            {
+              "relevance": "Abstract methods and sample counts.",
+              "tool_call_id": "call_qn4xv6OQQVx52SOEQF5akXsD"
+            }
+          ]
+        },
+        {
+          "finding": "Overall miss rates were 59.2% at the patient level (234/395) and 27.9% at the polyp level (578/2,068).",
+          "source_tools": [
+            {
+              "relevance": "Abstract results with exact denominators and rates.",
+              "tool_call_id": "call_qn4xv6OQQVx52SOEQF5akXsD"
+            }
+          ]
+        },
+        {
+          "finding": "Statistically significant factors associated with missed polyps were: afternoon examination (OR 1.632, P=0.046); small size, specifically <5 mm (OR 4.595, P<0.001) and 5–10 mm (OR 3.447, P<0.001); flat morphology (OR 2.406, P<0.001); sessile morphology (OR 1.768, P=0.002); and left-colon location (OR 1.391, P=0.007). No significant association was found with endoscopist experience or patient characteristics.",
+          "source_tools": [
+            {
+              "relevance": "Complete abstract results listing all reported significant and nonsignificant factors.",
+              "tool_call_id": "call_qn4xv6OQQVx52SOEQF5akXsD"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 15,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_KwfauACVoPtfroENDDiEwzRW",
+    "parent_tool_call_id": "call_UQyQG6tewPAj7AvLZl81xu5P",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25073668",
+          "observations": [
+            "2014 retrospective tandem-colonoscopy study of factors associated with missed colorectal polyps.",
+            "Included 395 patients and 2,068 polyps; elective repeat colonoscopy occurred from August 2011 through August 2013 for polyp resection."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Paper identity and study design",
+              "tool_call_id": "call_kS0sfgtRFstSGstnAZ94HKJV"
+            },
+            {
+              "relevance": "Population and protocol",
+              "tool_call_id": "call_qn4xv6OQQVx52SOEQF5akXsD"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Polyp miss rates",
+          "observations": [
+            "Patient-level miss rate was 59.2% (234/395), and polyp-level miss rate was 27.9% (578/2,068)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Overall miss-rate results",
+              "tool_call_id": "call_qn4xv6OQQVx52SOEQF5akXsD"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Missed-polyp risk factors",
+          "observations": [
+            "Afternoon examination was associated with missed polyps (OR 1.632, P=0.046).",
+            "Polyps smaller than 5 mm (OR 4.595, P<0.001) and 5–10 mm (OR 3.447, P<0.001) were more likely to be missed.",
+            "Flat morphology (OR 2.406, P<0.001), sessile morphology (OR 1.768, P=0.002), and left-colon location (OR 1.391, P=0.007) were associated with missed polyps.",
+            "Endoscopist experience and patient characteristics were not significantly associated with missed-polyps rates."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Significant and nonsignificant factors",
+              "tool_call_id": "call_qn4xv6OQQVx52SOEQF5akXsD"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:25073668",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Polyp miss rates"
+        },
+        {
+          "from_entity": "PMID:25073668",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Missed-polyp risk factors"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"PMID:25073668\", \"entityType\": \"PAPER\", \"observations\": [\"2014 retrospective tandem-colonoscopy study of factors associated with missed colorectal polyps.\", \"Included 395 patients and 2,068 polyps; elective repeat colonoscopy occurred from August 2011 through August 2013 for polyp resection.\"]}, {\"name\": \"Polyp miss rates\", \"entityType\": \"FINDING\", \"observations\": [\"Patient-level miss rate was 59.2% (234/395), and polyp-level miss rate was 27.9% (578/2,068).\"]}, {\"name\": \"Missed-polyp risk factors\", \"entityType\": \"FINDING\", \"observations\": [\"Afternoon examination was associated with missed polyps (OR 1.632, P=0.046).\", \"Polyps smaller than 5 mm (OR 4.595, P<0.001) and 5\\u201310 mm (OR 3.447, P<0.001) were more likely to be missed.\", \"Flat morphology (OR 2.406, P<0.001), sessile morphology (OR 1.768, P=0.002), and left-colon location (OR 1.391, P=0.007) were associated with missed polyps.\", \"Endoscopist experience and patient characteristics were not significantly associated with missed-polyps rates.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"PMID:25073668\", \"to\": \"Polyp miss rates\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:25073668\", \"to\": \"Missed-polyp risk factors\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_KwfauACVoPtfroENDDiEwzRW\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_UQyQG6tewPAj7AvLZl81xu5P\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

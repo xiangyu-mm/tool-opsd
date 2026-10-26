@@ -1,0 +1,3 @@
+No. In a study of 103 healthy, medication-free obese men, serum midregional proatrial natriuretic peptide (MR-proANP) was **negatively associated** with 24-hour systolic ambulatory blood pressure (age-adjusted standardized β = −0.32, p = 0.004). Thus, higher systolic pressure did not correspond to higher MR-proANP in this group. This was an observational study, so it establishes an association rather than causation. (Asferg et al., 2017; PMID: 27496822)
+
+FINAL DECISION: NO

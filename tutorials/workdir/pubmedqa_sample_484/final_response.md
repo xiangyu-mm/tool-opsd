@@ -1,0 +1,5 @@
+**Conclusion:** Switching DES type has **not been shown to prevent recurrent restenosis** compared with using the same type again. In the randomized ISAR-DESIRE 2 trial of 450 patients with restenosis inside a sirolimus-eluting stent, switching to a paclitaxel-eluting stent produced similar outcomes to repeat sirolimus-eluting stenting: binary restenosis at 6–8 months was 20.6% versus 19.6% (P=0.69), and 12-month target-lesion revascularization was 14.6% versus 16.6% (P=0.52). Neither comparison was statistically significant. [call_l2wkb220dfclvB6exWmkkAlo]
+
+Interpret this as **no demonstrated benefit from switching**, not proof that the approaches are equivalent. The direct evidence is limited to an older trial using first-generation stents in a specific restenosis setting; it does not establish whether switching among newer DES platforms helps. Evidence comparing other ISR treatments, such as drug-coated balloons versus repeat DES, addresses a different question and cannot show that switching DES type is beneficial. [call_l2wkb220dfclvB6exWmkkAlo; call_AiZVPEshUsH4DuXqp8iCqZBB; call_NwwYayl0bR2GW9c9WzIMiPQn]
+
+FINAL DECISION: NO

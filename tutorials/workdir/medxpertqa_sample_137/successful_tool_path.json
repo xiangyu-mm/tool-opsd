@@ -1,0 +1,191 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_C5lrr0z5LYllKaXKBOTMxW9N",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine, at long-term follow-up after comparable multiple traumatic injuries/polytrauma, whether male sex versus premenopausal female sex is associated with differences in depression, disability claims, readmissions, chronic pain, physical therapy, absenteeism, quality of life, PTSD, return to employment, or psychiatric treatment. Identify the specific study or review and the outcome that best matches the multiple-choice options."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_TuqEIqeiObMjTCG02EyMlVqP",
+    "parent_tool_call_id": "call_C5lrr0z5LYllKaXKBOTMxW9N",
+    "round": 1,
+    "tool_input": {
+      "task_name": "injury sex followup",
+      "boolean_query_text": "multiple trauma male female return to work psychiatric treatment readmission physical therapy",
+      "top_k": 20,
+      "max_requests_per_second": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='multiple trauma male female return to work psychiatric treatment readmission physical therapy',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='multiple trauma male female return to work psychiatric treatment readmission physical therapy',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/injury_sex_followup.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/injury_sex_followup.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/injury_sex_followup.csv'\nTotal results found: 20\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 33642624\nTitle: Abstracts from Trainee Research Event 5th November 2020\nSource: Ulster Med J (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39368736\nTitle: Association Between Caregiver Strain and Emergency Health Care Resource Utilization in Survivors of Critical Illness\nSource: Chest (2024)\nAbstract: Characteristic Overall (N = 124) Caregiver Strain Index P Value < 7 (n = 90) >= 7 (n = 34) Patient demographics Age, y 59 (47, 66) 59 (47, 66) 57 (45, 66) .60 Sex .20 <m>Male</m> 71 (57) 48 (53) 23 (68) <m>Female</m> 53 (43) 42 (47) 11 (32) ICU length of stay, d 12 (7, 19) 12 (8, 20) 11 (6, 17) .20 Hospital length of stay, d 29 (17, 51) 27 (17, 49) 32 (19, 53) .90 APACHE II score 19 (15, 25) 19 (15, 24) 20 (12, 28) .70 Respiratory support 114 (92) 83 (92) 31 (91) > .90 Cardiovascular support 99 (80) 75 (83) 24 (71) .11 Renal replacement <m>therapy</m> 30 (24) 21 (23) 9 (26) .70 No. of comorbidities 2.00 (1.00, 3.00) 2.00 (1.00, 3.00) 2.00 (1.00, 4.00) .085 Surgery at admission or within 7 d of ICU 40 (32) 31 (34) 9 (26) .40 SIMD quintile .50 1 (most deprived) 48 (39) 30 (33) 18 (53) 2 27 (22) 21 (23) 6 (18) 3 18 (15) 14 (16) 4 (12) 4 14 (11) 11 (12) 3 (8.8) 5 (least deprived) 17 (14) 14 (16) 3 (8.8) Caregiver demographics Age, y 58 (43, 64) 58 (43, 66) 55 (46, 61) .40 Sex .14 <m>Male</m> 40 (32) 33 (37) 7 (21) <m>Female</m> 80 (65) 55 (61) 25 (74) Unknown 4 (3.2) 2 (2.2) 2 (5.9) Relationship .13 Partner/spouse 82 (66) 64 (71) 18 (53) Parent 11 (8.9) 7 (7.8) 4 (12) Offspring 16 (13) ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 37943600\nTitle: Reduction of Mental Health-Related Emergency Department Admissions for Youth and Young Adults Following a Remote Intensive Outpatient Program: Quality Improvement Analysis\nSource: JMIR Form Res (2023)\nAbstract: It is also higher than the 30-day rate in broader studies of @SPECIES_9606 @@@outpatient@@@ care, such as the 22.2% @DISEASE_Mental_Disorders @DISEASE_MESH:D001523 @@@<m>psychiatric</m>@@@ <m>readmission</m> rate among young adults in @SPECIES_9606 @@@outpatient@@@ <m>treatment</m> for being @DISEASE_Bipolar_Disorder @DISEASE_MESH:D001714 @@@bipolar@@@.\n--------------------------------------------------------------------------------\nPMID: 40296977\nTitle: Assessment of Long-Term Outcomes of Lower Limb Fractures Managed by Non-orthopaedic Specialist Surgeons in Rural Rwanda: A Pilot Feasibility Study\nSource: Cureus (2025)\nAbstract: N (%)/Median (IQR) Age (median) 23 (7-44) Sex <m>Female</m> 7 (39) <m>Male</m> 11 (61) Employment status before <m>injury</m> Farmer 6 (33) Other employment 2 (11) Not employed (age <15 years) 7 (39) Not stated 3 (17) Highest attained education level High school 2 (11) Primary school 3 (16) No schooling 5 (26) Not stated 9 (47) Comorbidities Cardiovascular 2 (11) None documented 16 (89) Type of <m>trauma</m> Single fracture and no other <m>injuries</m> 11 (61) Multi-<m>trauma</m> with one fracture and other <m>injuries</m> 3 (17) Multi-<m>trauma</m> with <m>multiple</m> fractures 2 (11) Not stated 3 (17) <m>Trauma</m> etiology Fall 10 (56) Road traffic accident 2 (11) Crush <m>injuries</m> 2 (11) Violence/assault 1 (6) Not stated 3 (17) Main diagnosis on admission Femur/hip fracture 10 (56) Tibial fracture 4 (22) Pelvic fracture 2 (11) Fibular fracture 1 (6) Other 1 (6) Open/closed fracture Closed fracture 14 (78) Open fracture* 1 (6) Unknown 3 (17) Comminuted versus non-comminuted fracture Comminuted 3 (17) Non-comminuted 9 (50) Unknown 6 (33) Waiting time to initial <m>treatment</m> (median number of hours) - 36 (24-60) <m>Treatment</m> location/referral Treated at BL2TH only 5 ( ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 37197690\nTitle: Management of Incisional Self-Harm of the Upper Limb: A Systematic Review\nSource: JPRAS Open (2023)\nAbstract: Many self-inflicted <m>wounds</m> are managed surgically in operating theatres, often with <m>multiple</m> procedures.\n--------------------------------------------------------------------------------\nPMID: 38856202\nTitle: Self-Trephination in Cranial Excoriation Disorder\nSource: Neurosurgery (2024)\nAbstract: ...In our experience, surgical <m>wound</m> closure in the absence of @DISEASE_Mental_Disorders @DISEASE_MESH:D001523 @@@<m>psychiatric</m>@@@ and behavioral <m>treatment</m> was associated with poor outcomes.\n--------------------------------------------------------------------------------\nPMID: 34458530\nTitle: The Effects of Depression and Anxiety on 90-day Readmission Rates After Total Hip and Knee Arthroplasty\nSource: Arthroplast Today (2021)\nAbstract: ...<m>Readmission</m> after arthroplasty may be due to various factors. The most commonly cited surgery-related reasons for postoperative <m>return</m> to the emergency room are @DISEASE_Pain @DISEASE_MESH:D010146 @@@pain@@@, @DISEASE_Edema @DISEASE_MESH:D004487 @@@swelling@@@, @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>wound</m> complications@@@, and medication-related side effects.\n--------------------------------------------------------------------------------\nPMID: 37875314\nTitle: Psychiatric inpatient services in Ontario, 2019-2021: a cross-sectional comparison of admissions, diagnoses and acuity during the COVID-19 prerestriction, restriction and postrestriction periods\nSource: CMAJ Open (2023)\nAbstract: Thus, @DISEASE_Mental_Disorders @DISEASE_MESH:D001523 @@@<m>psychiatric</m>@@@ admissions may have <m>returned</m> to prepandemic rates, but each admission may now be more costly because admitted @SPECIES_9606 @@@patients@@@ are likely to be more <m>treatment</m>-resistant, prone to <m>readmission</m>, and in need of individualized care and supervision.\n--------------------------------------------------------------------------------\nPMID: 39718995\nTitle: The Effect of Depression on Total Knee Arthroplasty\nSource: J Am Acad Orthop Surg Glob Res Rev (2024)\nAbstract: ...<m>Multiple</m> studies have noted that @SPECIES_9606 @@@patients@@@ with @DISEASE_Mental_Disorders @DISEASE_MESH:D001523 @@@<m>psychiatric</m> disorders@@@, including @DISEASE_Depressive_Disorder @DISEASE_MESH:D003866 @@@depression@@@, were markedly more likely to experience a @DISEASE_Periprosthetic_Fractures @DISEASE_MESH:D057068 @@@periprosthetic joint infection@@@ following TKA.\n--------------------------------------------------------------------------------\nPMID: 32885344\nTitle: Supported discharge service versus inpatient care evaluation (SITE): a randomised controlled trial comparing effectiveness of an intensive community care service versus inpatient treatment as usual for adolescents with severe psychiatric disorders: self-harm, functional impairment, and educational and clinical outcomes\nSource: Eur Child Adolesc Psychiatry (2021)\nAbstract: ...<m>Readmissions</m> to inpatient @DISEASE_Mental_Disorders @DISEASE_MESH:D001523 @@@<m>psychiatric</m>@@@ units\n--------------------------------------------------------------------------------\nPMID: 41295815\nTitle: Nurses' Participation in the Psychiatric Recovery Process: A Qualitative Study in Psychiatric Intensive Care Units in Chile\nSource: Nurs Rep (2025)\nAbstract: Nurses also mention that the absence of family and social support leads to recovery processes with <m>multiple</m> relapses that delay reintegration, which makes @DISEASE_Mental_Disorders @DISEASE_MESH:D001523 @@@<m>psychiatric</m> conditions@@@ chronic and prolongs <m>treatment</m>.\n--------------------------------------------------------------------------------\nPMID: 36268640\nTitle: A systematic review of in-patient psychiatric care for people with intellectual disabilities and/or autism: effectiveness, patient safety and experience\nSource: BJPsych Open (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35668159\nTitle: A systematic review and meta-analysis of long term physical and mental sequelae of COVID-19 pandemic: call for research priority and action\nSource: Mol Psychiatry (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34444622\nTitle: An Integrative Review of Recovery Services to Improve the Lives of Adults Living with Severe Mental Illness\nSource: Int J Environ Res Public Health (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34737614\nTitle: Exploring the Application of a Multi-Targeted Nursing Group for Enhanced Recovery After Surgery Using the LEER (\"Less Pain\", \"Early Movement\", \"Early Return to a Normal Diet\" and \"Reassurance\") Model\nSource: Int J Gen Med (2021)\nAbstract: (1) Pre-operative procedures: on admission, routine admission information and education, routine pain composite assessment, and routine mood index score were conducted by the charge nurse. The preoperative <m>physical</m> exercise training and respiratory function exercise, special nutritional support <m>treatment</m>, and special preoperative psychological guidance intervention processes were not conducted by the daily bedside nurse.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_t3B6213GKZmySYCgq3xWFoQe",
+    "parent_tool_call_id": "call_TuqEIqeiObMjTCG02EyMlVqP",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|women|men|posttraumatic stress|psychologic support|rehabilitation|sick leave|quality-of-life|depression|disability|pain|employment|readmission|physical therapy",
+      "pmid": "19996800"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('19996800')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|women|men|posttraumatic stress|psychologic support|rehabilitation|sick leave|quality-of-life|depression|disability|pain|employment|readmission|physical therapy')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|women|men|posttraumatic stress|psycho ... |pain|employment|readmission|physical therapy\n      \u001b[90mpmid:\u001b[0m 19996800\n\n  \u001b[1m\u001b[93m[2] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m polytrauma gender review\n      \u001b[90mboolean_query_text:\u001b[0m \"Clinical re-examination 10 or more years after polytrauma\" gender related difference\n      \u001b[90mtop_k:\u001b[0m 10\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[3] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m long-term trauma sex review\n      \u001b[90mboolean_query_text:\u001b[0m systematic review sex differences long-term outcomes major trauma women men quality of life PTSD\n      \u001b[90mtop_k:\u001b[0m 20\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n\n=== PMID: 19996800 ===\n\nTitle: Clinical re-examination 10 or more years after polytrauma: is there a gender related difference?\n\nJournal/Date: The Journal of trauma (2010)\n\nMeSH Keywords: Adolescent, Adult, Cohort Studies, Female, Health Status, Humans, Male, Multiple Trauma\n\n\n--- ABSTRACT ---\n[BACKGROUND]: : Previous studies documented that premenopausal women better tolerate severe injuries than men in regards to mortality and intensive care complications. We test the hypothesis whether surviving women have a better long-term outcome than surviving men.\n[METHODS]: : We reassessed 637 polytrauma patients 10 or more years (mean 17 +/- 5 years) after trauma. Mental health was assessed by the posttraumatic stress diagnostic scale and the Hospital Anxiety and Depression Scale. The clinical outcome was assessed by standardized scores (Hannover Score for Polytrauma Outcome and short form-12). A physical examination was performed by an orthopedic surgeon.\n[RESULTS]: : We studied 479 men (M; 75.4%) and 158 women (F; 24.6%) aged M = 26.7 +/- 12.2 versus F = 25.9 +/- 13.0 years (p = 0.47). Injury Severity Score showed M = 20.4 +/- 9.9 versus F = 21.7 +/- 9.7 (p = 0.13). Women showed a higher rate of posttraumatic stress disorder (F = 14.5% vs. M = 6.2%; p = 0.035) and psychologic support (F = 28.0% vs. M = 15.0%; p < 0.001), longer duration of rehabilitation, and longer sick leave time. Quality-of-life was significantly lower in women (Short form-12 psychologic F = 48.6 +/- 10.8 vs. M = 50.8 +/- 9.4; p = 0.02), but the same rate of women (75.3%) and men (75.4%; p = 0.995) felt well rehabilitated.\n[CONCLUSION]: : Late after polytrauma, women suffer more severe psychologic impairment than men who had similar injuries. This finding is independent of physical impairment and the subjective feeling of a good rehabilitation outcome. Clinically, women require special support even years after injury to improve their psychologic status. In the future, they might benefit from early concomitant psychologic treatment if mental problems are suspected.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_dJjI26bKUEwFROlkclzJsDKz",
+    "parent_tool_call_id": "call_TuqEIqeiObMjTCG02EyMlVqP",
+    "round": 2,
+    "tool_input": {
+      "task_name": "long-term trauma sex review",
+      "boolean_query_text": "systematic review sex differences long-term outcomes major trauma women men quality of life PTSD",
+      "top_k": 20,
+      "max_requests_per_second": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='systematic review sex differences long-term outcomes major trauma women men quality of life PTSD',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='systematic review sex differences long-term outcomes major trauma women men quality of life PTSD',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/long-term_trauma_sex_review.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/long-term_trauma_sex_review.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/long-term_trauma_sex_review.csv'\nTotal results found: 20\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38872459\nTitle: Sex and gender in psychotrauma research\nSource: Eur J Psychotraumatol (2024)\nAbstract: Opaas et al. examined predictors of the <m>long</m>-<m>term</m> course of mental health and <m>quality</m> of <m>life</m> in @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@-affected refugee @SPECIES_9606 @@@patients@@@; they found gender <m>differences</m>.\n--------------------------------------------------------------------------------\nPMID: 41432092\nTitle: Gender differences in post-traumatic symptomatology among refugees: a systematic review and meta-analysis\nSource: Eur J Psychotraumatol (2025)\nAbstract: Gender <m>differences</m> in post-traumatic symptomatology among refugees: a <m>systematic</m> <m>review</m> and meta-analysis\n--------------------------------------------------------------------------------\nPMID: 35800025\nTitle: Lifetime Trauma Exposure and Posttraumatic Stress Disorder Among African Americans and Black Caribbeans by Sex and Ethnicity\nSource: Front Psychiatry (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39912534\nTitle: The impact of trauma and how to intervene: a narrative review of psychotraumatology over the past 15 years\nSource: Eur J Psychotraumatol (2025)\nAbstract: While abuse of older adults is prevalent (Acierno et al.,) research to better understand the <m>long</m>-<m>term</m> lifespan impact of early @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@ and how @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@ experienced later in <m>life</m> may impact older adults.\n--------------------------------------------------------------------------------\nPMID: 41294001\nTitle: Disparities in women's health and clinical considerations from a translational science perspective: A narrative review and framework for future directions\nSource: Womens Health (Lond) (2025)\nAbstract: While mortality and prevalence remain high in males and females, @SPECIES_9606 @@@<m>women</m>@@@ experience worse short- and <m>long</m>-<m>term</m> <m>outcomes</m> as <m>sex</m> and gender <m>differences</m> remain unrecognized and unaddressed.\n--------------------------------------------------------------------------------\nPMID: 41493956\nTitle: Digital health interventions for women in frontline public service roles: A systematic review of effectiveness in reducing substance use\nSource: PLOS Digit Health (2026)\nAbstract: Significant improvements in @DISEASE_Stress_Disorders_Post_Traumatic @DISEASE_MESH:D013313 @@@<m>PTSD</m>@@@, <m>quality</m> of <m>life</m>, resiliency, and coping were observed with no <m>differences</m> between conditions.\n--------------------------------------------------------------------------------\nPMID: 41263327\nTitle: Associations of estrogen with modifiable and non-modifiable risk factors for dementia: A narrative review\nSource: Alzheimers Dement (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38175945\nTitle: Racism-Related Experiences and Traumatic Stress Symptoms in Ethnoracially Minoritized Youth: A Systematic Review and Meta-Analysis\nSource: J Clin Child Adolesc Psychol (2024)\nAbstract: This extends findings from a prior <m>systematic</m> <m>review</m> demonstrating a significant association between racism-related experiences and difficulties with emotion regulation, a common response among @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@-exposed youth.\n--------------------------------------------------------------------------------\nPMID: 34794395\nTitle: Depression, anxiety, PTSD, and OCD after stillbirth: a systematic review\nSource: BMC Pregnancy Childbirth (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34654456\nTitle: Mental health of women and children experiencing family violence in conflict settings: a mixed methods systematic review\nSource: Confl Health (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35751671\nTitle: Systematic review exploring the relationship between sexual abuse and lower urinary tract symptoms\nSource: Int Urogynecol J (2022)\nAbstract: ...The <m>systematic</m> <m>review</m> conformed to the Preferred Reporting Items for <m>Systematic</m> <m>Review</m> and Meta-Analysis (PRISMA) statement and the protocol was registered with the International Prospective Register of <m>Systematic</m> <m>Reviews</m> (PROSPERO; CRD42019122080).\n--------------------------------------------------------------------------------\nPMID: 33815176\nTitle: A Systematic Review of Factors Affecting Mental Health and Well-Being of Asylum Seekers and Refugees in Germany\nSource: Front Psychiatry (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37740188\nTitle: Traumatic life events and risk for dementia: a systematic review and meta-analysis\nSource: BMC Geriatr (2023)\nAbstract: Traumatic <m>life</m> events and risk for @DISEASE_Dementia @DISEASE_MESH:D003704 @@@dementia@@@: a <m>systematic</m> <m>review</m> and meta-analysis\n--------------------------------------------------------------------------------\nPMID: 38577405\nTitle: Systematic review and meta-analysis of neurofeedback and its effect on posttraumatic stress disorder\nSource: Front Psychiatry (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38021711\nTitle: A Systematic Review of Quantitative and Qualitative Results of Randomized Controlled Trials Assessing the Effect of Yoga in Adult Women With Post-traumatic Stress Disorder: What Is Known So Far\nSource: Cureus (2023)\nAbstract: The prevalence of @DISEASE_Stress_Disorders_Post_Traumatic @DISEASE_MESH:D013313 @@@<m>PTSD</m>@@@ during <m>life</m> is approximated to be nearly 10-12% for @SPECIES_9606 @@@<m>women</m>@@@ and 5-6% for @SPECIES_9606 @@@<m>men</m>@@@.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_noRZRSoVtP0ztzYezDQkJgYm",
+    "parent_tool_call_id": "call_dJjI26bKUEwFROlkclzJsDKz",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The best-matching study is the 2010 cohort study, “Clinical re-examination 10 or more years after polytrauma: is there a gender related difference?” (PMID 19996800). It reassessed 637 comparable polytrauma survivors at a mean of 17 years after injury (479 men, 158 women; similar Injury Severity Scores). Premenopausal women had more PTSD than men (14.5% vs 6.2%, p=0.035), more psychological support/treatment (28.0% vs 15.0%, p<0.001), longer rehabilitation, longer sick leave, and lower psychological quality-of-life scores; thus the clearest multiple-choice match is higher long-term PTSD/psychiatric treatment in women, with poorer psychological quality of life and longer rehabilitation/absenteeism.",
+          "source_tools": [
+            {
+              "relevance": "Full abstract with study design, comparable injury severity, and all sex-specific long-term outcomes",
+              "tool_call_id": "call_t3B6213GKZmySYCgq3xWFoQe"
+            }
+          ]
+        },
+        {
+          "finding": "The study found no difference in the proportion who felt well rehabilitated (women 75.3% vs men 75.4%), and the abstract does not report a sex-specific difference in depression, disability claims, readmissions, chronic pain, physical therapy, or return to employment. Therefore those options should not be selected as the directly supported outcome unless the question’s choices use 'psychiatric treatment,' 'PTSD,' 'quality of life,' 'rehabilitation,' or 'sick leave.'",
+          "source_tools": [
+            {
+              "relevance": "Abstract explicitly reports the well-rehabilitated comparison and specifies the measured mental/clinical outcomes",
+              "tool_call_id": "call_t3B6213GKZmySYCgq3xWFoQe"
+            }
+          ]
+        },
+        {
+          "finding": "A 2021 systematic review on patient-reported outcomes after polytrauma was identified, but the directly relevant sex-comparison evidence in the search is the 2010 long-term cohort rather than a review; the broader search did not yield a review with a more specific male-versus-premenopausal-female result.",
+          "source_tools": [
+            {
+              "relevance": "Search result identifying the polytrauma patient-reported-outcomes systematic review",
+              "tool_call_id": "call_U02TC4eOw0AP0yuERI4yiYwN"
+            },
+            {
+              "relevance": "Focused search result locating the specific sex-comparison cohort",
+              "tool_call_id": "call_BzgLWSazkcH0L6DyMH0oYdgi"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_UjKekPcT6WKwMfutGzbCuvhJ",
+    "parent_tool_call_id": "call_C5lrr0z5LYllKaXKBOTMxW9N",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:19996800",
+          "observations": [
+            "Long-term reassessment of 637 comparable polytrauma survivors at a mean of 17 years after injury; men and women had similar injury severity.",
+            "Women had higher PTSD prevalence than men (14.5% vs 6.2%, p=0.035), more psychological support/treatment (28.0% vs 15.0%, p<0.001), longer rehabilitation and sick leave, and lower psychological quality-of-life scores.",
+            "The proportion feeling well rehabilitated was similar between women and men (75.3% vs 75.4%)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Directly supports all sex-specific long-term polytrauma findings used in the answer.",
+              "tool_call_id": "call_t3B6213GKZmySYCgq3xWFoQe"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Male quality of life",
+          "observations": [
+            "Compared with premenopausal women after comparable polytrauma, men had higher psychological quality-of-life scores at long-term follow-up.",
+            "This finding is the closest direct match among the answer choices because women, rather than men, had more PTSD and psychiatric treatment."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Maps the cohort result to the multiple-choice options.",
+              "tool_call_id": "call_t3B6213GKZmySYCgq3xWFoQe"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Female PTSD after polytrauma",
+          "observations": [
+            "At mean 17-year follow-up after comparable polytrauma, PTSD was more frequent in women than men: 14.5% versus 6.2%, p=0.035."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Establishes the direction of the sex difference.",
+              "tool_call_id": "call_t3B6213GKZmySYCgq3xWFoQe"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:19996800",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Male quality of life"
+        },
+        {
+          "from_entity": "PMID:19996800",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Female PTSD after polytrauma"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"PMID:19996800\", \"entityType\": \"PAPER\", \"observations\": [\"Long-term reassessment of 637 comparable polytrauma survivors at a mean of 17 years after injury; men and women had similar injury severity.\", \"Women had higher PTSD prevalence than men (14.5% vs 6.2%, p=0.035), more psychological support/treatment (28.0% vs 15.0%, p<0.001), longer rehabilitation and sick leave, and lower psychological quality-of-life scores.\", \"The proportion feeling well rehabilitated was similar between women and men (75.3% vs 75.4%).\"]}, {\"name\": \"Male quality of life\", \"entityType\": \"FINDING\", \"observations\": [\"Compared with premenopausal women after comparable polytrauma, men had higher psychological quality-of-life scores at long-term follow-up.\", \"This finding is the closest direct match among the answer choices because women, rather than men, had more PTSD and psychiatric treatment.\"]}, {\"name\": \"Female PTSD after polytrauma\", \"entityType\": \"FINDING\", \"observations\": [\"At mean 17-year follow-up after comparable polytrauma, PTSD was more frequent in women than men: 14.5% versus 6.2%, p=0.035.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"PMID:19996800\", \"to\": \"Male quality of life\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:19996800\", \"to\": \"Female PTSD after polytrauma\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_UjKekPcT6WKwMfutGzbCuvhJ\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_C5lrr0z5LYllKaXKBOTMxW9N\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

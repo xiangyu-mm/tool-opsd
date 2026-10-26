@@ -1,0 +1,3 @@
+There is no evidence of acute target-organ injury: renal function, troponin, urinalysis, fundoscopy, examination, and ECG show no new abnormalities. This is severe asymptomatic hypertension, not a hypertensive emergency, so rapid blood-pressure lowering with IV drugs or sublingual nifedipine is inappropriate. Continue his current therapy, monitor, and reassess for reversible causes or persistent elevation; if needed, adjust long-term oral treatment gradually. Severe COPD and a recent exacerbation also make adding a beta-blocker an unattractive choice here.
+
+FINAL ANSWER: J

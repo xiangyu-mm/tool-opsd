@@ -1,0 +1,3 @@
+Yes. A cross-sectional study of 44 adults with type 1 diabetes found a positive correlation between fasting serum DPP-4 activity and ALT (*r* = 0.364, *p* = 0.015). The association remained statistically significant after adjustment for age, sex, diabetes duration, statin use, and antihypertensive use (*p* = 0.025). The study was observational, and the abstract did not report an adjusted effect estimate or confidence interval (PMID: 25445232).
+
+FINAL DECISION: YES

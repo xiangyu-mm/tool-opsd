@@ -1,0 +1,3 @@
+Yes. A direct study in cultured human aortic smooth muscle cells found that aliskiren at 10⁻⁵ M significantly reduced prorenin-induced migration by 66.4±18.1% (p<0.05) in a Boyden-chamber assay. It did not significantly inhibit migration induced by PDGF-BB. The study was published as “Aliskiren inhibits prorenin-induced human aortic smooth muscle cell migration” (PMID: 25070349). Supporting evidence: `call_cKJlD5PEpKYNhjPUmQy7hCYq`.
+
+FINAL DECISION: YES

@@ -1,0 +1,1 @@
+{"answer":"4-methyl-N-[4-[4-methyl-5-(2-morpholin-4-ylethylsulfanyl)-1,2,4-triazol-3-yl]phenyl]benzenesulfonamide"}

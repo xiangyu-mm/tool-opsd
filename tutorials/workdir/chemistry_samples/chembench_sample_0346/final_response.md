@@ -1,0 +1,1 @@
+{"answer":"COC(=O)c1cccc(NC(=O)c2cnc(N3CCCCCC3)cn2)c1"}

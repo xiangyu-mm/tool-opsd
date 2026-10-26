@@ -1,0 +1,1 @@
+{"answer": "CNc1ccc(C(=O)N2CC[NH+](CC(=O)NC3CC3)CC2)cc1[N+](=O)[O-]"}

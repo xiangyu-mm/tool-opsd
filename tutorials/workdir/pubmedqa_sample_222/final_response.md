@@ -1,0 +1,3 @@
+No. In a prospective, randomized, double-blind trial, 92 patients undergoing cardiac surgery received intraoperative vasopressin or saline. CK-MB and troponin T levels did not differ significantly between groups at 0, 6, or 12 hours after surgery. The study therefore found no evidence that vasopressin raised these cardiac enzymes; its size and single-center design limit how broadly the result can be generalized. (Okamoto et al., 2015; PMID: 25440643)
+
+FINAL DECISION: NO

@@ -1,0 +1,264 @@
+[
+  {
+    "step": 17,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_5MP7Z6NaNdT92CXMTyYG6gp6",
+    "parent_tool_call_id": null,
+    "round": 2,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Search specifically for the paper titled or closely matching 'Is aRT an alternative for restoring occlusoproximal cavities in primary teeth? evidence from an updated systematic review and meta-analysis' (including variants 'ART' and 'atraumatic restorative treatment'). Report PMID/DOI, publication year, included studies and sample size, ART material/technique, comparator (e.g., conventional restorative treatment), follow-up, pooled survival/failure risk ratios or odds ratios with confidence intervals, heterogeneity, GRADE/certainty, and the review's final conclusion."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 19,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_zSOeVRqGK1XV4Y55vLPxeheQ",
+    "parent_tool_call_id": "call_5MP7Z6NaNdT92CXMTyYG6gp6",
+    "round": 1,
+    "tool_input": {
+      "task_name": "ART review",
+      "boolean_query_text": "atraumatic restorative treatment occlusoproximal cavities primary teeth systematic review meta-analysis",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='atraumatic restorative treatment occlusoproximal cavities primary teeth systematic review meta-analysis',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='atraumatic restorative treatment occlusoproximal cavities primary teeth systematic review meta-analysis',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ART_review.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ART_review.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ART_review.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 23190278\nTitle: Is Atraumatic restorative treatment an option for restoring occlusoproximal caries lesions in primary teeth? A systematic review and meta-analysis.\nSource: International journal of paediatric dentistry (2013)\nAbstract: BACKGROUND: Atraumatic restorative treatment (ART) has demonstrated good longevity when used for single-surface restorations, but lower success rates are reported for occlusoproximal surfaces. AIM: This systematic review and meta-analysis aimed to verify the pooled success rate of occlusoproximal ART restorations in primary teeth considering the outcomes: longevity, pulp damage, or caries lesion progression. DESIGN: Literature searching was carried out on the studies reporting clinical trials indexed in PubMed and in English language, comprising the outcomes. A meta-analysis was undertaken considering the results from reviewed studies. RESULTS: An initial search resulted in 126 articles, and three of them were finally selected. The main reasons for excluding articles were the absence of control group, as amalgam, composite resin, or compomer restorations to be compared with ART (hand excavation + high-viscous GIC). The pooled estimate (odds ratio; 95% confidence interval) for ART approach success was 1.04 (0.65-1.66). CONCLUSION: Atraumatic restorative treatment restorations performed with high-viscous GIC present similar survival/success rates to conventional approach using compos ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 27489205\nTitle: ART is an alternative for restoring occlusoproximal cavities in primary teeth - evidence from an updated systematic review and meta-analysis.\nSource: International journal of paediatric dentistry (2017)\nAbstract: BACKGROUND: A previous systematic review showed that atraumatic restorative treatment (ART) can be an option to restore the occlusoproximal cavities in primary teeth; however, few studies fulfilled the criteria of inclusion to generate a high level of evidence. AIM: To update the existing systematic review and address questions regarding survival rate of ART restorations compared to the conventional approach in occlusoproximal cavities in primary molars. DESIGN: The search was extended beyond the original search through the PubMed/MEDLINE database up to February 2016. Furthermore, Web of Science and EMBASE were searched. The inclusion criteria were subjects related to the scope of the systematic review. After selection by title and abstract, potentially eligible articles were read in full and included in accordance with exclusion criteria. Meta-analysis was carried out with the outcome being the survival rate of restorations. RESULTS: The search strategy identified 560 potentially relevant studies, in addition to 127 from the original systematic review. A total of four articles were included in the qualitative and quantitative analyses. Meta-analysis showed no statistically signifi ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 40437149\nTitle: Which management strategy has the highest success rate for occlusoproximal caries lesions in primary molars? A systematic review and network meta-analysis.\nSource: Evidence-based dentistry (2025)\nAbstract: AIM: Managing occlusoproximal lesions remains a challenge for dental professionals. The aim of this systematic review was to identify the best strategy to treat occlusoproximal caries lesions in primary molars. METHODS: A systematic search was conducted in MEDLINE/PubMed, Web of Science, Scopus, EMBASE, and ProQuest up to 7th February 2024. Randomized controlled trials comparing different management strategies for occlusoproximal caries lesions with at least 12 months of follow-up were included. Network meta-analyses were carried out considering the success rate of the treatments as the outcome. Risk of bias was assessed using the RoB 2 tool, and the certainty of evidence with the GRADE tool. RESULTS: Seven studies were included, evaluating five treatment modalities: Hall Technique (HT), non-restorative cavity control (NRCC), conventional restorative treatment (CRT), silver diamine fluoride application (SDF), and Atraumatic Restorative Treatment (ART). HT had the highest success rate (80.8%). There was no statistical difference between other strategies. Only two studies showed a low risk of bias; the others had a high risk, primarily due to selective reporting bias. DISCUSSION: The ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 34784027\nTitle: Minimal intervention dentistry for managing carious lesions into dentine in primary teeth: an umbrella review\nSource: Eur Arch Paediatr Dent (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36645645\nTitle: Scientific Abstracts of the 16th Congress of the European Academy of Paediatric Dentistry (EAPD), Lisbon, Portugal, June 15-18, 2022\nSource: Eur Arch Paediatr Dent (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 23190278\nTitle: Is Atraumatic restorative treatment an option for restoring occlusoproximal caries lesions in primary teeth? A systematic review and meta-analysis.\nSource: Int J Paediatr Dent (2013)\nAbstract: Is <m>Atraumatic</m> <m>restorative</m> <m>treatment</m> an option for restoring <m>occlusoproximal</m> @DISEASE_Dental_Caries @DISEASE_MESH:D003731 @@@caries lesions@@@ in <m>primary</m> <m>teeth</m>?\n--------------------------------------------------------------------------------\nPMID: 27489205\nTitle: ART is an alternative for restoring occlusoproximal cavities in primary teeth - evidence from an updated systematic review and meta-analysis.\nSource: Int J Paediatr Dent (2017)\nAbstract: ART is an alternative for restoring <m>occlusoproximal</m> <m>cavities</m> in <m>primary</m> <m>teeth</m> - evidence from an updated <m>systematic</m> <m>review</m> and <m>meta</m>-<m>analysis</m>.\n--------------------------------------------------------------------------------\nPMID: 30462676\nTitle: Scientific evidence for the management of dentin caries lesions in pediatric dentistry: A systematic review and network meta-analysis\nSource: PLoS One (2018)\nAbstract: The aim of this <m>systematic</m> <m>review</m> and network <m>meta</m>-<m>analysis</m> was to verify the effect of the <m>treatments</m> on @DISEASE_Dental_Caries @DISEASE_MESH:D003731 @@@caries lesion@@@ arrestment (CLA) or the success rate (SR) of @DISEASE_Dental_Caries @DISEASE_MESH:D003731 @@@dentin caries lesion@@@ <m>treatments</m> in the <m>primary</m> <m>teeth</m>.\n--------------------------------------------------------------------------------\nPMID: 32183770\nTitle: Recommended procedures for the management of early childhood caries lesions - a scoping review by the Children Experiencing Dental Anxiety: Collaboration on Research and Education (CEDACORE)\nSource: BMC Oral Health (2020)\nAbstract: ...<m>Atraumatic</m> <m>restorative</m> <m>treatment</m>\n--------------------------------------------------------------------------------\nPMID: 32286461\nTitle: Success rate of proximal tooth-coloured direct restorations in primary teeth at 24 months: a meta-analysis\nSource: Sci Rep (2020)\nAbstract: Success rate of proximal <m>tooth</m>-coloured direct restorations in <m>primary</m> <m>teeth</m> at 24 months: a <m>meta</m>-<m>analysis</m>\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 20,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_aHznvsMPezwUEjczVavi0SLJ",
+    "parent_tool_call_id": "call_5MP7Z6NaNdT92CXMTyYG6gp6",
+    "round": 1,
+    "tool_input": {
+      "task_name": "ART primary teeth",
+      "boolean_query_text": "ART conventional restorative treatment primary teeth proximal cavities survival meta-analysis",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='ART conventional restorative treatment primary teeth proximal cavities survival meta-analysis',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='ART conventional restorative treatment primary teeth proximal cavities survival meta-analysis',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ART_primary_teeth.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ART_primary_teeth.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ART_primary_teeth.csv'\nTotal results found: 21\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 32286461\nTitle: Success rate of proximal tooth-coloured direct restorations in primary teeth at 24 months: a meta-analysis.\nSource: Scientific reports (2020)\nAbstract: The aim was to determine the survival of tooth-coloured restorative materials in proximal restorations of primary teeth at 24 months of follow-up and the influence of the following variables: use of coating, use of cavity conditioner, use of rubber dam isolation, the cavity form, the dentist's experience and the methodological characteristics of the studies. We conducted a search until May 2019, obtaining 16 articles from which 30 independent studies were extracted, which were considered as units of analysis. Four outcome measures were extracted from each study: retention, marginal integrity, anatomic form, and absence of recurrent caries. Separate meta-analyses were carried for each outcome and multiple meta-regression model was applied. The outcomes with the highest mean success rates were absence of recurrent caries and anatomic form. The type of material significantly influenced success rates. The best materials were resin-based material plus total-etching adhesion and resin-modified glass ionomer cement (RMGIC), and the worst high viscosity glass ionomer cement (HVGIC). Atraumatic restorative treatment (ART) had a lower success rate than the conventional cavity form. RMGIC had ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 38391901\nTitle: Evaluating Glass Ionomer Cement Longevity in the Primary and Permanent Teeth:An Umbrella Review\nSource: J Funct Biomater (2024)\nAbstract: No No 24 No PubMed/MEDLINE, LILACS No Not specified English, Portuguese, Spanish 3 Yes Yes Amorim, 2018 <m>Survival</m> Percentages of Atraumatic <m>Restorative</m> <m>Treatment</m> (<m>ART</m>) Restorations and Sealants in Posterior <m>Teeth</m>: An Updated Systematic Review and <m>Meta</m>-<m>analysis</m> To assess <m>ART</m> restorations and sealants <m>survival</m> rates and carious preventive effects in permanent and <m>primary</m> posterior <m>teeth</m>.\n--------------------------------------------------------------------------------\nPMID: 37398856\nTitle: The revolutionary evolution in carious lesion management\nSource: J Conserv Dent (2023)\nAbstract: A 2018 systematic review and <m>meta</m>-<m>analysis</m> with <m>survival</m> rates as the outcome measure found high <m>survival</m> rates for single-surface <m>ART</m> restorations in <m>primary</m> and permanent posterior <m>teeth</m> over 5 years, medium <m>survival</m> rates for multi-surface <m>ART</m> restorations in <m>primary</m> molars over 2 years, and insufficient data on <m>survival</m> of multi-surface <m>ART</m> restorations in posterior permanent <m>teeth</m>.\n--------------------------------------------------------------------------------\nPMID: 34321731\nTitle: Survival Rate and Cost-Effectiveness of Conventional and Atraumatic Restorative Treatment Restorations among Anganwadi Preschool Children in Bengaluru City: A Follow-up Study\nSource: Indian J Community Med (2021)\nAbstract: ...The <m>primary</m> <m>teeth</m> restored using <m>ART</m> techniques had better <m>survival</m> rate at 6, 12, and 18 months and lower CER when compared to the <m>conventional</m> technique.\n--------------------------------------------------------------------------------\nPMID: 35819627\nTitle: Clinical effectiveness of restorative materials for the restoration of carious primary teeth without pulp therapy: a systematic review\nSource: Eur Arch Paediatr Dent (2022)\nAbstract: Clinical effectiveness of <m>restorative</m> materials for the restoration of carious <m>primary</m> <m>teeth</m> without pulp <m>therapy</m>: a systematic review\n--------------------------------------------------------------------------------\nPMID: 36185501\nTitle: Hall technique for primary teeth: A systematic review and meta-analysis\nSource: Jpn Dent Sci Rev (2022)\nAbstract: Hall technique for <m>primary</m> <m>teeth</m>: A systematic review and <m>meta</m>-<m>analysis</m>\n--------------------------------------------------------------------------------\nPMID: 40772222\nTitle: Minimally Invasive Techniques for Managing Dental Caries in Children: Efficacy, Applications, and Future Directions\nSource: Cureus (2025)\nAbstract: A <m>meta</m>-<m>analysis</m> revealed that <m>ART</m> restorations in <m>primary</m> <m>teeth</m> exhibited <m>survival</m> rates ranging from 75% to 85% over a three-year period, underscoring their reliability as an alternative to amalgam or composite restorations.\n--------------------------------------------------------------------------------\nPMID: 34940044\nTitle: Minimally Invasive Therapies for the Management of Dental Caries:A Literature Review\nSource: Dent J (Basel) (2021)\nAbstract: ...<m>Meta</m>-<m>analysis</m> assessing the <m>survival</m> rates of <m>ART</m> have found that for <m>primary</m> posterior <m>teeth</m>, they were 94.3% (+-1.5) for single surface restorations and 65.4% (+-3.9) for multi-surface restorations over 2 years.\n--------------------------------------------------------------------------------\nPMID: 36866132\nTitle: Future Perspectives in Pediatric Dentistry: Where are We Now and where are We Heading?\nSource: Int J Clin Pediatr Dent (2022)\nAbstract: <m>ART</m> have shown similar <m>survival</m> rates when compared to <m>conventional</m> <m>restorative</m> approaches on occluso-<m>proximal</m> lesions of <m>primary</m> <m>teeth</m>.\n--------------------------------------------------------------------------------\nPMID: 39807434\nTitle: Updates on the clinical application of glass ionomer cement in restorative and preventive dentistry\nSource: J Dent Sci (2024)\nAbstract: ...<m>Teeth</m> restored with atraumatic <m>restorative</m> <m>treatment</m> (<m>ART</m>) techniques using GIC have exhibited a wide range of <m>survival</m> rates, from 29.6 to 100%, over 4-month to 6-year follow-ups for single occlusal restorations, and 30.6-100% over 6-month to 2-year follow-ups for multi-surface restorations.\n--------------------------------------------------------------------------------\nPMID: 35248048\nTitle: Chlorhexidine gluconate enhances the remineralization effect of high viscosity glass ionomer cement on dentin carious lesions in vitro\nSource: BMC Oral Health (2022)\nAbstract: A low evidence-based study found that <m>ART</m> using H-GIC demonstrated a higher restoration failure rate in both <m>primary</m> and permanent <m>teeth</m> compared with the <m>conventional</m> <m>treatment</m>.\n--------------------------------------------------------------------------------\nPMID: 36056991\nTitle: Clinical effectiveness of restorative materials for the restoration of carious lesions in pulp treated primary teeth: a systematic review\nSource: Eur Arch Paediatr Dent (2022)\nAbstract: ...Clinicians usually use <m>conventional</m> <m>restorative</m> <m>treatment</m> to manage @DISEASE_Dental_Caries @DISEASE_MESH:D003731 @@@dental caries@@@ in healthy <m>primary</m> <m>teeth</m>, as well as after vital and non-vital pulp <m>therapy</m>.\n--------------------------------------------------------------------------------\nPMID: 35879115\nTitle: Nonrestorative Caries Treatment: A Systematic Review Update\nSource: Int Dent J (2022)\nAbstract: The Population, Intervention, Comparator, Outcome (PICO) strategy was followed to answer the research question: \"What is the currently available scientific evidence of clinical trials that evaluated effectiveness and adverse effects of nonrestorative @DISEASE_Dental_Caries @DISEASE_MESH:D003731 @@@caries@@@ <m>treatment</m> options?\" According to the PICO/PICOS statement, the comparison was carried out by using the terms: \"nonrestorative <m>cavity</m> control,\" \"<m>restorative</m> dental procedure on <m>tooth</m>,\" and \"topical application of @CHEMICAL_Fluorides @CHEMICAL_MESH:D005459 @@@fluoride@@@ - <m>tooth</m>.\"\n--------------------------------------------------------------------------------\nPMID: 37654409\nTitle: Isolation Systems and its Effectiveness in Oral and Maxillofacial Surgery: A Systematic Review\nSource: J Pharm Bioallied Sci (2023)\nAbstract: @SPECIES_9606 @@@Children@@@ receiving <m>proximal</m> <m>primary</m> \"atraumatic <m>restorative</m> <m>treatment</m> (<m>ART</m>)\" in <m>primary</m> molars were included in studies of Kemoli 2010 and Carvalho 2010.\n--------------------------------------------------------------------------------\nPMID: 39410424\nTitle: A Critical Review on the Factors Affecting the Bond Strength of Direct Restorative Material Alternatives to Amalgam\nSource: Materials (Basel) (2024)\nAbstract: Their insufficient mechanical properties limit their clinical indications to the restoration of <m>primary</m> <m>teeth</m>, @DISEASE_Uterine_Cervicitis @DISEASE_MESH:D002575 @@@cervical lesions@@@, temporary restorations, the intermediate base in the sandwich technique and atraumatic <m>restorative</m> <m>treatment</m> (<m>ART</m>).\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 21,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_P4TGu9MNe16iq7Vf95csNHSs",
+    "parent_tool_call_id": "call_aHznvsMPezwUEjczVavi0SLJ",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "DOI|included|sample|participants|restoration|high-viscosity|glass ionomer|comparator|conventional|follow-up|survival|failure|risk ratio|odds ratio|confidence interval|heterogeneity|GRADE|certainty|conclusion",
+      "pmid": "27489205"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27489205')\noutput = format_paper_content_output(result, filter_keywords='DOI|included|sample|participants|restoration|high-viscosity|glass ionomer|comparator|conventional|follow-up|survival|failure|risk ratio|odds ratio|confidence interval|heterogeneity|GRADE|certainty|conclusion')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m DOI|included|sample|participants|restoration| ... rval|heterogeneity|GRADE|certainty|conclusion\n      \u001b[90mpmid:\u001b[0m 27489205\n\n  \u001b[1m\u001b[93m[2] fetch_paper_annotations\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 10\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mpmids:\u001b[0m ['27489205']\n\n  \u001b[1m\u001b[93m[3] get_paper_references\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 20\n      \u001b[90mmax_workers:\u001b[0m 2\n      \u001b[90mmini_batch_size:\u001b[0m 10\n      \u001b[90mpmids:\u001b[0m ['27489205']\n      \u001b[90mrate_limit:\u001b[0m 3\n      \u001b[90mtask_name:\u001b[0m review studies\n\n=== PMID: 27489205 ===\n\nTitle: ART is an alternative for restoring occlusoproximal cavities in primary teeth - evidence from an updated systematic review and meta-analysis.\n\nJournal/Date: International journal of paediatric dentistry (2017)\n\nMeSH Keywords: Child, Dental Atraumatic Restorative Treatment, Dental Caries, Dental Occlusion, Dental Restoration Failure, Humans, Tooth, Deciduous\n\n\n--- ABSTRACT ---\n[BACKGROUND]: A previous systematic review showed that atraumatic restorative treatment (ART) can be an option to restore the occlusoproximal cavities in primary teeth; however, few studies fulfilled the criteria of inclusion to generate a high level of evidence.\n[AIM]: To update the existing systematic review and address questions regarding survival rate of ART restorations compared to the conventional approach in occlusoproximal cavities in primary molars.\n[DESIGN]: The search was extended beyond the original search through the PubMed/MEDLINE database up to February 2016. Furthermore, Web of Science and EMBASE were searched. The inclusion criteria were subjects related to the scope of the systematic review. After selection by title and abstract, potentially eligible articles were read in full and included in accordance with exclusion criteria. Meta-analysis was carried out with the outcome being the survival rate of restorations.\n[RESULTS]: The search strategy identified 560 potentially relevant studies, in addition to 127 from the original systematic review. A total of four articles were included in the qualitative and quantitative analyses. Meta-analysis showed no statistically significant difference between ART and conventional approaches in survival rate of occlusoproximal cavities (OR = 0.887, 95% CI: 0.574-1.371).\n[CONCLUSION]: ART restorations have similar survival rate compared to conventional treatment and can be considered an option to restore occlusoproximal cavities in primary molars.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 23,
+    "agent": "search",
+    "tool_name": "get_paper_references",
+    "tool_call_id": "call_FUa5Vu3UaZNC77OLw7tBBzTf",
+    "parent_tool_call_id": "call_aHznvsMPezwUEjczVavi0SLJ",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 20,
+      "max_workers": 2,
+      "mini_batch_size": 10,
+      "pmids": [
+        "27489205"
+      ],
+      "rate_limit": 3,
+      "task_name": "review studies"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_get_paper_references\nimport pandas as pd\n\nsearch_results = pubmed_api_get_paper_references(\n    pmids=['27489205'], batch_size=20, mini_batch_size=10,\n    max_workers=2, rate_limit=3\n)\n\nsearch_results_df = pd.DataFrame(search_results)\nsearch_results_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/review_studies.csv', index=False)\nprint(\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/review_studies.csv'\")\nprint(search_results_df.head().to_markdown())\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/review_studies.csv'\n\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 26,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_XoykxjSQZtC64wAuY92ajLwF",
+    "parent_tool_call_id": "call_FUa5Vu3UaZNC77OLw7tBBzTf",
+    "round": 3,
+    "tool_input": {
+      "task_name": "meta details",
+      "boolean_query_text": "\"0.887\" \"0.574\" ART conventional primary molars",
+      "top_k": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='\"0.887\" \"0.574\" ART conventional primary molars',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='\"0.887\" \"0.574\" ART conventional primary molars',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/meta_details.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/meta_details.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nUnexpected error (attempt 1/3): \"['pmcid'] not in index\"\nRetry attempt 2 after 0.3333333333333333 seconds...\nUnexpected error (attempt 2/3): \"['pmcid'] not in index\"\nRetry attempt 3 after 0.6666666666666666 seconds...\nUnexpected error (attempt 3/3): \"['pmcid'] not in index\"\nUnexpected error after 3 attempts\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/meta_details.csv'\nTotal results found: 1\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 27489205\nTitle: ART is an alternative for restoring occlusoproximal cavities in primary teeth - evidence from an updated systematic review and meta-analysis.\nSource: International journal of paediatric dentistry (2017)\nAbstract: BACKGROUND: A previous systematic review showed that atraumatic restorative treatment (ART) can be an option to restore the occlusoproximal cavities in primary teeth; however, few studies fulfilled the criteria of inclusion to generate a high level of evidence. AIM: To update the existing systematic review and address questions regarding survival rate of ART restorations compared to the conventional approach in occlusoproximal cavities in primary molars. DESIGN: The search was extended beyond the original search through the PubMed/MEDLINE database up to February 2016. Furthermore, Web of Science and EMBASE were searched. The inclusion criteria were subjects related to the scope of the systematic review. After selection by title and abstract, potentially eligible articles were read in full and included in accordance with exclusion criteria. Meta-analysis was carried out with the outcome being the survival rate of restorations. RESULTS: The search strategy identified 560 potentially relevant studies, in addition to 127 from the original systematic review. A total of four articles were included in the qualitative and quantitative analyses. Meta-analysis showed no statistically signifi ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 27,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_XiEqyggdXVR5lfRyAiEOUlHk",
+    "parent_tool_call_id": "call_XoykxjSQZtC64wAuY92ajLwF",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The target paper is confirmed as “ART is an alternative for restoring occlusoproximal cavities in primary teeth – evidence from an updated systematic review and meta-analysis,” International Journal of Paediatric Dentistry, 2017; PMID 27489205. The PubMed record/search output did not provide a DOI, so DOI remains unverified from the available source.",
+          "source_tools": [
+            {
+              "relevance": "Exact title, PMID, journal, and year",
+              "tool_call_id": "call_P4TGu9MNe16iq7Vf95csNHSs"
+            },
+            {
+              "relevance": "Independent exact-title search confirmation",
+              "tool_call_id": "call_bxjldVqCeciAksNlUtCbPsMk"
+            }
+          ]
+        },
+        {
+          "finding": "The update searched PubMed/MEDLINE through February 2016 plus Web of Science and EMBASE; 560 new potentially relevant studies were identified in addition to 127 from the original review, and four articles were included in both qualitative and quantitative analyses.",
+          "source_tools": [
+            {
+              "relevance": "Review abstract methods and study count",
+              "tool_call_id": "call_P4TGu9MNe16iq7Vf95csNHSs"
+            }
+          ]
+        },
+        {
+          "finding": "The intervention was ART for occlusoproximal cavities in primary molars; the precursor review defines ART as hand excavation plus high-viscosity glass-ionomer cement. The comparator in the updated review was conventional restorative treatment, and the outcome was restoration survival.",
+          "source_tools": [
+            {
+              "relevance": "ART technique and comparator context from predecessor review",
+              "tool_call_id": "call_zSOeVRqGK1XV4Y55vLPxeheQ"
+            },
+            {
+              "relevance": "Updated review intervention/comparator/outcome",
+              "tool_call_id": "call_P4TGu9MNe16iq7Vf95csNHSs"
+            }
+          ]
+        },
+        {
+          "finding": "The updated meta-analysis found no statistically significant survival difference between ART and conventional treatment: OR 0.887, 95% CI 0.574–1.371. The review concluded that ART restorations have a similar survival rate to conventional treatment and can be considered an option for occlusoproximal cavities in primary molars.",
+          "source_tools": [
+            {
+              "relevance": "Exact pooled estimate and final conclusion",
+              "tool_call_id": "call_P4TGu9MNe16iq7Vf95csNHSs"
+            }
+          ]
+        },
+        {
+          "finding": "The accessible PubMed abstract/tool output does not report the four included studies’ individual names, aggregate sample size, follow-up durations, heterogeneity statistics (for example I²), or GRADE/certainty assessment; these details should be treated as unavailable rather than inferred.",
+          "source_tools": [
+            {
+              "relevance": "Full-text unavailable notice and abstract limitation",
+              "tool_call_id": "call_P4TGu9MNe16iq7Vf95csNHSs"
+            },
+            {
+              "relevance": "Search output confirms only four articles and pooled OR, without requested additional details",
+              "tool_call_id": "call_XoykxjSQZtC64wAuY92ajLwF"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 28,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_h9RKtDouqGptTPJXLzKDik1T",
+    "parent_tool_call_id": "call_5MP7Z6NaNdT92CXMTyYG6gp6",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:27489205",
+          "observations": [
+            "2017 International Journal of Paediatric Dentistry updated systematic review and meta-analysis of ART for occlusoproximal cavities in primary teeth.",
+            "Searches covered PubMed/MEDLINE through February 2016, Web of Science, and EMBASE; four articles were included in qualitative and quantitative analyses."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Identifies the target review and its search/inclusion details.",
+              "tool_call_id": "call_P4TGu9MNe16iq7Vf95csNHSs"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL / DRUG",
+          "name": "Atraumatic restorative treatment",
+          "observations": [
+            "For primary molar occlusoproximal cavities, ART is described as hand excavation followed by high-viscosity glass-ionomer cement.",
+            "The updated review found no statistically significant survival difference versus conventional restorative treatment: OR 0.887, 95% CI 0.574–1.371."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Defines the intervention and reports the pooled comparative result.",
+              "tool_call_id": "call_zSOeVRqGK1XV4Y55vLPxeheQ"
+            },
+            {
+              "relevance": "Reports the meta-analysis conclusion.",
+              "tool_call_id": "call_P4TGu9MNe16iq7Vf95csNHSs"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "ART survival equivalence",
+          "observations": [
+            "In four included articles, ART restoration survival was not statistically different from conventional treatment; pooled OR 0.887 with 95% CI 0.574–1.371.",
+            "The review concluded ART can be considered an option for occlusoproximal cavities in primary molars."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Directly supports the pooled estimate and authors' conclusion.",
+              "tool_call_id": "call_P4TGu9MNe16iq7Vf95csNHSs"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Atraumatic restorative treatment",
+          "relation_type": "SUPPORTS",
+          "to_entity": "ART survival equivalence"
+        },
+        {
+          "from_entity": "PMID:27489205",
+          "relation_type": "SUPPORTS",
+          "to_entity": "ART survival equivalence"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"PMID:27489205\", \"entityType\": \"PAPER\", \"observations\": [\"2017 International Journal of Paediatric Dentistry updated systematic review and meta-analysis of ART for occlusoproximal cavities in primary teeth.\", \"Searches covered PubMed/MEDLINE through February 2016, Web of Science, and EMBASE; four articles were included in qualitative and quantitative analyses.\"]}, {\"name\": \"Atraumatic restorative treatment\", \"entityType\": \"CHEMICAL / DRUG\", \"observations\": [\"For primary molar occlusoproximal cavities, ART is described as hand excavation followed by high-viscosity glass-ionomer cement.\", \"The updated review found no statistically significant survival difference versus conventional restorative treatment: OR 0.887, 95% CI 0.574\\u20131.371.\"]}, {\"name\": \"ART survival equivalence\", \"entityType\": \"FINDING\", \"observations\": [\"In four included articles, ART restoration survival was not statistically different from conventional treatment; pooled OR 0.887 with 95% CI 0.574\\u20131.371.\", \"The review concluded ART can be considered an option for occlusoproximal cavities in primary molars.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"Atraumatic restorative treatment\", \"to\": \"ART survival equivalence\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:27489205\", \"to\": \"ART survival equivalence\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_h9RKtDouqGptTPJXLzKDik1T\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_5MP7Z6NaNdT92CXMTyYG6gp6\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

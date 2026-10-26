@@ -1,0 +1,236 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_jFM8f8ZZvdF61Qrhja80jpaL",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease",
+        "drug"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether an integrated community TB-HIV adherence model in Cape Town, South Africa provides an effective alternative to directly observed therapy (DOT) for tuberculosis patients. Identify the relevant Cape Town intervention/study, its TB and HIV adherence support components, comparator (DOT or usual care), treatment adherence/completion/cure outcomes, and whether the evidence supports replacing DOT, supplementing it, or is inconclusive. Prioritize peer-reviewed studies and report PMID or other source identifiers."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_JFh5vykMGKeoxp7X37QqFu2Y",
+    "parent_tool_call_id": "call_jFM8f8ZZvdF61Qrhja80jpaL",
+    "round": 1,
+    "tool_input": {
+      "task_name": "TB HIV adherence intervention",
+      "boolean_query_text": "South Africa integrated TB HIV adherence intervention community treatment outcomes DOT",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='South Africa integrated TB HIV adherence intervention community treatment outcomes DOT',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='South Africa integrated TB HIV adherence intervention community treatment outcomes DOT',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/TB_HIV_adherence_intervention.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/TB_HIV_adherence_intervention.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/TB_HIV_adherence_intervention.csv'\nTotal results found: 21\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 27510244\nTitle: An integrated community TB-HIV adherence model provides an alternative to DOT for tuberculosis patients in Cape Town.\nSource: The international journal of tuberculosis and lung disease : the official journal of the International Union against Tuberculosis and Lung Disease (2016)\nAbstract: SETTING: Cape Town, South Africa. OBJECTIVE: To evaluate anti-tuberculosis treatment outcomes and rate of antiretroviral therapy (ART) initiation using weekly community-based adherence support compared to daily directly observed therapy (DOT). METHODS: This was a retrospective analysis comparing two cohorts treated for tuberculosis (TB) in 70 TB clinics during 6-month periods before and after the introduction of a new adherence model comprising treatment literacy sessions during 2 weeks of DOT, followed by weekly home visits by community care workers to eligible patients managing their own treatment. Odds ratios (ORs) of treatment success and ART initiation were calculated using multivariable random effects logistic regression models. Hazard ratios (HRs) of default and death were calculated using multivariable random effects Cox regression models. RESULTS: The pre-intervention cohort comprised 11 896 patients with TB and the post-intervention cohort 11 314. There was no difference in pre- and post-intervention anti-tuberculosis treatment success rates (respectively 82.8% and 82.5%, adjusted OR [aOR] 1.02, 95%CI 0.89-1.17, P = 0.76) nor an increased hazard of death (adjusted HR [aHR ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 39816113\nTitle: Role of mothers in preventing tuberculosis in children: A scoping review\nSource: Narra J (2024)\nAbstract: In Lagos, Nigeria, @DISEASE_Tuberculosis @DISEASE_MESH:D014376 @@@<m>HIV</m>-<m>TB</m>@@@ <m>integrated</m> services showed good knowledge of @DISEASE_HIV_Infections @DISEASE_MESH:D015658 @@@<m>HIV</m>@@@ transmission and antiretroviral <m>therapy</m> but negative perceptions of healthcare workers.\n--------------------------------------------------------------------------------\nPMID: 39413071\nTitle: Adopting sustainable innovations for remote access to TB and HIV care in South Africa\nSource: PLOS Glob Public Health (2024)\nAbstract: Analysis of survey responses from 33 stakeholders in <m>South</m> <m>Africa</m> revealed that 47% of <m>interventions</m> targeted @DISEASE_HIV_Infections @DISEASE_MESH:D015658 @@@<m>HIV</m>@@@, 11% @DISEASE_Tuberculosis_Meningeal @DISEASE_MESH:D014390 @@@<m>TB</m>@@@, and 23% @DISEASE_HIV_Infections @DISEASE_MESH:D015658 @@@<m>HIV</m>@@@/@DISEASE_Tuberculosis_Meningeal @DISEASE_MESH:D014390 @@@<m>TB</m>@@@ <m>integrated</m> service delivery.\n--------------------------------------------------------------------------------\nPMID: 39964961\nTitle: A community based, bottom-up, multi-pronged, technology integrated approach to enhance tuberculosis related awareness and treatment adherence in Uganda: The ACTS model\nSource: PLoS One (2025)\nAbstract: ...<m>Treatment</m> <m>outcomes</m> of <m>DOTS</m> & VOT <m>adherence</m> modalities compared.\n--------------------------------------------------------------------------------\nPMID: 34108036\nTitle: Evaluation of adherence monitoring system using evriMED with a differentiated response compared to standard of care among drug-sensitive TB patients in three provinces in South Africa: a protocol for a cluster randomised control trial\nSource: Trials (2021)\nAbstract: <m>South</m> <m>Africa</m> reported <m>treatment</m> success rates of 77% among all @SPECIES_9606 @@@people@@@ with new and previously treated @DISEASE_Tuberculosis @DISEASE_MESH:D014376 @@@<m>TB</m>@@@ as well as 75% among @SPECIES_11676 @@@<m>HIV</m>@@@-positive @SPECIES_9606 @@@people@@@ with @DISEASE_Tuberculosis @DISEASE_MESH:D014376 @@@<m>TB</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 40343952\nTitle: Costs and cost-effectiveness of community health worker programs focussed on HIV, TB and malaria infectious diseases in low- and middle-income countries (2015-2024): A scoping literature review\nSource: PLOS Glob Public Health (2025)\nAbstract: One <m>intervention</m> in <m>South</m> <m>Africa</m>, integrating NCD screening into home-based @SPECIES_11676 @@@<m>HIV</m>@@@ testing, yielded inconclusive results.\n--------------------------------------------------------------------------------\nPMID: 40803739\nTitle: ThiPhiSA: new pathways to TB prevention from community screening - a household-randomised controlled trial in KwaZulu-Natal, South Africa\nSource: BMJ Open (2025)\nAbstract: ThiPhiSA: new pathways to @DISEASE_Tuberculosis @DISEASE_MESH:D014376 @@@<m>TB</m>@@@ prevention from <m>community</m> screening - a household-randomised controlled trial in KwaZulu-Natal, <m>South</m> <m>Africa</m>\n--------------------------------------------------------------------------------\nPMID: 41746007\nTitle: Reframing TB Care: A Perspective on Multimorbidity-Centered Care for People with TB\nSource: Trop Med Infect Dis (2026)\nAbstract: Even in countries such as <m>South</m> <m>Africa</m> that have adopted a model of co-located @DISEASE_HIV_Infections @DISEASE_MESH:D015658 @@@<m>HIV</m>@@@ and @DISEASE_Tuberculosis @DISEASE_MESH:D014376 @@@<m>TB</m>@@@ care at the primary care level there remain significant challenges in implementing <m>integrated</m> service delivery.\n--------------------------------------------------------------------------------\nPMID: 36918242\nTitle: Effectiveness of digital adherence technologies in improving tuberculosis treatment outcomes in four countries: a pragmatic cluster randomised trial protocol\nSource: BMJ Open (2023)\nAbstract: Country Stratification variables Restriction variables Philippines Province; poor <m>treatment</m> <m>outcome</m>* Poor <m>treatment</m> <m>outcome</m>*; no of DS-<m>TB</m> notifications; facility type Ukraine Poor <m>treatment</m> <m>outcome</m> <m>Treatment</m> failure*; no of DS-<m>TB</m> notifications; Oblast (district) Tanzania Poor <m>treatment</m> <m>outcome</m> <m>Treatment</m> failure*; no of DS-<m>TB</m> notifications; urban (vs rural); <m>HIV</m> coinfection rate; facility serving mining <m>communities</m> <m>South</m> <m>Africa</m> Province (two strata) <m>Treatment</m> success*; urban/rural, no of DS-<m>TB</m> notifications; facility type\n--------------------------------------------------------------------------------\nPMID: 36868589\nTitle: Qualitative study exploring the feasibility of using medication monitors and a differentiated care approach to support adherence among people receiving TB treatment in South Africa\nSource: BMJ Open (2023)\nAbstract: Qualitative study exploring the feasibility of using medication monitors and a differentiated care approach to support <m>adherence</m> among people receiving @DISEASE_Tuberculosis @DISEASE_MESH:D014376 @@@<m>TB</m>@@@ <m>treatment</m> in <m>South</m> <m>Africa</m>\n--------------------------------------------------------------------------------\nPMID: 40017294\nTitle: Integrating narrative and bibliometric approaches to examine factors and impacts of tuberculosis treatment non-compliance\nSource: Multidiscip Respir Med (2025)\nAbstract: Finlay, et all Patient-and provider-level risk factors associated with default from tuberculosis <m>treatment</m>, <m>South</m> <m>Africa</m>, 2002: a case-control study 2012 <m>South</m> <m>Africa</m> Case-control study <m>TB</m> patients from 8 provinces, both new and re-<m>treatment</m> cases 1164 (232 cases, 932 controls) Poor healthcare worker attitudeChanging residence during <m>TB</m> treatmentLack of formal educationFeeling ashamed to have TBNot receiving adequate counseling about their treatmentAlcohol useTraditional healersFelt betterHistory of previous <m>TB</m> <m>treatment</m> defaultPerception that food provisions would help finish <m>treatment</m> 17.\n--------------------------------------------------------------------------------\nPMID: 34535539\nTitle: Tuberculosis in times of COVID-19\nSource: J Epidemiol Community Health (2022)\nAbstract: To overcome the barriers created by facility-based <m>DOT</m>, there has been a shift towards strengthening <m>community</m>-based @DISEASE_Tuberculosis @DISEASE_MESH:D014376 @@@<m>TB</m>@@@ <m>treatment</m> services to ensure @SPECIES_9606 @@@patients@@@ get the medicine in a timely fashion.\n--------------------------------------------------------------------------------\nPMID: 41735988\nTitle: Identification and mapping of mHealth interventions applied in palliative care in Sub Saharan Africa: a scoping review:\nSource: BMC Palliat Care (2026)\nAbstract: To assess whether a digital medication event reminder and monitor (MERM) device -observed self-administered <m>therapy</m> improves <m>adherence</m> and <m>treatment</m> <m>outcomes</m> in @SPECIES_9606 @@@patients@@@ with <m>TB</m> compared with the standard in-person directly observed <m>therapy</m> (<m>DOT</m>).\n--------------------------------------------------------------------------------\nPMID: 34006254\nTitle: Acceptability, feasibility, and impact of a pilot tuberculosis literacy and treatment counselling intervention: a mixed methods study\nSource: BMC Infect Dis (2021)\nAbstract: The main global approach to promote @DISEASE_Tuberculosis @DISEASE_MESH:D014376 @@@<m>TB</m>@@@ <m>treatment</m> <m>adherence</m> and retention is directly observed <m>therapy</m> (<m>DOT</m>), wherein a designated supervisor such as a health provider or <m>community</m> member observes @SPECIES_9606 @@@patients@@@ ingest their medicines.\n--------------------------------------------------------------------------------\nPMID: 37736584\nTitle: TB programme stakeholder views on lessons from the COVID-19 response in South Africa\nSource: Public Health Action (2023)\nAbstract: These circumstances negatively impacted @DISEASE_Tuberculosis_Meningeal @DISEASE_MESH:D014390 @@@<m>TB</m>@@@ care-seeking, diagnosis, <m>treatment</m> and <m>outcomes</m>. The large-scale public health response to @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@ in <m>South</m> <m>Africa</m> potentially holds lessons for the @DISEASE_Tuberculosis_Meningeal @DISEASE_MESH:D014390 @@@<m>TB</m>@@@ programme's recovery, which we explore in this paper.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_oI3WJKismEzFEXPozlDtfDU1",
+    "parent_tool_call_id": "call_JFh5vykMGKeoxp7X37QqFu2Y",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|CONCLUSION|intervention|DOT|ART|treatment success|cure|default|completion",
+      "pmid": "27510244"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27510244')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|CONCLUSION|intervention|DOT|ART|treatment success|cure|default|completion')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|CONCLUSION|intervention|DOT|ART|treatment success|cure|default|completion\n      \u001b[90mpmid:\u001b[0m 27510244\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|CONCLUSION|intervention|DOT|treatment success|cure|smear conversion|default\n      \u001b[90mpmid:\u001b[0m 21276302\n\n  \u001b[1m\u001b[93m[3] fetch_paper_annotations\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 50\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mpmids:\u001b[0m ['27510244', '21276302']\n\n=== PMID: 27510244 ===\n\nTitle: An integrated community TB-HIV adherence model provides an alternative to DOT for tuberculosis patients in Cape Town.\n\nJournal/Date: The international journal of tuberculosis and lung disease : the official journal of the International Union against Tuberculosis and Lung Disease (2016)\n\nMeSH Keywords: Adult, Anti-HIV Agents, Antitubercular Agents, Community Health Workers, Directly Observed Therapy, Female, HIV Infections, Humans\n\n\n--- ABSTRACT ---\n[SETTING]: Cape Town, South Africa.\n[OBJECTIVE]: To evaluate anti-tuberculosis treatment outcomes and rate of antiretroviral therapy (ART) initiation using weekly community-based adherence support compared to daily directly observed therapy (DOT).\n[METHODS]: This was a retrospective analysis comparing two cohorts treated for tuberculosis (TB) in 70 TB clinics during 6-month periods before and after the introduction of a new adherence model comprising treatment literacy sessions during 2 weeks of DOT, followed by weekly home visits by community care workers to eligible patients managing their own treatment. Odds ratios (ORs) of treatment success and ART initiation were calculated using multivariable random effects logistic regression models. Hazard ratios (HRs) of default and death were calculated using multivariable random effects Cox regression models.\n[RESULTS]: The pre-intervention cohort comprised 11 896 patients with TB and the post-intervention cohort 11 314. There was no difference in pre- and post-intervention anti-tuberculosis treatment success rates (respectively 82.8% and 82.5%, adjusted OR [aOR] 1.02, 95%CI 0.89-1.17, P = 0.76) nor an increased hazard of death (adjusted HR [aHR] 0.98, 95%CI 0.80-1.21, P = 0.87) or default (aHR 0.97, 95%CI 0.81-1.15, P = 0.69). The ART initiation rate increased from 67% to 74% (aOR 1.43; 95%CI 1.01-1.85, P < 0.01).\n[CONCLUSION]: Weekly community-based adherence support was a viable alternative to daily DOT, with no deterioration in anti-tuberculosis treatment outcomes and an increase in ART initiation.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_RFCIeiyvTzGiIgbBydbPyTey",
+    "parent_tool_call_id": "call_JFh5vykMGKeoxp7X37QqFu2Y",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|CONCLUSION|intervention|DOT|treatment success|cure|smear conversion|default",
+      "pmid": "21276302"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('21276302')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|CONCLUSION|intervention|DOT|treatment success|cure|smear conversion|default')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 21276302 ===\n\nTitle: Lay health worker-supported tuberculosis treatment adherence in South Africa: an interrupted time-series study.\n\nJournal/Date: The international journal of tuberculosis and lung disease : the official journal of the International Union against Tuberculosis and Lung Disease (2011)\n\nMeSH Keywords: Adult, Antitubercular Agents, Bacteriological Techniques, Case-Control Studies, Directly Observed Therapy, Female, Health Personnel, Humans\n\n\n--- ABSTRACT ---\n[SETTING]: Better integration of treatment support for people living with tuberculosis (TB) and human immuno-deficiency virus/acquired immune-deficiency syndrome (HIV/AIDS) is a challenge in many settings, and has been identified as a service priority.\n[OBJECTIVE]: To determine the impact, compared to directly observed therapy, of a TB treatment intervention modelled on the community antiretroviral treatment (ART) support programme in South Africa.\n[DESIGN]: An interrupted time-series design was used, including five intervention clinics and five comparison clinics. Data were collected from January 2005 to March 2008 and analysed using Poisson regression.\n[RESULTS]: Between April 2007 and March 2008, a total of 71% of all new TB patients starting treatment at the intervention clinics were placed on the intervention. There were no significant differences in cure or treatment success rates for new TB patients between intervention and comparison clinics. There was a small improvement in smear conversion rates in intervention clinics when compared to comparison clinics.\n[CONCLUSION]: The new model does not result in significantly different TB cure and treatment success rates, but does result in small improvements in smear conversion rates for smear-positive TB patients. The model holds potential for the better integration of TB and ART support.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_annotations",
+    "tool_call_id": "call_VsmftiNqWllMoxqe0VjLjyKp",
+    "parent_tool_call_id": "call_JFh5vykMGKeoxp7X37QqFu2Y",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "pmids": [
+        "27510244",
+        "21276302"
+      ]
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_fetch_paper_annotations\nimport json\nsearch_results = pubtator_api_fetch_paper_annotations(\n    pmids=['27510244', '21276302'], batch_size=50, max_retries=3, max_requests_per_second=3\n)\nprint(json.dumps(search_results, indent=4))\n\n```\n\n### Output:\n```\nSuccessfully processed 2 publications from chunk\nTotal results: 2\n[\n    {\n        \"Disease\": [\n            \"Tuberculosis\"\n        ],\n        \"Relevant_Disease\": [\n            \"Acquired Immunodeficiency Syndrome\",\n            \"Tuberculosis\"\n        ],\n        \"Relevant_Species\": [\n            \"12721\",\n            \"9606\"\n        ],\n        \"Relation_Mentions\": [],\n        \"PMID\": 21276302\n    },\n    {\n        \"Disease\": [\n            \"Tuberculosis\"\n        ],\n        \"Species\": [\n            \"11676\",\n            \"9606\"\n        ],\n        \"Relevant_Disease\": [\n            \"Death\",\n            \"Tuberculosis\"\n        ],\n        \"Relevant_Species\": [\n            \"9606\"\n        ],\n        \"Relation_Mentions\": [],\n        \"PMID\": 27510244\n    }\n]\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_Uqd2fm145xkjupVXjHwhSYDG",
+    "parent_tool_call_id": "call_VsmftiNqWllMoxqe0VjLjyKp",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The most directly relevant Cape Town study is PMID 27510244 (2016), a retrospective pre/post cohort analysis across 70 TB clinics. The intervention began with 2 weeks of treatment-literacy sessions under DOT, then shifted eligible patients to self-administered TB treatment supported by weekly home visits from community care workers; it also addressed HIV care through ART initiation support.",
+          "source_tools": [
+            {
+              "relevance": "PubMed search identified the exact Cape Town intervention and its design/components",
+              "tool_call_id": "call_JFh5vykMGKeoxp7X37QqFu2Y"
+            },
+            {
+              "relevance": "Abstract/full extracted record confirms intervention and outcomes",
+              "tool_call_id": "call_oI3WJKismEzFEXPozlDtfDU1"
+            }
+          ]
+        },
+        {
+          "finding": "In PMID 27510244, the comparator was the pre-intervention model based on daily DOT. Among 11,896 pre-intervention versus 11,314 post-intervention patients, TB treatment success was essentially unchanged (82.8% vs 82.5%; adjusted OR 1.02, 95% CI 0.89–1.17; P=0.76), with no significant difference in default (adjusted HR 0.97, 95% CI 0.81–1.15) or death (adjusted HR 0.98, 95% CI 0.80–1.21). ART initiation increased from 67% to 74% (adjusted OR 1.43, 95% CI 1.01–1.85; P<0.01).",
+          "source_tools": [
+            {
+              "relevance": "Direct abstract outcome data for the Cape Town integrated model",
+              "tool_call_id": "call_oI3WJKismEzFEXPozlDtfDU1"
+            }
+          ]
+        },
+        {
+          "finding": "A related South African peer-reviewed interrupted time-series study, PMID 21276302 (2011), compared lay-health-worker TB adherence support modeled on community ART support with DOT/usual comparison-clinic care in five intervention and five comparison clinics. It found no significant difference in TB cure or treatment-success rates, but a small improvement in smear conversion; authors concluded the model had potential for better TB-ART integration.",
+          "source_tools": [
+            {
+              "relevance": "Direct abstract evidence on comparator, intervention, and TB outcomes",
+              "tool_call_id": "call_RFCIeiyvTzGiIgbBydbPyTey"
+            }
+          ]
+        },
+        {
+          "finding": "Overall, the evidence supports replacing routine daily DOT with a structured, community-based, patient-centered adherence model for eligible drug-sensitive TB patients in this setting without apparent loss of treatment success, while improving ART initiation. It does not demonstrate superiority for TB cure/completion, and because the key Cape Town study was retrospective pre/post rather than randomized, it is stronger evidence for a viable alternative or supplement than for universal replacement of DOT; continued DOT may remain appropriate for patients needing intensive supervision.",
+          "source_tools": [
+            {
+              "relevance": "Cape Town study's stated conclusion and non-inferior TB outcomes",
+              "tool_call_id": "call_oI3WJKismEzFEXPozlDtfDU1"
+            },
+            {
+              "relevance": "Independent related study showing unchanged cure/success and only small smear-conversion benefit",
+              "tool_call_id": "call_RFCIeiyvTzGiIgbBydbPyTey"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_Bt1GZBhH0mWh3mrBRoQrVMZu",
+    "parent_tool_call_id": "call_jFM8f8ZZvdF61Qrhja80jpaL",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:27510244",
+          "observations": [
+            "Retrospective pre/post cohort across 70 Cape Town TB clinics compared daily DOT with an integrated TB-HIV adherence model.",
+            "The model used 2 weeks of DOT and treatment-literacy sessions, then self-administered TB treatment with weekly community-care-worker home visits and HIV-care support.",
+            "Among 11,896 pre-intervention and 11,314 post-intervention patients, treatment success was 82.8% versus 82.5%; adjusted OR 1.02 (95% CI 0.89–1.17).",
+            "Default and death did not differ significantly; ART initiation increased from 67% to 74% (adjusted OR 1.43, 95% CI 1.01–1.85)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct Cape Town intervention design and outcomes",
+              "tool_call_id": "call_oI3WJKismEzFEXPozlDtfDU1"
+            },
+            {
+              "relevance": "Study identification and intervention summary",
+              "tool_call_id": "call_JFh5vykMGKeoxp7X37QqFu2Y"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:21276302",
+          "observations": [
+            "Interrupted time-series study in five intervention and five comparison South African clinics evaluated lay-health-worker TB adherence support against DOT/usual care.",
+            "The intervention found no significant difference in TB cure or treatment success, with a small improvement in smear conversion and potential for improved TB-ART integration."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Supporting South African comparative evidence",
+              "tool_call_id": "call_RFCIeiyvTzGiIgbBydbPyTey"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Cape Town TB-HIV model",
+          "observations": [
+            "In eligible drug-sensitive TB patients, structured community support maintained treatment success relative to routine daily DOT while increasing ART initiation.",
+            "The model de-intensified rather than eliminated supervision because it retained initial DOT; evidence does not establish superiority or universal replacement."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Synthesis of direct and supporting studies",
+              "tool_call_id": "call_oI3WJKismEzFEXPozlDtfDU1"
+            },
+            {
+              "relevance": "Supporting evidence and limitation",
+              "tool_call_id": "call_RFCIeiyvTzGiIgbBydbPyTey"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:27510244",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Cape Town TB-HIV model"
+        },
+        {
+          "from_entity": "PMID:21276302",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Cape Town TB-HIV model"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"PMID:27510244\", \"entityType\": \"PAPER\", \"observations\": [\"Retrospective pre/post cohort across 70 Cape Town TB clinics compared daily DOT with an integrated TB-HIV adherence model.\", \"The model used 2 weeks of DOT and treatment-literacy sessions, then self-administered TB treatment with weekly community-care-worker home visits and HIV-care support.\", \"Among 11,896 pre-intervention and 11,314 post-intervention patients, treatment success was 82.8% versus 82.5%; adjusted OR 1.02 (95% CI 0.89\\u20131.17).\", \"Default and death did not differ significantly; ART initiation increased from 67% to 74% (adjusted OR 1.43, 95% CI 1.01\\u20131.85).\"]}, {\"name\": \"PMID:21276302\", \"entityType\": \"PAPER\", \"observations\": [\"Interrupted time-series study in five intervention and five comparison South African clinics evaluated lay-health-worker TB adherence support against DOT/usual care.\", \"The intervention found no significant difference in TB cure or treatment success, with a small improvement in smear conversion and potential for improved TB-ART integration.\"]}, {\"name\": \"Cape Town TB-HIV model\", \"entityType\": \"FINDING\", \"observations\": [\"In eligible drug-sensitive TB patients, structured community support maintained treatment success relative to routine daily DOT while increasing ART initiation.\", \"The model de-intensified rather than eliminated supervision because it retained initial DOT; evidence does not establish superiority or universal replacement.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"PMID:27510244\", \"to\": \"Cape Town TB-HIV model\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:21276302\", \"to\": \"Cape Town TB-HIV model\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_Bt1GZBhH0mWh3mrBRoQrVMZu\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_jFM8f8ZZvdF61Qrhja80jpaL\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

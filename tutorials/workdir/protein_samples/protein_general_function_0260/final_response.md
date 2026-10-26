@@ -1,0 +1,4 @@
+### Functional summary
+The 44-aa sequence is an **exact match** to reviewed *Larix decidua* UniProt Q85V00, annotated as **Photosystem I reaction center subunit IX**. Its annotation suggests it **may help organize PsaE and PsaF**. The reference protein is localized to the **chloroplast thylakoid membrane** and annotated as **single-pass**.
+
+The sequence is strongly hydrophobic (GRAVY **0.94**), consistent with a membrane-associated protein. A Pfam scan identifies the **PSI_PsaJ** family (PF01701) at residues 1–37. Predicted molecular mass is about **4.97 kDa** and theoretical pI is **4.56**. These are sequence-based estimates; the proposed organizational role is an annotation, not direct experimental evidence from this analysis.

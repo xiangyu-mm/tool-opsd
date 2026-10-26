@@ -1,0 +1,1 @@
+{"answer":"CC(=O)c1ccc2c(c1)N(C)C(=O)CO2"}

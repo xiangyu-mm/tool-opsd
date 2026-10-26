@@ -1,0 +1,3 @@
+Yes—**as comparative features**, not as universal or pathognomonic findings. A pathology study comparing 6 groove PDACs with 24 conventional PDACs and 6 duodenal adenocarcinomas found well differentiation significantly more often, and abnormal Smad4 immunolabeling significantly less often, in groove PDACs. Thus, well differentiation and retained (“intact”) Smad4 expression support groove PDAC relative to conventional PDAC, but the small study does not establish that every groove tumor has these features or that they occur only in groove tumors. ([PMID: 25426619](https://pubmed.ncbi.nlm.nih.gov/25426619/))
+
+FINAL DECISION: YES

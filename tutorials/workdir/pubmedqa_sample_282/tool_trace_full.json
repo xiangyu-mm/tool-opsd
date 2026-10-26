@@ -1,0 +1,537 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_argo1a80D0WGXzEEegxW9xNq",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "drug",
+        "disease"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether qS-21 (QS-21 saponin adjuvant) enhances the early antibody response to an oil-adjuvanted foot-and-mouth disease (FMD) vaccine in cattle. Identify the relevant study or studies, including cattle population, vaccine formulation, comparator, early post-vaccination time points, antibody assays/titers, and whether qS-21 produced a statistically or substantively higher early antibody response. Search terms should include qS-21, QS-21, foot-and-mouth disease, FMD vaccine, oil adjuvant, cattle, bovine, early antibody response, neutralizing antibody, and liquid-phase blocking ELISA."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_zUezLDdo4gtvePSwSidMYZqc",
+    "parent_tool_call_id": "call_argo1a80D0WGXzEEegxW9xNq",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "qS-21 QS-21 foot-and-mouth disease vaccine cattle oil adjuvant antibody",
+      "task_name": "qS21 FMD cattle",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='qS-21 QS-21 foot-and-mouth disease vaccine cattle oil adjuvant antibody',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='qS-21 QS-21 foot-and-mouth disease vaccine cattle oil adjuvant antibody',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/qS21_FMD_cattle.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/qS21_FMD_cattle.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/qS21_FMD_cattle.csv'\nTotal results found: 17\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 27489804\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\nSource: Clinical and experimental vaccine research (2016)\nAbstract: PURPOSE: One of the most important tools against foot-and-mouth disease, a highly contagious and variable viral disease of cloven-hoofed animals, is vaccination. However, the effectiveness of foot-and-mouth disease vaccines on slowing the spread of the disease is questionable. In contrast, high potency vaccines providing early protection may solve issues with the spread of the disease, escaping mutants, and persistency. To increase the potency of the vaccine, additives such as saponin and aluminium hydroxide are used. However, the use of saponin with an oil adjuvant is not common and is sometimes linked to toxicity. QS-21, which is less toxic than Quil A, has been presented as an alternative for use with saponin. In this study, the addition of QS-21 to a commercially available foot-and-mouth disease water-in-oil-in-water emulsion vaccine was evaluated in cattle. MATERIALS AND METHODS: After vaccination, serum samples were collected periodically over 3 months. Sera of the QS-21 and normal oil vaccine groups were compared via serum virus neutralization antibody titre and liquid phase blocking enzyme-linked immunosorbent assay antibody titre. RESULTS: The results showed that there was ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 27489804\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle\nSource: Clin Exp Vaccine Res (2016)\nAbstract: @CHEMICAL_saponin_QA_21V1 @CHEMICAL_MESH:C078785 @@@<m>QS</m>-<m>21</m>@@@ enhances the early <m>antibody</m> response to @CHEMICAL_Oils @CHEMICAL_MESH:D009821 @@@<m>oil</m>@@@ <m>adjuvant</m> @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>foot</m>-and-<m>mouth</m> <m>disease</m>@@@ <m>vaccine</m> in <m>cattle</m>\n--------------------------------------------------------------------------------\nPMID: 38006036\nTitle: Advancements in Vaccine Adjuvants: The Journey from Alum to Nano Formulations\nSource: Vaccines (Basel) (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37885619\nTitle: The combination of vaccines and adjuvants to prevent the occurrence of high incidence of infectious diseases in bovine\nSource: Front Vet Sci (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35891284\nTitle: Advances in Infectious Disease Vaccine Adjuvants\nSource: Vaccines (Basel) (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36125739\nTitle: Plant-derived immuno-adjuvants in vaccines formulation: a promising avenue for improving vaccines efficacy against SARS-CoV-2 virus\nSource: Pharmacol Rep (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36851331\nTitle: Immunogenicity of Different Types of Adjuvants and Nano-Adjuvants in Veterinary Vaccines: A Comprehensive Review\nSource: Vaccines (Basel) (2023)\nAbstract: @SPECIES_9913 @@@Bovine@@@ @GENE_IL18 @GENE_281249 @@@IL-18@@@ was used as an <m>adjuvant</m> in a DNA <m>vaccine</m> against @SPECIES_1074441 @@@FMD@@@, which elicited cellular and <m>antibody</m> responses in @SPECIES_9913 @@@<m>cattle</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 36864517\nTitle: An inventory of adjuvants used for vaccination in horses: the past, the present and the future\nSource: Vet Res (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40214462\nTitle: Role of T Follicular Helper Cells in Viral Infections and Vaccine Design\nSource: Cells (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38937820\nTitle: Evaluation of the immunogenicity and protective efficacy of an inactivated vaccine candidate for sheep infected with ovine parainfluenza virus type 3\nSource: Vet Res (2024)\nAbstract: Inactivated viruses have been traditionally used for <m>vaccine</m> development, and such <m>vaccines</m> are safe and effective for the prevention of @DISEASE_Virus_Diseases @DISEASE_MESH:D014777 @@@viral <m>diseases</m>@@@ such as @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@coronavirus <m>disease</m> 2019@@@ (@DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@), @DISEASE_Influenza_Human @DISEASE_MESH:D007251 @@@influenza@@@, @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>foot</m> and <m>mouth</m> <m>disease</m>@@@, and @DISEASE_Poliomyelitis @DISEASE_MESH:D011051 @@@polio@@@.\n--------------------------------------------------------------------------------\nPMID: 36423016\nTitle: Vaccination Strategies Based on Bacterial Self-Assembling Proteins as Antigen Delivery Nanoscaffolds\nSource: Vaccines (Basel) (2022)\nAbstract: In another example, an SpFN nanoparticle <m>vaccine</m> candidate was paired with two distinct <m>adjuvants</m>, @CHEMICAL_Aluminum_Hydroxide @CHEMICAL_MESH:D000536 @@@Alhydrogel@@@ or Army Liposome Formulation containing @CHEMICAL_saponin_QA_21V1 @CHEMICAL_MESH:C078785 @@@<m>QS</m>-<m>21</m>@@@ (ALFQ).\n--------------------------------------------------------------------------------\nPMID: 37631328\nTitle: Non-Invasive Vaccines: Challenges in Formulation and Vaccine Adjuvants\nSource: Pharmaceutics (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33142799\nTitle: Promotion of Cellular and Humoral Immunity against Foot-and-Mouth Disease Virus by Immunization with Virus-Like Particles Encapsulated in Monophosphoryl Lipid A and Liposomes\nSource: Vaccines (Basel) (2020)\nAbstract: Virus-like particles (VLPs) have emerged as promising <m>vaccine</m> candidates against @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>foot</m>-and-<m>mouth</m> <m>disease</m>@@@ (@DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@FMD@@@).\n--------------------------------------------------------------------------------\nPMID: 27076287\nTitle: Challenges in Veterinary Vaccine Development and Immunization\nSource: Methods Mol Biol (2016)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 29359135\nTitle: Antimicrobial Resistance: Its Surveillance, Impact, and Alternative Management Strategies in Dairy Animals\nSource: Front Vet Sci (2018)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_JQGqm0z89LclHvw30QuNQPPN",
+    "parent_tool_call_id": "call_argo1a80D0WGXzEEegxW9xNq",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "QS-21 foot-and-mouth disease cattle liquid-phase blocking ELISA",
+      "task_name": "QS21 LPBE FMD",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='QS-21 foot-and-mouth disease cattle liquid-phase blocking ELISA',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='QS-21 foot-and-mouth disease cattle liquid-phase blocking ELISA',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/QS21_LPBE_FMD.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/QS21_LPBE_FMD.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/QS21_LPBE_FMD.csv'\nTotal results found: 6\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 27489804\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\nSource: Clinical and experimental vaccine research (2016)\nAbstract: PURPOSE: One of the most important tools against foot-and-mouth disease, a highly contagious and variable viral disease of cloven-hoofed animals, is vaccination. However, the effectiveness of foot-and-mouth disease vaccines on slowing the spread of the disease is questionable. In contrast, high potency vaccines providing early protection may solve issues with the spread of the disease, escaping mutants, and persistency. To increase the potency of the vaccine, additives such as saponin and aluminium hydroxide are used. However, the use of saponin with an oil adjuvant is not common and is sometimes linked to toxicity. QS-21, which is less toxic than Quil A, has been presented as an alternative for use with saponin. In this study, the addition of QS-21 to a commercially available foot-and-mouth disease water-in-oil-in-water emulsion vaccine was evaluated in cattle. MATERIALS AND METHODS: After vaccination, serum samples were collected periodically over 3 months. Sera of the QS-21 and normal oil vaccine groups were compared via serum virus neutralization antibody titre and liquid phase blocking enzyme-linked immunosorbent assay antibody titre. RESULTS: The results showed that there was ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 35479882\nTitle: A comprehensive overview of vaccines developed for pandemic viral pathogens over the past two decades including those in clinical trials for the current novel SARS-CoV-2\nSource: RSC Adv (2021)\nAbstract: <m>Phase</m> 1/2 NCT04473690 To be implemented <m>21</m> PS Protein subunit Adjuvanted vaccine of @SPECIES_2697049 @@@SARS-CoV-2@@@ formulation spike protein (baculovirus production) : Sanofi Pasteur + Glaxo SmithKline plc.\n--------------------------------------------------------------------------------\nPMID: 27489804\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle\nSource: Clin Exp Vaccine Res (2016)\nAbstract: @CHEMICAL_saponin_QA_21V1 @CHEMICAL_MESH:C078785 @@@<m>QS</m>-<m>21</m>@@@ enhances the early antibody response to @CHEMICAL_Oils @CHEMICAL_MESH:D009821 @@@oil@@@ adjuvant @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>foot</m>-and-<m>mouth</m> <m>disease</m>@@@ vaccine in <m>cattle</m>\n--------------------------------------------------------------------------------\nPMID: 32617601\nTitle: EB2020 1st World Congress on Epidermolysis Bullosa\nSource: Acta Derm Venereol (2020)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 15113312\nTitle: Abstracts\nSource: Clin Microbiol Infect (2004)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 15796719\nTitle: Abstracts\nSource: Clin Microbiol Infect (2005)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_uuRrKE9ZbMHPXrNIPfBGHrX7",
+    "parent_tool_call_id": "call_argo1a80D0WGXzEEegxW9xNq",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "qS-21 FMD vaccine bovine neutralizing antibody early",
+      "task_name": "qS21 bovine antibody",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='qS-21 FMD vaccine bovine neutralizing antibody early',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='qS-21 FMD vaccine bovine neutralizing antibody early',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/qS21_bovine_antibody.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/qS21_bovine_antibody.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/qS21_bovine_antibody.csv'\nTotal results found: 8\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 37885619\nTitle: The combination of vaccines and adjuvants to prevent the occurrence of high incidence of infectious diseases in bovine\nSource: Front Vet Sci (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36125739\nTitle: Plant-derived immuno-adjuvants in vaccines formulation: a promising avenue for improving vaccines efficacy against SARS-CoV-2 virus\nSource: Pharmacol Rep (2022)\nAbstract: @SPECIES_11676 @@@HIV-1@@@ <m>vaccine</m> formulated with @CHEMICAL_saponin_QA_21V1 @CHEMICAL_MESH:C078785 @@@<m>QS</m>-<m>21</m>@@@ has shown significantly higher titer of <m>antibodies</m> response and induce group-specific proliferative responses in comparison to alum absorbed @SPECIES_11676 @@@HIV@@@ <m>vaccines</m>.\n--------------------------------------------------------------------------------\nPMID: 36851331\nTitle: Immunogenicity of Different Types of Adjuvants and Nano-Adjuvants in Veterinary Vaccines: A Comprehensive Review\nSource: Vaccines (Basel) (2023)\nAbstract: @SPECIES_9913 @@@<m>Bovine</m>@@@ @GENE_IL18 @GENE_281249 @@@IL-18@@@ was used as an adjuvant in a DNA <m>vaccine</m> against @SPECIES_1074441 @@@<m>FMD</m>@@@, which elicited cellular and <m>antibody</m> responses in @SPECIES_9913 @@@cattle@@@.\n--------------------------------------------------------------------------------\nPMID: 35891284\nTitle: Advances in Infectious Disease Vaccine Adjuvants\nSource: Vaccines (Basel) (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37576639\nTitle: Nanoadjuvants: Promising Bioinspired and Biomimetic Approaches in Vaccine Innovation\nSource: ACS Omega (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 27489804\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle\nSource: Clin Exp Vaccine Res (2016)\nAbstract: In particular, a dramatic increase in <m>neutralizing</m> <m>antibody</m> response as <m>early</m> as the eighth day was observed in the @CHEMICAL_saponin_QA_21V1 @CHEMICAL_MESH:C078785 @@@<m>QS</m>-<m>21</m>@@@ group, a good indicator of protection against @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>FMD</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 27076287\nTitle: Challenges in Veterinary Vaccine Development and Immunization\nSource: Methods Mol Biol (2016)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 31615112\nTitle: Recent Advances in Nanovaccines Using Biomimetic Immunomodulatory Materials\nSource: Pharmaceutics (2019)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "find_entities",
+    "tool_call_id": "call_nZxfIuzolk4P5bJz68PfI4X6",
+    "parent_tool_call_id": "call_argo1a80D0WGXzEEegxW9xNq",
+    "round": 1,
+    "tool_input": {
+      "concept_type": "CHEMICAL",
+      "limit": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "query_text": "QS-21"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_find_entities\nimport pandas as pd\nresults = pubtator_api_find_entities(\n    query_text='QS-21', concept_type='CHEMICAL',\n    limit=10, max_retries=3, max_requests_per_second=3\n)\nif len(results) == 0:\n    print(\"No entities found. Please try again with different query.\")\nelse:\n    if isinstance(results, pd.DataFrame): print(results.to_markdown())\n    else: print(\"No entities found. Please try again with different query.\")\n\n```\n\n### Output:\n```\nSuccessfully retrieved 2 entity suggestions\n|    | PubTator3_EntityID        | Name            | Type     | SourceDB   | ID_in_SourceDB   |\n|---:|:--------------------------|:----------------|:---------|:-----------|:-----------------|\n|  0 | @CHEMICAL_saponin_QA_21V1 | saponin QA-21V1 | chemical | ncbi_mesh  | C078785          |\n|  1 | @CHEMICAL_QS_21_xylose    | QS-21-xylose    | chemical | ncbi_mesh  | C531367          |\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_ih0binELHj6gGciubX4Hogsp",
+    "parent_tool_call_id": "call_nZxfIuzolk4P5bJz68PfI4X6",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "cattle|calves|vaccine|QS-21|oil|water-in-oil-in-water|day 8|day 15|day 21|neutralizing|liquid phase blocking|titre|titer|statistically|significant",
+      "pmid": "27489804"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27489804')\noutput = format_paper_content_output(result, filter_keywords='cattle|calves|vaccine|QS-21|oil|water-in-oil-in-water|day 8|day 15|day 21|neutralizing|liquid phase blocking|titre|titer|statistically|significant')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m cattle|calves|vaccine|QS-21|oil|water-in-oil- ... locking|titre|titer|statistically|significant\n      \u001b[90mpmid:\u001b[0m 27489804\n\n  \u001b[1m\u001b[93m[2] fetch_paper_annotations\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 50\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mpmids:\u001b[0m ['27489804']\n\n  \u001b[1m\u001b[93m[3] get_paper_references\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 20\n      \u001b[90mmax_workers:\u001b[0m 2\n      \u001b[90mmini_batch_size:\u001b[0m 10\n      \u001b[90mpmids:\u001b[0m ['27489804']\n      \u001b[90mrate_limit:\u001b[0m 3\n      \u001b[90mtask_name:\u001b[0m QS21 FMD references\n\n=== PMID: 27489804 ===\n\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\n\nJournal/Date: Clinical and experimental vaccine research (2016)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[PURPOSE]: One of the most important tools against foot-and-mouth disease, a highly contagious and variable viral disease of cloven-hoofed animals, is vaccination. However, the effectiveness of foot-and-mouth disease vaccines on slowing the spread of the disease is questionable. In contrast, high potency vaccines providing early protection may solve issues with the spread of the disease, escaping mutants, and persistency. To increase the potency of the vaccine, additives such as saponin and aluminium hydroxide are used. However, the use of saponin with an oil adjuvant is not common and is sometimes linked to toxicity. QS-21, which is less toxic than Quil A, has been presented as an alternative for use with saponin. In this study, the addition of QS-21 to a commercially available foot-and-mouth disease water-in-oil-in-water emulsion vaccine was evaluated in cattle.\n[MATERIALS AND METHODS]: After vaccination, serum samples were collected periodically over 3 months. Sera of the QS-21 and normal oil vaccine groups were compared via serum virus neutralization antibody titre and liquid phase blocking enzyme-linked immunosorbent assay antibody titre.\n[RESULTS]: The results showed that there was a significant early antibody increase in the QS-21 group.\n[CONCLUSION]: Strong early virus neutralizing antibody response will be useful for emergency or ring vaccinations against foot-and-mouth disease in target animals.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nReactogenicity\n\nA drop of blood was observed at the injection site for animals in the QS-21 group. There was an evident increase in local temperature at the injection site that lasted several days. Body temperatures fell within physiological range for both groups. No other adverse effect was observed during the study. Post-mortem examination of the injection site revealed no macroscopic differences between the two groups of animals.\n\nSerological responses\n\nVirus neutralization test results\n\nFor type O, virus neutralizing antibodies were detected from the third day on in both groups (4/6 for QS-21 and 3/6 for control vaccine). On the eighth day post-vaccination (dpv), a strong neutralizing antibody titre was measured in the QS-21 group; this rapid increase continued until 28 dpv. T...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_annotations",
+    "tool_call_id": "call_BZeFtxepJYsqY4ZtnkSmksST",
+    "parent_tool_call_id": "call_nZxfIuzolk4P5bJz68PfI4X6",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 50,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "pmids": [
+        "27489804"
+      ]
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_fetch_paper_annotations\nimport json\nsearch_results = pubtator_api_fetch_paper_annotations(\n    pmids=['27489804'], batch_size=50, max_retries=3, max_requests_per_second=3\n)\nprint(json.dumps(search_results, indent=4))\n\n```\n\n### Output:\n```\nSuccessfully processed 1 publications from chunk\nTotal results: 1\n[\n    {\n        \"Chemical\": [\n            \"Oils\",\n            \"saponin QA-21V1\"\n        ],\n        \"Disease\": [\n            \"Foot-and-Mouth Disease\"\n        ],\n        \"Species\": [\n            \"9913\"\n        ],\n        \"Relevant_Disease\": [\n            \"Drug-Related Side Effects and Adverse Reactions\",\n            \"Foot-and-Mouth Disease\"\n        ],\n        \"Relevant_Chemical\": [\n            \"Aluminum Hydroxide\",\n            \"Oils\",\n            \"Quil A\",\n            \"Saponins\",\n            \"Water\",\n            \"saponin QA-21V1\"\n        ],\n        \"Relevant_Species\": [\n            \"9913\"\n        ],\n        \"Relation_Mentions\": [\n            \"Oils:negative_correlation:Foot-and-Mouth Disease\",\n            \"saponin QA-21V1:negative_correlation:Foot-and-Mouth Disease\"\n        ],\n        \"PMID\": 27489804\n    }\n]\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "get_paper_references",
+    "tool_call_id": "call_U5QBddu2oD1ZF6Q5IFbSFjCm",
+    "parent_tool_call_id": "call_nZxfIuzolk4P5bJz68PfI4X6",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 20,
+      "max_workers": 2,
+      "mini_batch_size": 10,
+      "pmids": [
+        "27489804"
+      ],
+      "rate_limit": 3,
+      "task_name": "QS21 FMD references"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_get_paper_references\nimport pandas as pd\n\nsearch_results = pubmed_api_get_paper_references(\n    pmids=['27489804'], batch_size=20, mini_batch_size=10,\n    max_workers=2, rate_limit=3\n)\n\nsearch_results_df = pd.DataFrame(search_results)\nsearch_results_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/QS21_FMD_references.csv', index=False)\nprint(\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/QS21_FMD_references.csv'\")\nprint(search_results_df.head().to_markdown())\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/QS21_FMD_references.csv'\n|    |   source_pmid |   target_pmid | relation_type   | target_title                                                                                                                                               |   target_year |\n|---:|--------------:|--------------:|:----------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------|--------------:|\n|  0 |      27489804 |      25473385 | cites           | Enhancing Immunogenicity of Cancer Vaccines: QS-21 as an Immune Adjuvant.                                                                                  |          2011 |\n|  1 |      27489804 |      25239045 | cites           | Silica vesicles as nanocarriers and adjuvants for generating both antibody and T-cell mediated immune resposes to Bovine Viral Diarrhoea Virus E2 protein. |          2014 |\n|  2 |      27489804 |      25066738 | cites           | Enhanced immune responses of foot-and-mouth disease vaccine using new oil/gel adjuvant mixtures in pigs and goats.                                         |          2014 |\n|  3 |      27489804 |      22142583 | cites           | An engineered mutant of HIV-1 gp120 formulated with adjuvant Quil A promotes elicitation of antibody responses overlapping the CD4-binding site.           |          2012 |\n|  4 |      27489804 |      21894173 | cites           | ISCOMATRIX vaccines mediate CD8+ T-cell cross-priming by a MyD88-dependent signaling pathway.                                                              |          2012 |\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_fsKObHmQc8IVvNoIxHelfJMp",
+    "parent_tool_call_id": "call_U5QBddu2oD1ZF6Q5IFbSFjCm",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "Animals|animal|calf|calves|six|12|vaccinated|formulated|commercial|water-in-oil-in-water|W/O/W|oil vaccine|QS-21|50|100|microgram|day 3|day 8|day 14|day 21|day 28|90|neutralizing antibody|log2|log10|LPBE|liquid phase|significant|P<|p <|titre|titer|Table|Figure",
+      "pmid": "27489804"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27489804')\noutput = format_paper_content_output(result, filter_keywords='Animals|animal|calf|calves|six|12|vaccinated|formulated|commercial|water-in-oil-in-water|W/O/W|oil vaccine|QS-21|50|100|microgram|day 3|day 8|day 14|day 21|day 28|90|neutralizing antibody|log2|log10|LPBE|liquid phase|significant|P<|p <|titre|titer|Table|Figure')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Animals|animal|calf|calves|six|12|vaccinated| ... e|significant|P<|p <|titre|titer|Table|Figure\n      \u001b[90mpmid:\u001b[0m 27489804\n\n=== PMID: 27489804 ===\n\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\n\nJournal/Date: Clinical and experimental vaccine research (2016)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[PURPOSE]: One of the most important tools against foot-and-mouth disease, a highly contagious and variable viral disease of cloven-hoofed animals, is vaccination. However, the effectiveness of foot-and-mouth disease vaccines on slowing the spread of the disease is questionable. In contrast, high potency vaccines providing early protection may solve issues with the spread of the disease, escaping mutants, and persistency. To increase the potency of the vaccine, additives such as saponin and aluminium hydroxide are used. However, the use of saponin with an oil adjuvant is not common and is sometimes linked to toxicity. QS-21, which is less toxic than Quil A, has been presented as an alternative for use with saponin. In this study, the addition of QS-21 to a commercially available foot-and-mouth disease water-in-oil-in-water emulsion vaccine was evaluated in cattle.\n[MATERIALS AND METHODS]: After vaccination, serum samples were collected periodically over 3 months. Sera of the QS-21 and normal oil vaccine groups were compared via serum virus neutralization antibody titre and liquid phase blocking enzyme-linked immunosorbent assay antibody titre.\n[RESULTS]: The results showed that there was a significant early antibody increase in the QS-21 group.\n[CONCLUSION]: Strong early virus neutralizing antibody response will be useful for emergency or ring vaccinations against foot-and-mouth disease in target animals.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nReactogenicity\n\nA drop of blood was observed at the injection site for animals in the QS-21 group. There was an evident increase in local temperature at the injection site that lasted several days. Body temperatures fell within physiological range for both groups. No other adverse effect was observed during the study. Post-mortem examination of the injection site revealed no macroscopic differences between the two groups of animals.\n\nSerological responses\n\nVirus neutralization test results\n\nFor type O, virus neutralizing antibodies were detected from the third day on in both groups (4/6 for QS-21 and 3/6 for control vaccine). On the eighth day post-vaccination (dpv), a strong neutralizing antibody titre was measured in the QS-21 group; this rapid increase continued until 28 dpv. T...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "code_execution",
+    "tool_call_id": "call_bR2B9Iz2Zv5m5MhU77IG2bdW",
+    "parent_tool_call_id": "call_fsKObHmQc8IVvNoIxHelfJMp",
+    "round": 4,
+    "tool_input": {
+      "code": "import requests\nfrom bs4 import BeautifulSoup\npmid='27489804'\nr=requests.get(f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term={pmid}[pmid]',timeout=20)\nprint(r.text[:1000])",
+      "language": "python"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\nimport requests\nfrom bs4 import BeautifulSoup\npmid='27489804'\nr=requests.get(f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term={pmid}[pmid]',timeout=20)\nprint(r.text[:1000])\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] code_execution\u001b[0m\n      \u001b[90mcode:\u001b[0m import requests\nfrom bs4 import BeautifulSoup ... pmid}[pmid]',timeout=20)\nprint(r.text[:1000])\n      \u001b[90mlanguage:\u001b[0m python\n\n<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<!DOCTYPE eSearchResult PUBLIC \"-//NLM//DTD esearch 20060628//EN\" \"https://eutils.ncbi.nlm.nih.gov/eutils/dtd/20060628/esearch.dtd\">\n<eSearchResult><Count>1</Count><RetMax>1</RetMax><RetStart>0</RetStart><IdList>\n<Id>4969278</Id>\n</IdList><TranslationSet/><QueryTranslation>\"27489804\"[PMID]</QueryTranslation></eSearchResult>\n\n\n```",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "code_execution",
+    "tool_call_id": "call_MSuDAQRy29KaW538GLjatsgm",
+    "parent_tool_call_id": "call_bR2B9Iz2Zv5m5MhU77IG2bdW",
+    "round": 5,
+    "tool_input": {
+      "code": "import requests, re\nfrom bs4 import BeautifulSoup\nxml=requests.get('https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_json/PMC4969278/unicode',timeout=30).json()\ntext='\\n'.join(p.get('text','') for d in xml for p in d.get('passages',[]))\nterms=['cattle','calves','six','QS-21','water-in-oil-in-water','day 8','8 dpv','14 dpv','21 dpv','28 dpv','neutralizing','liquid phase','blocking','significant','titre','titer']\nfor term in terms:\n print('\\n###',term)\n for m in list(re.finditer(term,text,re.I))[:8]: print(text[max(0,m.start()-250):m.end()+500].replace('\\n',' '))\n",
+      "language": "python"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\nimport requests, re\nfrom bs4 import BeautifulSoup\nxml=requests.get('https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_json/PMC4969278/unicode',timeout=30).json()\ntext='\\n'.join(p.get('text','') for d in xml for p in d.get('passages',[]))\nterms=['cattle','calves','six','QS-21','water-in-oil-in-water','day 8','8 dpv','14 dpv','21 dpv','28 dpv','neutralizing','liquid phase','blocking','significant','titre','titer']\nfor term in terms:\n print('\\n###',term)\n for m in list(re.finditer(term,text,re.I))[:8]: print(text[max(0,m.start()-250):m.end()+500].replace('\\n',' '))\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] code_execution\u001b[0m\n      \u001b[90mcode:\u001b[0m import requests, re\nfrom bs4 import Beautiful ... start()-250):m.end()+500].replace('\\n',' '))\n\n      \u001b[90mlanguage:\u001b[0m python\n\n\n### cattle\n\n### calves\n\n### six\n\n### QS-21\n\n### water-in-oil-in-water\n\n### day 8\n\n### 8 dpv\n\n### 14 dpv\n\n### 21 dpv\n\n### 28 dpv\n\n### neutralizing\n\n### liquid phase\n\n### blocking\n\n### significant\n\n### titre\n\n### titer\n\n```",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_BJCCtYBkzaKqtJ21P3y1TegO",
+    "parent_tool_call_id": null,
+    "round": 2,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 4,
+      "search_target": "Find the primary cattle vaccination study testing QS-21 or qS-21 added to an oil-adjuvanted foot-and-mouth disease vaccine. Extract the paper title/PMID if available; cattle numbers; oil-adjuvant and QS-21 formulation; control group; days after vaccination (especially days 7, 14, and 21); antibody measurements such as virus-neutralization or liquid-phase blocking ELISA; and whether QS-21 significantly increased the early antibody response compared with oil-adjuvanted vaccine alone."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_OypAqKW0c6wOe1UFjVzehN4H",
+    "parent_tool_call_id": "call_BJCCtYBkzaKqtJ21P3y1TegO",
+    "round": 1,
+    "tool_input": {
+      "task_name": "QS-21 FMD cattle",
+      "boolean_query_text": "QS-21 foot-and-mouth disease vaccine cattle oil adjuvant",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='QS-21 foot-and-mouth disease vaccine cattle oil adjuvant',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='QS-21 foot-and-mouth disease vaccine cattle oil adjuvant',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/QS-21_FMD_cattle.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/QS-21_FMD_cattle.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/QS-21_FMD_cattle.csv'\nTotal results found: 17\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 27489804\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\nSource: Clinical and experimental vaccine research (2016)\nAbstract: PURPOSE: One of the most important tools against foot-and-mouth disease, a highly contagious and variable viral disease of cloven-hoofed animals, is vaccination. However, the effectiveness of foot-and-mouth disease vaccines on slowing the spread of the disease is questionable. In contrast, high potency vaccines providing early protection may solve issues with the spread of the disease, escaping mutants, and persistency. To increase the potency of the vaccine, additives such as saponin and aluminium hydroxide are used. However, the use of saponin with an oil adjuvant is not common and is sometimes linked to toxicity. QS-21, which is less toxic than Quil A, has been presented as an alternative for use with saponin. In this study, the addition of QS-21 to a commercially available foot-and-mouth disease water-in-oil-in-water emulsion vaccine was evaluated in cattle. MATERIALS AND METHODS: After vaccination, serum samples were collected periodically over 3 months. Sera of the QS-21 and normal oil vaccine groups were compared via serum virus neutralization antibody titre and liquid phase blocking enzyme-linked immunosorbent assay antibody titre. RESULTS: The results showed that there was ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 27489804\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle\nSource: Clin Exp Vaccine Res (2016)\nAbstract: @CHEMICAL_saponin_QA_21V1 @CHEMICAL_MESH:C078785 @@@<m>QS</m>-<m>21</m>@@@ enhances the early antibody response to @CHEMICAL_Oils @CHEMICAL_MESH:D009821 @@@<m>oil</m>@@@ <m>adjuvant</m> @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>foot</m>-and-<m>mouth</m> <m>disease</m>@@@ <m>vaccine</m> in <m>cattle</m>\n--------------------------------------------------------------------------------\nPMID: 37885619\nTitle: The combination of vaccines and adjuvants to prevent the occurrence of high incidence of infectious diseases in bovine\nSource: Front Vet Sci (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38006036\nTitle: Advancements in Vaccine Adjuvants: The Journey from Alum to Nano Formulations\nSource: Vaccines (Basel) (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35891284\nTitle: Advances in Infectious Disease Vaccine Adjuvants\nSource: Vaccines (Basel) (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36851331\nTitle: Immunogenicity of Different Types of Adjuvants and Nano-Adjuvants in Veterinary Vaccines: A Comprehensive Review\nSource: Vaccines (Basel) (2023)\nAbstract: @GENE_IL12B @GENE_3593 @@@IL-12@@@ is used in @SPECIES_9685 @@@cats@@@ as an <m>adjuvant</m> for immunodeficiency virus <m>vaccine</m> subunits. Cytokines are used in <m>vaccines</m> for various @DISEASE_Virus_Diseases @DISEASE_MESH:D014777 @@@viral <m>diseases</m>@@@ of poultry, @SPECIES_9913 @@@<m>cattle</m>@@@ and fish species.\n--------------------------------------------------------------------------------\nPMID: 36125739\nTitle: Plant-derived immuno-adjuvants in vaccines formulation: a promising avenue for improving vaccines efficacy against SARS-CoV-2 virus\nSource: Pharmacol Rep (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36864517\nTitle: An inventory of adjuvants used for vaccination in horses: the past, the present and the future\nSource: Vet Res (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38937820\nTitle: Evaluation of the immunogenicity and protective efficacy of an inactivated vaccine candidate for sheep infected with ovine parainfluenza virus type 3\nSource: Vet Res (2024)\nAbstract: Inactivated viruses have been traditionally used for <m>vaccine</m> development, and such <m>vaccines</m> are safe and effective for the prevention of @DISEASE_Virus_Diseases @DISEASE_MESH:D014777 @@@viral <m>diseases</m>@@@ such as @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@coronavirus <m>disease</m> 2019@@@ (@DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@), @DISEASE_Influenza_Human @DISEASE_MESH:D007251 @@@influenza@@@, @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>foot</m> and <m>mouth</m> <m>disease</m>@@@, and @DISEASE_Poliomyelitis @DISEASE_MESH:D011051 @@@polio@@@.\n--------------------------------------------------------------------------------\nPMID: 40214462\nTitle: Role of T Follicular Helper Cells in Viral Infections and Vaccine Design\nSource: Cells (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37631328\nTitle: Non-Invasive Vaccines: Challenges in Formulation and Vaccine Adjuvants\nSource: Pharmaceutics (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36423016\nTitle: Vaccination Strategies Based on Bacterial Self-Assembling Proteins as Antigen Delivery Nanoscaffolds\nSource: Vaccines (Basel) (2022)\nAbstract: In another example, an SpFN nanoparticle <m>vaccine</m> candidate was paired with two distinct <m>adjuvants</m>, @CHEMICAL_Aluminum_Hydroxide @CHEMICAL_MESH:D000536 @@@Alhydrogel@@@ or Army Liposome Formulation containing @CHEMICAL_saponin_QA_21V1 @CHEMICAL_MESH:C078785 @@@<m>QS</m>-<m>21</m>@@@ (ALFQ).\n--------------------------------------------------------------------------------\nPMID: 33142799\nTitle: Promotion of Cellular and Humoral Immunity against Foot-and-Mouth Disease Virus by Immunization with Virus-Like Particles Encapsulated in Monophosphoryl Lipid A and Liposomes\nSource: Vaccines (Basel) (2020)\nAbstract: Virus-like particles (VLPs) have emerged as promising <m>vaccine</m> candidates against @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>foot</m>-and-<m>mouth</m> <m>disease</m>@@@ (@DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@FMD@@@).\n--------------------------------------------------------------------------------\nPMID: 27076287\nTitle: Challenges in Veterinary Vaccine Development and Immunization\nSource: Methods Mol Biol (2016)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 29359135\nTitle: Antimicrobial Resistance: Its Surveillance, Impact, and Alternative Management Strategies in Dairy Animals\nSource: Front Vet Sci (2018)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_gg4gQDLw8fMIRU6eD45PYlUv",
+    "parent_tool_call_id": "call_BJCCtYBkzaKqtJ21P3y1TegO",
+    "round": 1,
+    "tool_input": {
+      "task_name": "saponin FMD cattle",
+      "boolean_query_text": "qS-21 oil adjuvanted foot-and-mouth disease vaccine cattle",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='qS-21 oil adjuvanted foot-and-mouth disease vaccine cattle',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='qS-21 oil adjuvanted foot-and-mouth disease vaccine cattle',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/saponin_FMD_cattle.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/saponin_FMD_cattle.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/saponin_FMD_cattle.csv'\nTotal results found: 11\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 27489804\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\nSource: Clinical and experimental vaccine research (2016)\nAbstract: PURPOSE: One of the most important tools against foot-and-mouth disease, a highly contagious and variable viral disease of cloven-hoofed animals, is vaccination. However, the effectiveness of foot-and-mouth disease vaccines on slowing the spread of the disease is questionable. In contrast, high potency vaccines providing early protection may solve issues with the spread of the disease, escaping mutants, and persistency. To increase the potency of the vaccine, additives such as saponin and aluminium hydroxide are used. However, the use of saponin with an oil adjuvant is not common and is sometimes linked to toxicity. QS-21, which is less toxic than Quil A, has been presented as an alternative for use with saponin. In this study, the addition of QS-21 to a commercially available foot-and-mouth disease water-in-oil-in-water emulsion vaccine was evaluated in cattle. MATERIALS AND METHODS: After vaccination, serum samples were collected periodically over 3 months. Sera of the QS-21 and normal oil vaccine groups were compared via serum virus neutralization antibody titre and liquid phase blocking enzyme-linked immunosorbent assay antibody titre. RESULTS: The results showed that there was ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 38006036\nTitle: Advancements in Vaccine Adjuvants: The Journey from Alum to Nano Formulations\nSource: Vaccines (Basel) (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35891284\nTitle: Advances in Infectious Disease Vaccine Adjuvants\nSource: Vaccines (Basel) (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36125739\nTitle: Plant-derived immuno-adjuvants in vaccines formulation: a promising avenue for improving vaccines efficacy against SARS-CoV-2 virus\nSource: Pharmacol Rep (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36864517\nTitle: An inventory of adjuvants used for vaccination in horses: the past, the present and the future\nSource: Vet Res (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36851331\nTitle: Immunogenicity of Different Types of Adjuvants and Nano-Adjuvants in Veterinary Vaccines: A Comprehensive Review\nSource: Vaccines (Basel) (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38937820\nTitle: Evaluation of the immunogenicity and protective efficacy of an inactivated vaccine candidate for sheep infected with ovine parainfluenza virus type 3\nSource: Vet Res (2024)\nAbstract: Inactivated viruses have been traditionally used for <m>vaccine</m> development, and such <m>vaccines</m> are safe and effective for the prevention of @DISEASE_Virus_Diseases @DISEASE_MESH:D014777 @@@viral <m>diseases</m>@@@ such as @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@coronavirus <m>disease</m> 2019@@@ (@DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@), @DISEASE_Influenza_Human @DISEASE_MESH:D007251 @@@influenza@@@, @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>foot</m> and <m>mouth</m> <m>disease</m>@@@, and @DISEASE_Poliomyelitis @DISEASE_MESH:D011051 @@@polio@@@.\n--------------------------------------------------------------------------------\nPMID: 40214462\nTitle: Role of T Follicular Helper Cells in Viral Infections and Vaccine Design\nSource: Cells (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 27489804\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle\nSource: Clin Exp Vaccine Res (2016)\nAbstract: @CHEMICAL_saponin_QA_21V1 @CHEMICAL_MESH:C078785 @@@<m>QS</m>-<m>21</m>@@@ enhances the early antibody response to @CHEMICAL_Oils @CHEMICAL_MESH:D009821 @@@<m>oil</m>@@@ adjuvant @DISEASE_Foot_and_Mouth_Disease @DISEASE_MESH:D005536 @@@<m>foot</m>-and-<m>mouth</m> <m>disease</m>@@@ <m>vaccine</m> in <m>cattle</m>\n--------------------------------------------------------------------------------\nPMID: 29359135\nTitle: Antimicrobial Resistance: Its Surveillance, Impact, and Alternative Management Strategies in Dairy Animals\nSource: Front Vet Sci (2018)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 27076287\nTitle: Challenges in Veterinary Vaccine Development and Immunization\nSource: Methods Mol Biol (2016)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "find_entities",
+    "tool_call_id": "call_20rF6t7FtIqGxWqdAC2haSOY",
+    "parent_tool_call_id": "call_BJCCtYBkzaKqtJ21P3y1TegO",
+    "round": 1,
+    "tool_input": {
+      "concept_type": "CHEMICAL",
+      "limit": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "query_text": "QS-21"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_find_entities\nimport pandas as pd\nresults = pubtator_api_find_entities(\n    query_text='QS-21', concept_type='CHEMICAL',\n    limit=10, max_retries=3, max_requests_per_second=3\n)\nif len(results) == 0:\n    print(\"No entities found. Please try again with different query.\")\nelse:\n    if isinstance(results, pd.DataFrame): print(results.to_markdown())\n    else: print(\"No entities found. Please try again with different query.\")\n\n```\n\n### Output:\n```\nSuccessfully retrieved 2 entity suggestions\n|    | PubTator3_EntityID        | Name            | Type     | SourceDB   | ID_in_SourceDB   |\n|---:|:--------------------------|:----------------|:---------|:-----------|:-----------------|\n|  0 | @CHEMICAL_saponin_QA_21V1 | saponin QA-21V1 | chemical | ncbi_mesh  | C078785          |\n|  1 | @CHEMICAL_QS_21_xylose    | QS-21-xylose    | chemical | ncbi_mesh  | C531367          |\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 15,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_rC4IWZMmQavK0K6pW484oPzh",
+    "parent_tool_call_id": "call_20rF6t7FtIqGxWqdAC2haSOY",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "cattle|calves|QS-21|oil|water-in-oil-in-water|day|7|14|21|neutralization|liquid phase blocking|LPBE|control|dose|antibody",
+      "pmid": "27489804"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27489804')\noutput = format_paper_content_output(result, filter_keywords='cattle|calves|QS-21|oil|water-in-oil-in-water|day|7|14|21|neutralization|liquid phase blocking|LPBE|control|dose|antibody')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (2):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m cattle|calves|QS-21|oil|water-in-oil-in-water ... uid phase blocking|LPBE|control|dose|antibody\n      \u001b[90mpmid:\u001b[0m 27489804\n\n  \u001b[1m\u001b[93m[2] fetch_paper_annotations\u001b[0m\n      \u001b[90mbatch_size:\u001b[0m 10\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mpmids:\u001b[0m ['27489804']\n\n=== PMID: 27489804 ===\n\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\n\nJournal/Date: Clinical and experimental vaccine research (2016)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[PURPOSE]: One of the most important tools against foot-and-mouth disease, a highly contagious and variable viral disease of cloven-hoofed animals, is vaccination. However, the effectiveness of foot-and-mouth disease vaccines on slowing the spread of the disease is questionable. In contrast, high potency vaccines providing early protection may solve issues with the spread of the disease, escaping mutants, and persistency. To increase the potency of the vaccine, additives such as saponin and aluminium hydroxide are used. However, the use of saponin with an oil adjuvant is not common and is sometimes linked to toxicity. QS-21, which is less toxic than Quil A, has been presented as an alternative for use with saponin. In this study, the addition of QS-21 to a commercially available foot-and-mouth disease water-in-oil-in-water emulsion vaccine was evaluated in cattle.\n[MATERIALS AND METHODS]: After vaccination, serum samples were collected periodically over 3 months. Sera of the QS-21 and normal oil vaccine groups were compared via serum virus neutralization antibody titre and liquid phase blocking enzyme-linked immunosorbent assay antibody titre.\n[RESULTS]: The results showed that there was a significant early antibody increase in the QS-21 group.\n[CONCLUSION]: Strong early virus neutralizing antibody response will be useful for emergency or ring vaccinations against foot-and-mouth disease in target animals.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nReactogenicity\n\nA drop of blood was observed at the injection site for animals in the QS-21 group. There was an evident increase in local temperature at the injection site that lasted several days. Body temperatures fell within physiological range for both groups. No other adverse effect was observed during the study. Post-mortem examination of the injection site revealed no macroscopic differences between the two groups of animals.\n\nSerological responses\n\nVirus neutralization test results\n\nFor type O, virus neutralizing antibodies were detected from the third day on in both groups (4/6 for QS-21 and 3/6 for control vaccine). On the eighth day post-vaccination (dpv), a strong neutralizing antibody titre was measured in the QS-21 group; this rapid increase continued until 28 dpv. T...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "search",
+    "tool_name": "fetch_paper_annotations",
+    "tool_call_id": "call_j3DxBe0Hxd61tyIRaZzSOl6R",
+    "parent_tool_call_id": "call_20rF6t7FtIqGxWqdAC2haSOY",
+    "round": 2,
+    "tool_input": {
+      "batch_size": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "pmids": [
+        "27489804"
+      ]
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_fetch_paper_annotations\nimport json\nsearch_results = pubtator_api_fetch_paper_annotations(\n    pmids=['27489804'], batch_size=10, max_retries=3, max_requests_per_second=3\n)\nprint(json.dumps(search_results, indent=4))\n\n```\n\n### Output:\n```\nSuccessfully processed 1 publications from chunk\nTotal results: 1\n[\n    {\n        \"Chemical\": [\n            \"Oils\",\n            \"saponin QA-21V1\"\n        ],\n        \"Disease\": [\n            \"Foot-and-Mouth Disease\"\n        ],\n        \"Species\": [\n            \"9913\"\n        ],\n        \"Relevant_Disease\": [\n            \"Drug-Related Side Effects and Adverse Reactions\",\n            \"Foot-and-Mouth Disease\"\n        ],\n        \"Relevant_Chemical\": [\n            \"Aluminum Hydroxide\",\n            \"Oils\",\n            \"Quil A\",\n            \"Saponins\",\n            \"Water\",\n            \"saponin QA-21V1\"\n        ],\n        \"Relevant_Species\": [\n            \"9913\"\n        ],\n        \"Relation_Mentions\": [\n            \"Oils:negative_correlation:Foot-and-Mouth Disease\",\n            \"saponin QA-21V1:negative_correlation:Foot-and-Mouth Disease\"\n        ],\n        \"PMID\": 27489804\n    }\n]\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 17,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_8Zi0hSAYq18mgrKPLchXWc80",
+    "parent_tool_call_id": "call_j3DxBe0Hxd61tyIRaZzSOl6R",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "Animals|animal|cattle|six|6|group|vaccinated|dose|ml|ISA|Montanide|emulsion|QS-21|saponin|day 7|day 14|day 21|7 dpv|14 dpv|21 dpv",
+      "pmid": "27489804"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27489804')\noutput = format_paper_content_output(result, filter_keywords='Animals|animal|cattle|six|6|group|vaccinated|dose|ml|ISA|Montanide|emulsion|QS-21|saponin|day 7|day 14|day 21|7 dpv|14 dpv|21 dpv')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (2):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Animals|animal|cattle|six|6|group|vaccinated| ... ponin|day 7|day 14|day 21|7 dpv|14 dpv|21 dpv\n      \u001b[90mpmid:\u001b[0m 27489804\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m liquid phase blocking|LPBE|ELISA|virus neutra ... 8 dpv|15 dpv|22 dpv|28 dpv|significant|P <|p<\n      \u001b[90mpmid:\u001b[0m 27489804\n\n=== PMID: 27489804 ===\n\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\n\nJournal/Date: Clinical and experimental vaccine research (2016)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[PURPOSE]: One of the most important tools against foot-and-mouth disease, a highly contagious and variable viral disease of cloven-hoofed animals, is vaccination. However, the effectiveness of foot-and-mouth disease vaccines on slowing the spread of the disease is questionable. In contrast, high potency vaccines providing early protection may solve issues with the spread of the disease, escaping mutants, and persistency. To increase the potency of the vaccine, additives such as saponin and aluminium hydroxide are used. However, the use of saponin with an oil adjuvant is not common and is sometimes linked to toxicity. QS-21, which is less toxic than Quil A, has been presented as an alternative for use with saponin. In this study, the addition of QS-21 to a commercially available foot-and-mouth disease water-in-oil-in-water emulsion vaccine was evaluated in cattle.\n[MATERIALS AND METHODS]: After vaccination, serum samples were collected periodically over 3 months. Sera of the QS-21 and normal oil vaccine groups were compared via serum virus neutralization antibody titre and liquid phase blocking enzyme-linked immunosorbent assay antibody titre.\n[RESULTS]: The results showed that there was a significant early antibody increase in the QS-21 group.\n[CONCLUSION]: Strong early virus neutralizing antibody response will be useful for emergency or ring vaccinations against foot-and-mouth disease in target animals.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nReactogenicity\n\nA drop of blood was observed at the injection site for animals in the QS-21 group. There was an evident increase in local temperature at the injection site that lasted several days. Body temperatures fell within physiological range for both groups. No other adverse effect was observed during the study. Post-mortem examination of the injection site revealed no macroscopic differences between the two groups of animals.\n\nSerological responses\n\nVirus neutralization test results\n\nFor type O, virus neutralizing antibodies were detected from the third day on in both groups (4/6 for QS-21 and 3/6 for control vaccine). On the eighth day post-vaccination (dpv), a strong neutralizing antibody titre was measured in the QS-21 group; this rapid increase continued until 28 dpv. T...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 18,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_XLzAV8PUqB3oZ8qVeRu7JRvd",
+    "parent_tool_call_id": "call_j3DxBe0Hxd61tyIRaZzSOl6R",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "liquid phase blocking|LPBE|ELISA|virus neutralizing|neutralization|type O|type A|8 dpv|15 dpv|22 dpv|28 dpv|significant|P <|p<",
+      "pmid": "27489804"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('27489804')\noutput = format_paper_content_output(result, filter_keywords='liquid phase blocking|LPBE|ELISA|virus neutralizing|neutralization|type O|type A|8 dpv|15 dpv|22 dpv|28 dpv|significant|P <|p<')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 27489804 ===\n\nTitle: QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\n\nJournal/Date: Clinical and experimental vaccine research (2016)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[PURPOSE]: One of the most important tools against foot-and-mouth disease, a highly contagious and variable viral disease of cloven-hoofed animals, is vaccination. However, the effectiveness of foot-and-mouth disease vaccines on slowing the spread of the disease is questionable. In contrast, high potency vaccines providing early protection may solve issues with the spread of the disease, escaping mutants, and persistency. To increase the potency of the vaccine, additives such as saponin and aluminium hydroxide are used. However, the use of saponin with an oil adjuvant is not common and is sometimes linked to toxicity. QS-21, which is less toxic than Quil A, has been presented as an alternative for use with saponin. In this study, the addition of QS-21 to a commercially available foot-and-mouth disease water-in-oil-in-water emulsion vaccine was evaluated in cattle.\n[MATERIALS AND METHODS]: After vaccination, serum samples were collected periodically over 3 months. Sera of the QS-21 and normal oil vaccine groups were compared via serum virus neutralization antibody titre and liquid phase blocking enzyme-linked immunosorbent assay antibody titre.\n[RESULTS]: The results showed that there was a significant early antibody increase in the QS-21 group.\n[CONCLUSION]: Strong early virus neutralizing antibody response will be useful for emergency or ring vaccinations against foot-and-mouth disease in target animals.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nReactogenicity\n\nA drop of blood was observed at the injection site for animals in the QS-21 group. There was an evident increase in local temperature at the injection site that lasted several days. Body temperatures fell within physiological range for both groups. No other adverse effect was observed during the study. Post-mortem examination of the injection site revealed no macroscopic differences between the two groups of animals.\n\nSerological responses\n\nVirus neutralization test results\n\nFor type O, virus neutralizing antibodies were detected from the third day on in both groups (4/6 for QS-21 and 3/6 for control vaccine). On the eighth day post-vaccination (dpv), a strong neutralizing antibody titre was measured in the QS-21 group; this rapid increase continued until 28 dpv. T...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 19,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_rZFJDUxHZYzDx2tZiIvZ3pZ3",
+    "parent_tool_call_id": "call_XLzAV8PUqB3oZ8qVeRu7JRvd",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The primary study is “QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle” (Clinical and Experimental Vaccine Research, 2016; PMID 27489804). It evaluated adding QS-21 to a commercially available water-in-oil-in-water (W/O/W) emulsion FMD vaccine and compared it with the normal oil-adjuvanted vaccine without QS-21.",
+          "source_tools": [
+            {
+              "relevance": "Direct PubMed search result identifying the primary cattle study and PMID/title",
+              "tool_call_id": "call_OypAqKW0c6wOe1UFjVzehN4H"
+            },
+            {
+              "relevance": "Full paper abstract and section preview",
+              "tool_call_id": "call_rC4IWZMmQavK0K6pW484oPzh"
+            }
+          ]
+        },
+        {
+          "finding": "The study used six cattle per group (the results explicitly report 4/6 QS-21 animals and 3/6 control animals with type-O neutralizing antibodies from day 3 onward). The control was the oil-adjuvanted FMD vaccine alone; the intervention was the same vaccine supplemented with QS-21. The available record identifies the oil formulation as a commercially available W/O/W emulsion, but does not expose the specific oil brand/composition or QS-21 dose/formulation.",
+          "source_tools": [
+            {
+              "relevance": "Full-text results preview reports 4/6 and 3/6 animals and identifies QS-21 versus control vaccine groups",
+              "tool_call_id": "call_rC4IWZMmQavK0K6pW484oPzh"
+            },
+            {
+              "relevance": "Abstract states addition of QS-21 to a commercially available W/O/W emulsion vaccine",
+              "tool_call_id": "call_XLzAV8PUqB3oZ8qVeRu7JRvd"
+            }
+          ]
+        },
+        {
+          "finding": "Antibody outcomes were serum virus-neutralization titres and liquid-phase blocking ELISA titres, with serial sampling over three months. For type O virus neutralization, antibodies appeared from day 3 in both groups; by day 8 post-vaccination the QS-21 group showed a strong neutralizing-antibody titre, with the rapid increase continuing through day 28. The retrieved excerpts do not provide exact day-7, day-14, or day-21 numerical titres, nor the corresponding LPBE values.",
+          "source_tools": [
+            {
+              "relevance": "Direct full-text results preview describing day 3 and day 8 onward neutralization kinetics",
+              "tool_call_id": "call_rC4IWZMmQavK0K6pW484oPzh"
+            },
+            {
+              "relevance": "Abstract specifies virus neutralization and liquid-phase blocking ELISA measurements and serial sampling",
+              "tool_call_id": "call_XLzAV8PUqB3oZ8qVeRu7JRvd"
+            }
+          ]
+        },
+        {
+          "finding": "Yes—according to the paper abstract, QS-21 produced a statistically significant early antibody increase versus the normal oil-vaccine group, and the paper emphasizes an early virus-neutralizing response. The retrieved content does not expose the exact P values or identify whether significance was demonstrated specifically at days 7, 14, and/or 21.",
+          "source_tools": [
+            {
+              "relevance": "Abstract explicitly states a significant early antibody increase in the QS-21 group",
+              "tool_call_id": "call_rC4IWZMmQavK0K6pW484oPzh"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 20,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_ZCYBixNbi6D048zAoDsJuh83",
+    "parent_tool_call_id": "call_BJCCtYBkzaKqtJ21P3y1TegO",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:27489804",
+          "observations": [
+            "2016 Clinical and Experimental Vaccine Research study titled “QS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.”",
+            "Compared a commercial W/O/W oil-adjuvanted FMD vaccine supplemented with QS-21 against the same oil-adjuvanted vaccine without QS-21 in six cattle per group.",
+            "Measured serum virus-neutralization and liquid-phase blocking ELISA antibody titers serially for approximately three months.",
+            "The abstract reports a statistically significant early antibody increase with QS-21, especially for virus-neutralizing antibodies.",
+            "Type O neutralizing antibodies were detected on day 3 in 4/6 QS-21 cattle versus 3/6 controls; a strong QS-21-group neutralizing response was reported by day 8 and increased through about day 28. Exact titers and P values were not available in the retrieved excerpts."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Primary study identification and design",
+              "tool_call_id": "call_OypAqKW0c6wOe1UFjVzehN4H"
+            },
+            {
+              "relevance": "Primary study results and conclusion",
+              "tool_call_id": "call_rC4IWZMmQavK0K6pW484oPzh"
+            },
+            {
+              "relevance": "Group size and formulation details",
+              "tool_call_id": "call_XLzAV8PUqB3oZ8qVeRu7JRvd"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL / DRUG",
+          "name": "QS-21",
+          "observations": [
+            "Saponin adjuvant added to a commercial W/O/W oil-adjuvanted FMD vaccine in cattle; the study reports enhanced early antibody responses compared with vaccine alone."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Intervention and outcome",
+              "tool_call_id": "call_rC4IWZMmQavK0K6pW484oPzh"
+            }
+          ]
+        },
+        {
+          "entity_type": "DISEASE / PHENOTYPE",
+          "name": "Foot-and-mouth disease",
+          "observations": [
+            "The cattle study evaluated an oil-adjuvanted foot-and-mouth disease vaccine and type O virus-neutralizing antibody responses."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Vaccine and assay context",
+              "tool_call_id": "call_rC4IWZMmQavK0K6pW484oPzh"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "QS-21 early antibody enhancement",
+          "observations": [
+            "In cattle, adding QS-21 to a W/O/W oil-adjuvanted FMD vaccine produced a statistically significant early antibody increase versus the same vaccine without QS-21, with emphasis on virus-neutralizing antibodies.",
+            "Type O neutralizing antibodies appeared by day 3 in both groups, in 4/6 QS-21 cattle versus 3/6 controls; the QS-21 group showed a strong response by day 8."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct answer to the research question",
+              "tool_call_id": "call_rC4IWZMmQavK0K6pW484oPzh"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "QS-21",
+          "relation_type": "INHIBITS",
+          "to_entity": "Foot-and-mouth disease"
+        },
+        {
+          "from_entity": "QS-21 early antibody enhancement",
+          "relation_type": "SUPPORTS",
+          "to_entity": "PMID:27489804"
+        },
+        {
+          "from_entity": "PMID:27489804",
+          "relation_type": "CITES",
+          "to_entity": "Foot-and-mouth disease"
+        },
+        {
+          "from_entity": "PMID:27489804",
+          "relation_type": "CITES",
+          "to_entity": "QS-21"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 4, \"entities\": [{\"name\": \"PMID:27489804\", \"entityType\": \"PAPER\", \"observations\": [\"2016 Clinical and Experimental Vaccine Research study titled \\u201cQS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\\u201d\", \"Compared a commercial W/O/W oil-adjuvanted FMD vaccine supplemented with QS-21 against the same oil-adjuvanted vaccine without QS-21 in six cattle per group.\", \"Measured serum virus-neutralization and liquid-phase blocking ELISA antibody titers serially for approximately three months.\", \"The abstract reports a statistically significant early antibody increase with QS-21, especially for virus-neutralizing antibodies.\", \"Type O neutralizing antibodies were detected on day 3 in 4/6 QS-21 cattle versus 3/6 controls; a strong QS-21-group neutralizing response was reported by day 8 and increased through about day 28. Exact titers and P values were not available in the retrieved excerpts.\"]}, {\"name\": \"QS-21\", \"entityType\": \"CHEMICAL / DRUG\", \"observations\": [\"Saponin adjuvant added to a commercial W/O/W oil-adjuvanted FMD vaccine in cattle; the study reports enhanced early antibody responses compared with vaccine alone.\"]}, {\"name\": \"Foot-and-mouth disease\", \"entityType\": \"DISEASE / PHENOTYPE\", \"observations\": [\"The cattle study evaluated an oil-adjuvanted foot-and-mouth disease vaccine and type O virus-neutralizing antibody responses.\"]}, {\"name\": \"QS-21 early antibody enhancement\", \"entityType\": \"FINDING\", \"observations\": [\"In cattle, adding QS-21 to a W/O/W oil-adjuvanted FMD vaccine produced a statistically significant early antibody increase versus the same vaccine without QS-21, with emphasis on virus-neutralizing antibodies.\", \"Type O neutralizing antibodies appeared by day 3 in both groups, in 4/6 QS-21 cattle versus 3/6 controls; the QS-21 group showed a strong response by day 8.\"]}]}, \"relations_created\": {\"count\": 4, \"relations\": [{\"from\": \"QS-21\", \"to\": \"Foot-and-mouth disease\", \"relationType\": \"INHIBITS\"}, {\"from\": \"QS-21 early antibody enhancement\", \"to\": \"PMID:27489804\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:27489804\", \"to\": \"Foot-and-mouth disease\", \"relationType\": \"CITES\"}, {\"from\": \"PMID:27489804\", \"to\": \"QS-21\", \"relationType\": \"CITES\"}]}}, \"provenance\": {\"tool_call_id\": \"call_ZCYBixNbi6D048zAoDsJuh83\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_BJCCtYBkzaKqtJ21P3y1TegO\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 21,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_kEWnomrcY0V4evKmOpevrgr4",
+    "parent_tool_call_id": "call_ZCYBixNbi6D048zAoDsJuh83",
+    "round": 4,
+    "tool_input": {
+      "entity_names": "[\"PMID:27489804\",\"QS-21 early antibody enhancement\",\"QS-21\"]",
+      "get_full_map": false,
+      "max_entities": null,
+      "max_observations_per_entity": 5,
+      "query": null,
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"requested_entities\": [\"PMID:27489804\", \"QS-21 early antibody enhancement\", \"QS-21\"], \"results\": {\"entities\": [{\"name\": \"PMID:27489804\", \"entityType\": \"PAPER\", \"observations\": [\"2016 Clinical and Experimental Vaccine Research study titled \\u201cQS-21 enhances the early antibody response to oil adjuvant foot-and-mouth disease vaccine in cattle.\\u201d\", \"Compared a commercial W/O/W oil-adjuvanted FMD vaccine supplemented with QS-21 against the same oil-adjuvanted vaccine without QS-21 in six cattle per group.\", \"Measured serum virus-neutralization and liquid-phase blocking ELISA antibody titers serially for approximately three months.\", \"The abstract reports a statistically significant early antibody increase with QS-21, especially for virus-neutralizing antibodies.\", \"Type O neutralizing antibodies were detected on day 3 in 4/6 QS-21 cattle versus 3/6 controls; a strong QS-21-group neutralizing response was reported by day 8 and increased through about day 28. Exact titers and P values were not available in the retrieved excerpts.\"]}, {\"name\": \"QS-21\", \"entityType\": \"CHEMICAL / DRUG\", \"observations\": [\"Saponin adjuvant added to a commercial W/O/W oil-adjuvanted FMD vaccine in cattle; the study reports enhanced early antibody responses compared with vaccine alone.\"]}, {\"name\": \"QS-21 early antibody enhancement\", \"entityType\": \"FINDING\", \"observations\": [\"In cattle, adding QS-21 to a W/O/W oil-adjuvanted FMD vaccine produced a statistically significant early antibody increase versus the same vaccine without QS-21, with emphasis on virus-neutralizing antibodies.\", \"Type O neutralizing antibodies appeared by day 3 in both groups, in 4/6 QS-21 cattle versus 3/6 controls; the QS-21 group showed a strong response by day 8.\"]}], \"relations\": [{\"from\": \"QS-21 early antibody enhancement\", \"to\": \"PMID:27489804\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:27489804\", \"to\": \"QS-21\", \"relationType\": \"CITES\"}]}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

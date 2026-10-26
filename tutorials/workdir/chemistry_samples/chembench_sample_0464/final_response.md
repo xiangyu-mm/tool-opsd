@@ -1,0 +1,1 @@
+{"answer": "CCCOC1COCCC1NC"}

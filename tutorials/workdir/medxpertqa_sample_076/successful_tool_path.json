@@ -1,0 +1,232 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_iIxJItyfTkHZfp783gaGRP3o",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "drug",
+        "disease",
+        "clinical_trials"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine the most appropriate immediate management for a 2-year-old who ingested an unknown strong-smelling clear automotive-related liquid, with vomiting, cough, conjunctival irritation, odor on clothing, and faint unilateral pulmonary opacities suggesting hydrocarbon aspiration/pneumonitis. Compare activated charcoal, gastric lavage, endoscopy, bronchoscopy, oxygen, bronchodilators, antibiotics, ECG, and laboratory testing; identify guideline-supported recommendations for hydrocarbon ingestion with respiratory symptoms."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_7sG3b9SwyLYUlclXDBDMQHDY",
+    "parent_tool_call_id": "call_iIxJItyfTkHZfp783gaGRP3o",
+    "round": 1,
+    "tool_input": {
+      "task_name": "petroleum aspiration",
+      "boolean_query_text": "petroleum hydrocarbon aspiration pneumonitis children treatment corticosteroids antibiotics bronchoscopy",
+      "top_k": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='petroleum hydrocarbon aspiration pneumonitis children treatment corticosteroids antibiotics bronchoscopy',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='petroleum hydrocarbon aspiration pneumonitis children treatment corticosteroids antibiotics bronchoscopy',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/petroleum_aspiration.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/petroleum_aspiration.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/petroleum_aspiration.csv'\nTotal results found: 2\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 30313102\nTitle: Lipoid pneumonitis in a patient with an accidental ingestion of kerosene successfully treated with bronchoscopic segmental lavage and systemic steroid\nSource: Medicine (Baltimore) (2018)\nAbstract: ...Optimal <m>treatment</m> of @DISEASE_Pneumonia @DISEASE_MESH:D011014 @@@kerosene <m>pneumonitis</m>@@@ remains unclear and some controversies exist, particularly regarding the use of <m>antibiotics</m> and systemic @CHEMICAL_Steroids @CHEMICAL_MESH:D013256 @@@steroid@@@.\n--------------------------------------------------------------------------------\nPMID: 24678434\nTitle: Non-resolving Findings in a Long-term Radiographic Follow-up of an Infant with Acute Paraffin Oil Aspiration\nSource: J Clin Imaging Sci (2014)\nAbstract: The <m>children</m> showed no improvement with <m>antibiotic</m> <m>therapy</m> and were later investigated with high-resolution CT and BAL.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_INgHWPwi4RTnhDTaozIgofyg",
+    "parent_tool_call_id": "call_7sG3b9SwyLYUlclXDBDMQHDY",
+    "round": 2,
+    "tool_input": {
+      "task_name": "hydrocarbon aspiration",
+      "boolean_query_text": "hydrocarbon aspiration children supportive care oxygen antibiotics",
+      "top_k": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='hydrocarbon aspiration children supportive care oxygen antibiotics',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='hydrocarbon aspiration children supportive care oxygen antibiotics',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/hydrocarbon_aspiration.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/hydrocarbon_aspiration.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/hydrocarbon_aspiration.csv'\nTotal results found: 11\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 26910771\nTitle: Respiratory complications following hydrocarbon aspiration in children.\nSource: Pediatric pulmonology (2016)\nAbstract: Accidental hydrocarbon ingestion may lead to aspiration and chemical pneumonitis in children. In this review article, the clinical course of hydrocarbon pneumonitis, chest radiographic abnormalities, complications, and treatment interventions are summarized. Most children remain asymptomatic and without complications following ingestion of a hydrocarbon. In approximately 15% of ingestions, aspiration pneumonitis occurs and evolves over the first 6-8 hr presenting with fever, tachypnea, hypoxemia, and tachycardia. A symptom zenith is reached within 48 hr followed by progressive improvement. Up to 5% of pneumonitis cases progress rapidly to acute respiratory failure. Chest radiographic abnormalities develop by 4-8 hr after ingestion, but they are not always predictive of clinical pneumonitis. Patients with history of hydrocarbon ingestion should be monitored for 6-8 hr in the emergency department and a chest radiogram should be obtained at the end of the observation period. Spontaneous or induced emesis and gastric lavage have been related to aspiration pneumonitis. Children who are symptomatic are admitted to the hospital for cardiorespiratory status monitoring and supportive care.  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 37427165\nTitle: Diesel siphoning induced chemical pneumonitis: a case report\nSource: Ann Med Surg (Lond) (2023)\nAbstract: Our @SPECIES_9606 @@@patient@@@ responded favourably to a 7-day <m>antibiotic</m> course with conservative <m>supportive</m> and symptomatic <m>care</m> and high-flow @CHEMICAL_Oxygen @CHEMICAL_MESH:D010100 @@@<m>oxygen</m>@@@ administered through a mask, was also discharged without developing any complications.\n--------------------------------------------------------------------------------\nPMID: 35882725\nTitle: A case report of recreational use of inhaled Freon leading to acute hypoxemic respiratory failure salvaged by veno-venous extracorporeal membrane oxygenation\nSource: Can J Anaesth (2022)\nAbstract: An acute @DISEASE_Lung_Injury @DISEASE_MESH:D055370 @@@lung injury@@@ known as <m>hydrocarbon</m> pneumonitis has been described in the pediatric literature following unintentional ingestion and <m>aspiration</m> of liquid @CHEMICAL_Hydrocarbons @CHEMICAL_MESH:D006838 @@@<m>hydrocarbons</m>@@@ by young <m>children</m>.\n--------------------------------------------------------------------------------\nPMID: 37312797\nTitle: Accidental kerosene oil ingestion in under-five age children in Nigeria - The need for vigilance in primary care settings in low- and middle-income countries (LMICs)\nSource: J Family Med Prim Care (2023)\nAbstract: Accidental kerosene oil ingestion in under-five age <m>children</m> in Nigeria - The need for vigilance in primary <m>care</m> settings in low- and middle-income countries (LMICs)\n--------------------------------------------------------------------------------\nPMID: 35145844\nTitle: Acute exogenous lipoid pneumonia: Unusual presentation as cavitating lung disease with pneumothorax\nSource: Respir Med Case Rep (2022)\nAbstract: Inflammatory reaction in the lungs and resultant @DISEASE_Drug_Related_Side_Effects_and_Adverse_Reactions @DISEASE_MESH:D064420 @@@toxicity@@@ depends on the route and degree of exposure, and volatility, and viscosity of the product. While ingestion or <m>aspiration</m> of kerosene, a petroleum distillate, is a common cause of accidental @DISEASE_Poisoning @DISEASE_MESH:D011041 @@@poisoning@@@ in <m>children</m>, is rarely seen in adults.\n--------------------------------------------------------------------------------\nPMID: 39810993\nTitle: Bronchoscopic lung lavage and exogenous surfactant successfully reverse respiratory failure after severe chlorine exposure: A pediatric case report\nSource: Clin Case Rep (2025)\nAbstract: In the context of @SPECIES_9606 @@@human@@@ studies on toxic inhalants, there are only cases of surfactant administration following @CHEMICAL_Hydrocarbons @CHEMICAL_MESH:D006838 @@@<m>hydrocarbon</m>@@@ <m>aspiration</m>, severe @DISEASE_Burns @DISEASE_MESH:D002056 @@@burns@@@, and near-drowning with sand <m>aspiration</m>.\n--------------------------------------------------------------------------------\nPMID: 34535889\nTitle: The Toxicology Investigators Consortium 2020 Annual Report\nSource: J Med Toxicol (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36070069\nTitle: The Toxicology Investigators Consortium Case Registry:the 2021 Annual Report\nSource: J Med Toxicol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33791944\nTitle: 2021 ACMT Annual Scientific Meeting Abstracts:Virtual\nSource: J Med Toxicol (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39844583\nTitle: Microbes Saving Lives and Reducing Suffering\nSource: Microb Biotechnol (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37630494\nTitle: Microbial Biofilms: Applications, Clinical Consequences, and Alternative Therapies\nSource: Microorganisms (2023)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_crwr1s4B3kTvp5arSBv5lc5N",
+    "parent_tool_call_id": "call_7sG3b9SwyLYUlclXDBDMQHDY",
+    "round": 2,
+    "tool_input": {
+      "task_name": "hydrocarbon decontamination",
+      "boolean_query_text": "hydrocarbon ingestion activated charcoal gastric lavage contraindicated",
+      "top_k": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='hydrocarbon ingestion activated charcoal gastric lavage contraindicated',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='hydrocarbon ingestion activated charcoal gastric lavage contraindicated',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/hydrocarbon_decontamination.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/hydrocarbon_decontamination.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/hydrocarbon_decontamination.csv'\nTotal results found: 12\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 3734388\nTitle: Gastric lavage.\nSource: The Journal of emergency medicine (1986)\nAbstract: Gastric lavage has been used to manage toxic ingestions since the early 1800s. The entire realm of gastrointestinal decontamination has been extensively studied for the past 30 years. Recommendations are still evolving and remain controversial. The current indications for lavage are obtundation, unprotected airway, seizures, the need for urgent removal, and the tendency to form concretions. Hydrocarbon management depends on specific toxicity and viscosity. Contraindications for this procedure are insignificant ingestions, prolonged time since ingestion, and caustic poisoning. Proper technique minimizes complications and maximizes toxin removal. Activated charcoal and a cathartic are given after lavage. Complications include nasal trauma, esophageal perforation, tracheal intubation, aspiration, electrolyte imbalance, and hypothermia.\n--------------------------------------------------------------------------------\nPMID: 3784840\nTitle: Gastric emptying. Risk versus benefit in the treatment of acute poisoning.\nSource: Medical toxicology (1986)\nAbstract: This review examines the various clinical options used to elicit gastric emptying, viz. drug-induced emesis, mechanical pharyngeal stimulation, gastric lavage, and catharsis. Apomorphine and syrup of ipecac are the 2 drugs most frequently used for induction of emesis. Both agents act centrally and, in addition, syrup of ipecac has a peripheral action. Toxins ingested or foods previously eaten may inhibit or enhance emetic action by interfering with mediating and conducting mechanisms. Studies indicate that both syrup of ipecac and apomorphine are similarly effective in inducing emesis; however, apomorphine has a shorter reaction time compared with syrup of ipecac. There are more risks involved with the use of apomorphine, since it causes central nervous system and respiratory depression. Syrup of ipecac has been shown to be relatively safe when used in its recommended dosage for emesis. However, several toxicities have been reported with the use of the fluid extract of ipecac. Emesis is contraindicated in patients who are obtunded or comatose, and in patients who have ingested stimulants, some hydrocarbons, or corrosives. Mechanical pharyngeal stimulation is a simple method of indu ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 36919135\nTitle: The Role of Activated Charcoal in Prehospital Care\nSource: Med Arch (2023)\nAbstract: Decontamination of @DISEASE_Drug_Overdose @DISEASE_MESH:D062787 @@@gut overdose@@@ has traditionally been known as <m>gastric</m> <m>lavage</m>, @CHEMICAL_Charcoal @CHEMICAL_MESH:D002606 @@@<m>activated</m> <m>charcoal</m>@@@, and emetic.\n--------------------------------------------------------------------------------\nPMID: 33526543\nTitle: Venlafaxine overdose treated with extracorporeal life support\nSource: CMAJ (2021)\nAbstract: ...<m>Gastric</m> <m>lavage</m> is a rarely used method of gastrointestinal decontamination that has largely been supplanted by less invasive methods, such as @CHEMICAL_Charcoal @CHEMICAL_MESH:D002606 @@@<m>activated</m> <m>charcoal</m>@@@ and whole-bowel irrigation.\n--------------------------------------------------------------------------------\nPMID: 37144259\nTitle: Childhood Poisoning During the COVID-19 Pandemic\nSource: Turk Arch Pediatr (2023)\nAbstract: In the current study, the low rates of <m>gastric</m> <m>lavage</m> and @CHEMICAL_Charcoal @CHEMICAL_MESH:D002606 @@@<m>activated</m> <m>charcoal</m>@@@ administration may be due to the fact that the intake of corrosive substances was higher than in other studies, and in such cases, <m>gastric</m> <m>lavage</m> and @CHEMICAL_Charcoal @CHEMICAL_MESH:D002606 @@@<m>activated</m> <m>charcoal</m>@@@ administration is <m>contraindicated</m>.\n--------------------------------------------------------------------------------\nPMID: 37859962\nTitle: A retrospective evaluation of confirmed and suspected poisonings in 166 cats between 2016 and 2020\nSource: Vet World (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 33791944\nTitle: 2021 ACMT Annual Scientific Meeting Abstracts:Virtual\nSource: J Med Toxicol (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 3784840\nTitle: Gastric emptying. Risk versus benefit in the treatment of acute poisoning.\nSource: Med Toxicol (1986)\nAbstract: <m>Lavage</m> also provides an excellent route for <m>activated</m> @CHEMICAL_Charcoal @CHEMICAL_MESH:D002606 @@@<m>charcoal</m>@@@ and selected antidotes.\n--------------------------------------------------------------------------------\nPMID: 22988413\nTitle: Gastric lavage in hair dye (Super-Vasmaol 33) poisoning: A friend or foe\nSource: J Emerg Trauma Shock (2012)\nAbstract: In view of nature of hair dye constituents, <m>gastric</m> <m>lavage</m> should not be performed. In our hospital we do not do <m>gastric</m> <m>lavage</m> but we are using @CHEMICAL_Charcoal @CHEMICAL_MESH:D002606 @@@<m>activated</m> <m>charcoal</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 18280328\nTitle: Multiple-dose activated charcoal in acute self-poisoning: a randomised controlled trial\nSource: Lancet (2008)\nAbstract: Treatment of @DISEASE_Poisoning @DISEASE_MESH:D011041 @@@self-poisoning@@@ involves resuscitation, antidotes, <m>gastric</m> decontamination, and supportive care. However, no evidence of benefit from <m>gastric</m> decontamination exists, resulting in widespread debate about the role of forced @DISEASE_Vomiting @DISEASE_MESH:D014839 @@@emesis@@@, <m>gastric</m> <m>lavage</m>, and @CHEMICAL_Charcoal @CHEMICAL_MESH:D002606 @@@<m>activated</m> <m>charcoal</m>@@@ in the management of poisoned @SPECIES_9606 @@@patients@@@.\n--------------------------------------------------------------------------------\nPMID: 32021004\nTitle: Kerosene, Camphor, and Naphthalene Poisoning in Children\nSource: Indian J Crit Care Med (2019)\nAbstract: Transfer to the pediatric intensive care unit (PICU) is required at this stage. Emesis, <m>gastric</m> <m>lavage</m>, and administration of @CHEMICAL_Charcoal @CHEMICAL_MESH:D002606 @@@<m>activated</m> <m>charcoal</m>@@@ are <m>contraindicated</m> due to risk of aspiration.\n--------------------------------------------------------------------------------\nPMID: 33226502\nTitle: Management of pharmaceutical and recreational drug poisoning\nSource: Ann Intensive Care (2020)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_DQsvrpcs9gihpIAzXafyBwbt",
+    "parent_tool_call_id": "call_crwr1s4B3kTvp5arSBv5lc5N",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "This symptomatic 2-year-old should receive immediate emergency evaluation and hospital admission/observation with continuous cardiorespiratory and pulse-oximetry monitoring, airway assessment, supplemental oxygen for hypoxemia or respiratory distress, and supportive care; hydrocarbon pneumonitis commonly evolves over 6–8 hours, peaks around 48 hours, and a minority rapidly develop respiratory failure. The review specifically recommends hospitalizing symptomatic children and obtaining chest radiography after the observation period; in this case, existing symptoms and unilateral opacities justify inpatient monitoring now.",
+          "source_tools": [
+            {
+              "relevance": "Pediatric hydrocarbon aspiration review with timing, severity, monitoring, and supportive-care recommendations",
+              "tool_call_id": "call_INgHWPwi4RTnhDTaozIgofyg"
+            }
+          ]
+        },
+        {
+          "finding": "Do not give activated charcoal, induce emesis, or perform gastric lavage: these agents generally bind hydrocarbons poorly and—more importantly in a coughing/vomiting child—can increase regurgitation and aspiration. Pediatric poisoning guidance identified emesis, lavage, and activated charcoal as contraindicated because of aspiration risk; lavage itself has recognized aspiration and airway-trauma complications.",
+          "source_tools": [
+            {
+              "relevance": "Pediatric kerosene/hydrocarbon review stating charcoal, emesis, and lavage are contraindicated",
+              "tool_call_id": "call_crwr1s4B3kTvp5arSBv5lc5N"
+            },
+            {
+              "relevance": "Review describing aspiration and other complications of gastric lavage",
+              "tool_call_id": "call_crwr1s4B3kTvp5arSBv5lc5N"
+            }
+          ]
+        },
+        {
+          "finding": "Routine bronchoscopy and endoscopy are not indicated for uncomplicated hydrocarbon ingestion or mild aspiration pneumonitis. Bronchoscopy should be reserved for selected severe or persistent cases—such as airway obstruction, severe respiratory failure, or diagnostic/therapeutic uncertainty—under pediatric critical-care/toxicology supervision; endoscopy is reserved for suspected caustic injury, foreign body, or significant upper-GI pathology, not routine hydrocarbon exposure.",
+          "source_tools": [
+            {
+              "relevance": "Available evidence describes bronchoscopy/lavage only in unusual severe or non-resolving pneumonitis cases, not routine initial management",
+              "tool_call_id": "call_7sG3b9SwyLYUlclXDBDMQHDY"
+            },
+            {
+              "relevance": "Hydrocarbon aspiration review supports supportive management rather than routine invasive procedures",
+              "tool_call_id": "call_INgHWPwi4RTnhDTaozIgofyg"
+            }
+          ]
+        },
+        {
+          "finding": "Bronchodilator therapy is not routine but may be used if wheezing/bronchospasm is present. Prophylactic antibiotics and corticosteroids are not routinely recommended for chemical hydrocarbon pneumonitis; antibiotics should be reserved for convincing bacterial superinfection (for example, persistent/worsening fever, leukocytosis, purulent infection, or clinical deterioration), recognizing that case reports of antibiotics do not establish benefit.",
+          "source_tools": [
+            {
+              "relevance": "Review of pediatric hydrocarbon respiratory complications emphasizes supportive care; case literature notes uncertainty and lack of improvement with antibiotics",
+              "tool_call_id": "call_INgHWPwi4RTnhDTaozIgofyg"
+            },
+            {
+              "relevance": "Kerosene pneumonitis report explicitly describes controversy around antibiotics/steroids; non-resolving paraffin aspiration did not improve with antibiotics",
+              "tool_call_id": "call_7sG3b9SwyLYUlclXDBDMQHDY"
+            }
+          ]
+        },
+        {
+          "finding": "Perform focused testing rather than indiscriminate laboratory panels: continuous pulse oximetry, serial respiratory examinations, chest radiograph (repeat/obtain after several hours or sooner if worsening), and blood gas only if significant hypoxemia, distress, altered mental status, or impending respiratory failure. Obtain ECG and bedside glucose/electrolytes when the product is unknown, exposure may include additives/co-ingestants, or there are cardiac/neurologic abnormalities; there is no hydrocarbon-specific antidote or routine confirmatory laboratory test that should delay supportive care.",
+          "source_tools": [
+            {
+              "relevance": "Hydrocarbon aspiration review supports serial clinical monitoring and chest radiography; the available literature does not support routine invasive testing",
+              "tool_call_id": "call_INgHWPwi4RTnhDTaozIgofyg"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_XC9ucxisl25HRwBriphdD65V",
+    "parent_tool_call_id": "call_iIxJItyfTkHZfp783gaGRP3o",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "CHEMICAL / DRUG",
+          "name": "Hydrocarbon exposure",
+          "observations": [
+            "Automotive-related hydrocarbon ingestion can cause aspiration and chemical pneumonitis; emesis, gastric lavage, and routine activated charcoal increase aspiration risk.",
+            "Unknown hydrocarbon products may warrant ECG assessment for cardiac toxicity or co-ingestants."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Acute pediatric management and cardiac assessment",
+              "tool_call_id": "call_INgHWPwi4RTnhDTaozIgofyg"
+            },
+            {
+              "relevance": "GI decontamination contraindications",
+              "tool_call_id": "call_crwr1s4B3kTvp5arSBv5lc5N"
+            }
+          ]
+        },
+        {
+          "entity_type": "DISEASE / PHENOTYPE",
+          "name": "Chemical pneumonitis",
+          "observations": [
+            "Symptomatic children with cough and radiographic opacities after hydrocarbon ingestion require hospital observation, serial respiratory assessment, and supportive care.",
+            "Routine antibiotics, bronchoscopy, and endoscopy are not indicated without bacterial infection, airway obstruction, severe persistent respiratory failure, or suspected caustic injury."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Hospital observation and supportive care",
+              "tool_call_id": "call_INgHWPwi4RTnhDTaozIgofyg"
+            },
+            {
+              "relevance": "Avoiding routine invasive procedures and antibiotics",
+              "tool_call_id": "call_7sG3b9SwyLYUlclXDBDMQHDY"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "ECG in unknown hydrocarbon ingestion",
+          "observations": [
+            "With an unknown automotive-related product, ECG is an appropriate focused test to assess possible cardiac effects or additives/co-ingestants; it should not delay respiratory support."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Focused testing recommendation",
+              "tool_call_id": "call_INgHWPwi4RTnhDTaozIgofyg"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Hydrocarbon exposure",
+          "relation_type": "CAUSES",
+          "to_entity": "Chemical pneumonitis"
+        },
+        {
+          "from_entity": "Hydrocarbon exposure",
+          "relation_type": "SUPPORTS",
+          "to_entity": "ECG in unknown hydrocarbon ingestion"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"Hydrocarbon exposure\", \"entityType\": \"CHEMICAL / DRUG\", \"observations\": [\"Automotive-related hydrocarbon ingestion can cause aspiration and chemical pneumonitis; emesis, gastric lavage, and routine activated charcoal increase aspiration risk.\", \"Unknown hydrocarbon products may warrant ECG assessment for cardiac toxicity or co-ingestants.\"]}, {\"name\": \"Chemical pneumonitis\", \"entityType\": \"DISEASE / PHENOTYPE\", \"observations\": [\"Symptomatic children with cough and radiographic opacities after hydrocarbon ingestion require hospital observation, serial respiratory assessment, and supportive care.\", \"Routine antibiotics, bronchoscopy, and endoscopy are not indicated without bacterial infection, airway obstruction, severe persistent respiratory failure, or suspected caustic injury.\"]}, {\"name\": \"ECG in unknown hydrocarbon ingestion\", \"entityType\": \"FINDING\", \"observations\": [\"With an unknown automotive-related product, ECG is an appropriate focused test to assess possible cardiac effects or additives/co-ingestants; it should not delay respiratory support.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"Hydrocarbon exposure\", \"to\": \"Chemical pneumonitis\", \"relationType\": \"CAUSES\"}, {\"from\": \"Hydrocarbon exposure\", \"to\": \"ECG in unknown hydrocarbon ingestion\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_XC9ucxisl25HRwBriphdD65V\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_iIxJItyfTkHZfp783gaGRP3o\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

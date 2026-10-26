@@ -8,6 +8,7 @@ This module provides two simple tools:
 from typing import Optional, List, Dict, Any, Annotated, Type
 from langchain_core.tools import BaseTool, InjectedToolArg
 from pydantic import BaseModel, Field
+from biodsa.agents.deepevidence.state import ToolSourceRef
 import json
 
 from biodsa.memory.memory_graph import (
@@ -24,6 +25,7 @@ class Entity(BaseModel):
     name: str
     entity_type: str
     observations: List[str]
+    source_tools: List[ToolSourceRef] = Field(default_factory=list)
 
 class Relation(BaseModel):
     from_entity: str
@@ -59,6 +61,7 @@ class AddToGraph(BaseTool):
         entities: Optional[List[Entity]] = None,
         relations: Optional[List[Relation]] = None,
         observations: Optional[Entity] = None,
+        provenance: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Add entities, relations, or observations to the graph.
@@ -151,7 +154,8 @@ class AddToGraph(BaseTool):
             
             return json.dumps({
                 "success": True,
-                "results": results
+                "results": results,
+                "provenance": provenance,
             })
                 
         except json.JSONDecodeError as e:

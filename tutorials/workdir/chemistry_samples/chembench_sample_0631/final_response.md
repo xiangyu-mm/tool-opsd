@@ -1,0 +1,1 @@
+{"answer": "[(4S)-7,7-dioxo-5,6-dihydro-4H-thieno[2,3-b]thiopyran-4-yl] 2-chlorobenzoate"}

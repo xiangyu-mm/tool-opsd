@@ -1,0 +1,1 @@
+{"answer":"[N-]=[N+]=NC(CO)C(=O)NCCCCC1CCCCC1"}

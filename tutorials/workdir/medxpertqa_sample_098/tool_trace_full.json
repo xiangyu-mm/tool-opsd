@@ -1,0 +1,295 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_YTmyBX7koXdpiyMVWMhqFuUT",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease",
+        "clinical_trials"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine the diagnosis suggested by a 50-year-old woman with poorly controlled diabetes and HIV, maxillary sinus tenderness, and black eschar of the nares/palate; identify which symptom among impaired extraocular movements, unilateral ptosis, retro-orbital pain, proptosis with chemosis, reduced smell, blood-tinged discharge, diplopia with lateral gaze, decreased corneal reflex, altered mental status, or V2 numbness most strongly indicates a severe complication such as orbital apex involvement, cavernous sinus thrombosis, or intracranial spread. Use authoritative clinical literature and disease information on rhino-orbital-cerebral mucormycosis."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "unified_disease_search",
+    "tool_call_id": "call_Sk9BJErZbvd1Sl36DWtO9GUF",
+    "parent_tool_call_id": "call_YTmyBX7koXdpiyMVWMhqFuUT",
+    "round": 1,
+    "tool_input": {
+      "context_tool_call_ids": [],
+      "limit_per_source": 5,
+      "search_term": "rhino-orbital-cerebral mucormycosis",
+      "sources": [
+        "biothings",
+        "kegg",
+        "opentargets"
+      ],
+      "task_name": "mucormycosis search"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.diseases import search_diseases_unified\n\n# Perform unified disease search across multiple sources\nresults, output = search_diseases_unified(\n    search_term='rhino-orbital-cerebral mucormycosis',\n    limit_per_source=5,\n    sources=['biothings', 'kegg', 'opentargets'],\n    save_path='/home/data4/xiangyu/BioDSA/workdir/workdir/mucormycosis_search.json',\n)\n\n# Display formatted output\nprint(output)\n\n```\n\n### Output:\n# Unified Disease Search Results\n\n## Search Term: 'rhino-orbital-cerebral mucormycosis'\n\n**Total results:** 0 across 3 sources\n\n### Results by Source:\n- **BioThings (MyDisease.info):** Found 0 diseases in 2ms\n- **KEGG Disease:** Found 0 diseases\n- **Open Targets:** Found 0 diseases\n\n================================================================================\n\n\n================================================================================\n\n## Aggregated Information\n\n\n⚠️ **Error saving results:** [Errno 2] No such file or directory: '/home/data4/xiangyu/BioDSA/workdir/workdir/mucormycosis_search.json'\n\n\n*Executed locally (no sandbox)*",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_BzhfWafuhH6ARCEQ5auZMANh",
+    "parent_tool_call_id": "call_YTmyBX7koXdpiyMVWMhqFuUT",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "rhino-orbital-cerebral mucormycosis diabetic HIV black eschar orbital apex cavernous sinus thrombosis intracranial spread",
+      "relation_query": null,
+      "task_name": "mucor complications",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='rhino-orbital-cerebral mucormycosis diabetic HIV black eschar orbital apex cavernous sinus thrombosis intracranial spread',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='rhino-orbital-cerebral mucormycosis diabetic HIV black eschar orbital apex cavernous sinus thrombosis intracranial spread',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/mucor_complications.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/mucor_complications.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/mucor_complications.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38469024\nTitle: Role of Imaging Spectrum Along With Other Diagnostic Modalities in Rhino-Orbital-Cerebral Mucormycosis (ROCM)\nSource: Cureus (2024)\nAbstract: The fungus can <m>spread</m> to the frontal lobe via the ophthalmic arteries and cribriform plate or to the <m>cavernous</m> <m>sinus</m> via the <m>orbital</m> <m>apex</m>.\n--------------------------------------------------------------------------------\nPMID: 34767092\nTitle: Rhino-orbito-cerebral Mucormycosis: Pictorial Review\nSource: Insights Imaging (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34827023\nTitle: COVID-19-associated mucormycosis: Preliminary report from a tertiary eye care centre\nSource: Indian J Ophthalmol (2021)\nAbstract: The order Mucorales includes several species involved in <m>rhino</m>-<m>orbital</m> -<m>cerebral</m>, pulmonary, cutaneous, gastrointestinal and other less frequent disseminated forms of @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>mucormycosis</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 35155019\nTitle: Study of Profile of Mucormycosis During the Second Wave of COVID-19 in a Tertiary Care Hospital\nSource: Cureus (2022)\nAbstract: Case number Clinical Diagnosis Stage of the disease Surgery Outcome Survived Outcome/ Expired 1 <m>Rhino</m>-sino-<m>orbital</m> <m>mucormycosis</m> Stage 2 FESS + debridement - Expired 2 Left supraclavicular mass Not done Not done DAMA - 3 <m>Rhino</m>-sino-<m>orbital</m> <m>mucormycosis</m> with aspergillosis Stage 2 Not done - Expired before surgery 4 <m>Rhino</m>-sino-<m>orbital</m> <m>mucormycosis</m> Stage 2 Not done - Expired before surgery 5 <m>Rhino</m>-sino-<m>orbital</m>-<m>cerebral</m> <m>mucormycosis</m> Stage 3 FESS + debridement Survived - 6 <m>Rhino</m>-sino-<m>orbital</m> <m>mucormycosis</m> Stage 2 FESS + debridement - Expired 7 <m>Rhino</m>-<m>orbital</m>-<m>cerebral</m> <m>mucormycosis</m> Stage 3 Not done - Expired before surgery 8 <m>Rhino</m>-sino-<m>orbital</m>-<m>cerebral</m> <m>mucormycosis</m> Stage 3 FESS + Denker's medial maxillectomy + radical frontal, ethmoid and sphenoidectomy + TRAMB\n--------------------------------------------------------------------------------\nPMID: 37519583\nTitle: Orbital Mucormycosis: Understanding the Deadly Fungus Sweeping the Globe\nSource: Cureus (2023)\nAbstract: @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-<m>orbital</m>-<m>cerebral</m> <m>mucormycosis</m>@@@ included @SPECIES_9606 @@@patients@@@ with <m>cavernous</m> <m>sinus</m> and <m>intracranial</m> region involvement, with or without <m>orbital</m> and maxillary involvement.\n--------------------------------------------------------------------------------\nPMID: 35300232\nTitle: Radiological spectrum of invasive mucormycosis in COVID-19\nSource: BJR Case Rep (2022)\nAbstract: @DISEASE_Cavernous_Sinus_Thrombosis @DISEASE_MESH:D020226 @@@<m>Cavernous</m> <m>sinus</m> <m>thrombosis</m>@@@ usually results from the <m>spread</m> of @DISEASE_Infections @DISEASE_MESH:D007239 @@@infection@@@ from the <m>orbit</m> and appears as a filling defect within the enhancing <m>sinus</m> or as a lateral convexity.\n--------------------------------------------------------------------------------\nPMID: 35087975\nTitle: Rhino-orbital mucormycosis: Our experiences with clinical features and management in a tertiary care center \nSource: Rom J Ophthalmol (2021)\nAbstract: Results: Six cases of @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@Covid-19@@@ associated with @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-<m>orbital</m>-<m>cerebral</m> <m>mucormycosis</m>@@@ have been analyzed in the study.\n--------------------------------------------------------------------------------\nPMID: 34395187\nTitle: COVID-19 associated mucormycosis: Staging and management recommendations (Report of a multi-disciplinary expert committee)\nSource: J Oral Biol Craniofac Res (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34237335\nTitle: Mucormycosis: An opportunistic pathogen during COVID-19\nSource: Environ Res (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36684821\nTitle: Study of Clinicoepidemiology and Surgical Complications in Acute Invasive Fungal Rhinosinusitis\nSource: Indian J Otolaryngol Head Neck Surg (2023)\nAbstract: Sr. no Site No 1 Face + palate 72 2 <m>Orbit</m> 38 3 <m>Orbital</m> <m>apex</m> 4 4 PPT&ITF 29 5 <m>Cavernous</m> <m>sinus</m> 12 6 ICA 4 7 Brain 18\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_d9CxmQvH39P8J3vZGlbUQmf0",
+    "parent_tool_call_id": "call_YTmyBX7koXdpiyMVWMhqFuUT",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "rhino-orbital cerebral mucormycosis clinical features ophthalmoplegia ptosis proptosis chemosis V2 numbness",
+      "relation_query": null,
+      "task_name": "mucor signs",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='rhino-orbital cerebral mucormycosis clinical features ophthalmoplegia ptosis proptosis chemosis V2 numbness',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='rhino-orbital cerebral mucormycosis clinical features ophthalmoplegia ptosis proptosis chemosis V2 numbness',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/mucor_signs.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/mucor_signs.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/mucor_signs.csv'\nTotal results found: 5\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 34509790\nTitle: COVID-19 associated rhino-orbital-cerebral mucormycosis: An observational study from Eastern India, with special emphasis on neurological spectrum\nSource: Diabetes Metab Syndr (2021)\nAbstract: ...Elaborate the <m>clinical</m> spectrum of @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-<m>Orbital</m>-<m>Cerebral</m> <m>Mucormycosis</m>@@@ (@DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@ROCM@@@), pattern of neuroaxis involvement and it's radiological correlates.\n--------------------------------------------------------------------------------\nPMID: 36588206\nTitle: Rhino-orbito-cerebral mucormycosis and its resurgence during COVID-19 pandemic: A review\nSource: Indian J Ophthalmol (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37362115\nTitle: Skull Base Involvement in Covid Associated Rhino-Orbital-Cerebral Mucormycosis: A Comprehensive Analysis\nSource: Indian J Otolaryngol Head Neck Surg (2023)\nAbstract: Skull Base Involvement in @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@Covid@@@ Associated @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-<m>Orbital</m>-<m>Cerebral</m> <m>Mucormycosis</m>@@@: A Comprehensive Analysis\n--------------------------------------------------------------------------------\nPMID: 40341683\nTitle: Survival and prognostic factors in rhino-orbito-cerebral mucormycosis: A 3-year cohort study\nSource: Sci Rep (2025)\nAbstract: This three-year cohort study aims to investigate an overview of the epidemiology, <m>clinical</m> and radiographic signs, treatment, and prognosis of @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-Orbito-<m>Cerebral</m> <m>Mucormycosis</m>@@@ (@DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@ROCM@@@).\n--------------------------------------------------------------------------------\nPMID: 35505951\nTitle: Imaging of the head and neck during the COVID19 pandemic\nSource: Oper Tech Otolayngol Head Neck Surg (2022)\nAbstract: @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-<m>orbital</m> <m>mucormycosis</m>@@@ was most common (42%), followed by @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>rhino</m>-orbito-<m>cerebral</m> <m>mucormycosis</m>@@@ (24%) and @DISEASE_Paranasal_Sinus_Diseases @DISEASE_MESH:D010254 @@@nose and/or paranasal sinus@@@ (16%).\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_nfS8FXCZzJwXJBOFY7nakGSD",
+    "parent_tool_call_id": "call_d9CxmQvH39P8J3vZGlbUQmf0",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "black eschar|diabetes|HIV|ophthalmoplegia|ptosis|proptosis|chemosis|orbital apex|cavernous sinus|intracranial|V2|corneal reflex|diplopia|altered mental status",
+      "pmid": "36588206"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('36588206')\noutput = format_paper_content_output(result, filter_keywords='black eschar|diabetes|HIV|ophthalmoplegia|ptosis|proptosis|chemosis|orbital apex|cavernous sinus|intracranial|V2|corneal reflex|diplopia|altered mental status')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m black eschar|diabetes|HIV|ophthalmoplegia|pto ... corneal reflex|diplopia|altered mental status\n      \u001b[90mpmid:\u001b[0m 36588206\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m ophthalmoplegia|ptosis|proptosis|chemosis|orb ... corneal reflex|diplopia|altered mental status\n      \u001b[90mpmid:\u001b[0m 34509790\n\n  \u001b[1m\u001b[93m[3] search_papers\u001b[0m\n      \u001b[90mboolean_query_text:\u001b[0m mucormycosis black eschar diabetes HIV rhino orbital cerebral diagnosis\n      \u001b[90mrelation_query:\u001b[0m None\n      \u001b[90mtask_name:\u001b[0m mucor diagnosis\n      \u001b[90mtop_k:\u001b[0m 10\n\n=== PMID: 36588206 ===\n\nTitle: Rhino-orbito-cerebral mucormycosis and its resurgence during COVID-19 pandemic: A review.\n\nJournal/Date: Indian journal of ophthalmology (2023)\n\nMeSH Keywords: Humans, Mucormycosis, COVID-19, Nose, Aggression, India, Orbital Diseases\n\n\n--- ABSTRACT ---\nThis study aimed to review the current literature for epidemiology, pathogenesis, clinical spectrum and management of rhino-orbito-cerebral-mucormycosis (ROCM), especially highlighting the association between ROCM and COVID-19 disease and factors resulting in its resurgence during the pandemic. Mucormycosis is a rare, but an important emerging opportunistic fungal infection, often associated with high morbidity and mortality. ROCM is the commonest and also the most aggressive clinical form occurring in debilitated patients in conjunction with sinus or para-sinus involvement due to the propensity for contiguous spread. Recently ROCM has shown an unprecedented resurgence during the current pandemic. Reports from different parts of the world indicated an increased risk and incidence of ROCM in patients who had required hospital admission and have recovered from moderate-to-severe COVID-19 disease. A majority of mucormycosis cases have been reported from India. The presence of diabetes mellitus (DM) and use of corticosteroids for COVID-19 pneumonia were found to be the key risk factors, resulting in higher mortality. Amidst the ongoing pandemic, with the third wave already having affected most of the world, it becomes imperative to adopt a risk-based approach toward COVID-19 patients predisposed to developing ROCM. This could be based on the most recently published literature and emerging data from centers across the world. The present review intended to elucidate the causes that brought about the current spike in ROCM and the importance of its early detection and management to reduce mortality, loss of eye, and the need for mutilating debridement.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[DISCUSS]\nROCM and COVID-19 Disease: Perspectives and Changing Trends\n\nCoronavirus disease 2019 (COVID-19), caused by severe acute respiratory syndrome coronavirus 2 (SARS-CoV-2), was found to be associated with a variety of secondary bacterial and fungal co-infections. There has been a huge resurgence seen in the number of mucormycosis cases in association with the second wave of COVID-19 disease, especially in India. Such outbreaks of mucormycosis, even in immunocompetent adults, have been observed in the past, associated with major natural disasters.\n\nEpidemiology, incidence and microbiological spectrum of COVID-19 patients\n\nScant literature is available including case reports, small data-based case series, and reviews describing an association between COVID-19 and ROCM [Table 3]. However, the sw...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_cCScWVa7I4amxWsZ8Y7NBZNv",
+    "parent_tool_call_id": "call_d9CxmQvH39P8J3vZGlbUQmf0",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "ophthalmoplegia|ptosis|proptosis|chemosis|orbital apex|cavernous sinus|intracranial|V2|corneal reflex|diplopia|altered mental status",
+      "pmid": "34509790"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('34509790')\noutput = format_paper_content_output(result, filter_keywords='ophthalmoplegia|ptosis|proptosis|chemosis|orbital apex|cavernous sinus|intracranial|V2|corneal reflex|diplopia|altered mental status')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 34509790 ===\n\nTitle: COVID-19 associated rhino-orbital-cerebral mucormycosis: An observational study from Eastern India, with special emphasis on neurological spectrum.\n\nJournal/Date: Diabetes & metabolic syndrome (2021)\n\nMeSH Keywords: Adult, COVID-19, Central Nervous System Fungal Infections, Eye Infections, Fungal, Female, Humans, India, Male\n\n\n--- ABSTRACT ---\n[AIMS]: 1: Describe the epidemiology and determine risk factors for COVID-19 associated mucormycosis. 2: Elaborate the clinical spectrum of Rhino-Orbital-Cerebral Mucormycosis (ROCM), pattern of neuroaxis involvement and it's radiological correlates.\n[METHODS]: Observational study. Consecutive, confirmed cases of mucormycosis (N = 55) were included. A case of mucormycosis was defined as one who had clinical and radiological features consistent with mucormycosis along with demonstration of the fungus in tissue via KOH mount/culture/histopathological examination (HPE). Data pertaining to epidemiology, risk factors, clinico-radiological features were analysed using percentage of total cases.\n[RESULTS]: Middle aged, diabetic males with recent COVID-19 infection were most affected. New onset upper jaw toothache was a striking observation in several cases. Among neurological manifestations headache, proptosis, vision loss, extraocular movement restriction; cavernous sinus, meningeal and parenchymal involvement were common. Stroke in ROCM followed a definitive pattern with watershed infarction.\n[CONCLUSIONS]: New onset upper jaw toothache and loosening of teeth should prompt an immediate search for mucormycosis in backdrop of diabetic patients with recent COVID-19 disease, aiding earlier diagnosis and treatment initiation. Neuroaxis involvement was characterized by a multitude of features pertaining to involvement of optic nerve, extraocular muscles, meninges, brain parenchyma and internal carotid artery.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nEpidemiology and risk factors: Mean age of subjects was 53 ± 10.28 years, with 33 (60%) being in between forty to sixty years of age, with a male predominance (35, 63.64%). Forty-three subjects (78.18%) were from rural background. Thirty two subjects (58.18%) belonged to lower middle class and the rest were from upper middle class. Assessment of risk factors (Table 1 ) revealed all subjects (100%) had Diabetes Mellitus (as per American Diabetes Association diagnostic criteria) at the time of diagnosis with Mucormycosis and most strikingly 21 subjects (38.18%) had been diagnosed with diabetes for the first time, during the course of SARS-CoV-2 infection. 46 subjects (83.64%) had RT-PCR positive SARS-CoV-2 infection in the recent past. Remaining 9 subjects (16.36%) had clear symptom...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_T7s9oFTuMDaOVk2cidh5RYRE",
+    "parent_tool_call_id": "call_d9CxmQvH39P8J3vZGlbUQmf0",
+    "round": 2,
+    "tool_input": {
+      "boolean_query_text": "mucormycosis black eschar diabetes HIV rhino orbital cerebral diagnosis",
+      "relation_query": null,
+      "task_name": "mucor diagnosis",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='mucormycosis black eschar diabetes HIV rhino orbital cerebral diagnosis',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='mucormycosis black eschar diabetes HIV rhino orbital cerebral diagnosis',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/mucor_diagnosis.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/mucor_diagnosis.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/mucor_diagnosis.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 34586055\nTitle:  Outbreak of Mucormycosis in Coronavirus Disease Patients, Pune, India\nSource: Emerg Infect Dis (2022)\nAbstract: We identified 178 @SPECIES_9606 @@@patients@@@ who had clinical, endoscopically <m>diagnosed</m>, or histopathologically confirmed localized @DISEASE_Langer_Giedion_Syndrome @DISEASE_MESH:D015826 @@@<m>rhino</m>-,@@@ sinus-, <m>orbital</m>-, or @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>rhino</m>-sino-<m>orbital</m> <m>mucormycosis</m>@@@ or generalized @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>rhino</m>-sino-<m>orbital</m>-<m>cerebral</m> <m>mucormycosis</m>@@@ after completing @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@ treatment.\n--------------------------------------------------------------------------------\nPMID: 37809164\nTitle: Rhino-Orbito-Cerebral Mucormycosis: A Challenging Case\nSource: Cureus (2023)\nAbstract: @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-Orbito-<m>Cerebral</m> <m>Mucormycosis</m>@@@: A Challenging Case\n--------------------------------------------------------------------------------\nPMID: 35615254\nTitle: Rhino-Orbital-Cerebral Mucormycosis in a Young Diabetic Patient with COVID-19 in Ethiopia: A Case Report\nSource: Int Med Case Rep J (2022)\nAbstract: @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-<m>Orbital</m>-<m>Cerebral</m> <m>Mucormycosis</m>@@@ in a Young @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@Diabetic@@@ @SPECIES_9606 @@@Patient@@@ with @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@ in Ethiopia: A Case Report\n--------------------------------------------------------------------------------\nPMID: 34430451\nTitle: Emergence of Mucormycosis during COVID-19 Pandemic and Dermatological Manifestations\nSource: Indian Dermatol Online J (2021)\nAbstract: @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-<m>orbital</m> <m>mucormycosis</m>@@@ is the commonest presentation followed by @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>rhino</m> <m>cerebral</m> and pulmonary <m>mucormycosis</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 34759398\nTitle: Mucormycosis: The Scathing Invader\nSource: Indian J Dermatol (2021)\nAbstract: ...It has been found that <m>rhino</m>-orbito-<m>cerebral</m> involvement is the commonest manifestation of @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>mucormycosis</m>@@@ in @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@ with sinus involvement occurring in 100% cases, <m>orbital</m> in 43%, and <m>cerebral</m> in 9%.\n--------------------------------------------------------------------------------\nPMID: 34827023\nTitle: COVID-19-associated mucormycosis: Preliminary report from a tertiary eye care centre\nSource: Indian J Ophthalmol (2021)\nAbstract: The order Mucorales includes several species involved in <m>rhino</m>-<m>orbital</m> -<m>cerebral</m>, pulmonary, cutaneous, gastrointestinal and other less frequent disseminated forms of @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>mucormycosis</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 35074291\nTitle: COVID-19 associated mucormycosis - An emerging threat\nSource: J Microbiol Immunol Infect (2022)\nAbstract: In one large series of @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19@@@ associated @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>rhino</m>-<m>orbital</m>-<m>cerebral</m> <m>mucormycosis</m>@@@, @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@<m>diabetes</m> mellitus@@@ was presented in 78% of 2826 @SPECIES_9606 @@@patients@@@, and 87% had been treated with corticosteroid.\n--------------------------------------------------------------------------------\nPMID: 35800548\nTitle: Oral Mucormycosis: An Inevitable Complication of COVID-19\nSource: J Family Med Prim Care (2022)\nAbstract: Mehta and Pandey (2020) reported a case of a 60-year-old male subject who had a chronic history of @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@<m>diabetes</m>@@@ <m>diagnosed</m> with @DISEASE_COVID_19 @DISEASE_MESH:D000086382 @@@COVID-19 infection@@@ contacted @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>rhino</m>-<m>orbital</m> <m>mucormycosis</m>@@@ during his treatment.\n--------------------------------------------------------------------------------\nPMID: 36865825\nTitle: COVID-19 and Mucormycosis: A Black Fungus Disaster?\nSource: Indian J Dermatol (2022)\nAbstract: @SPECIES_64495 @@@Rhizopus oryzae@@@ is the most common type and responsible for nearly 60% of @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>mucormycosis</m>@@@ cases in @SPECIES_9606 @@@humans@@@ and also accounts for 90% of the @DISEASE_Orbital_Diseases @DISEASE_MESH:D009916 @@@<m>rhino</m>-<m>orbital</m>-<m>cerebral</m>@@@ (ROCM) form.\n--------------------------------------------------------------------------------\nPMID: 38469024\nTitle: Role of Imaging Spectrum Along With Other Diagnostic Modalities in Rhino-Orbital-Cerebral Mucormycosis (ROCM)\nSource: Cureus (2024)\nAbstract: Role of Imaging Spectrum Along With Other Diagnostic Modalities in @DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@<m>Rhino</m>-<m>Orbital</m>-<m>Cerebral</m> <m>Mucormycosis</m>@@@ (@DISEASE_Mucormycosis @DISEASE_MESH:D009091 @@@ROCM@@@)\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_ukl1q4NKSk2lkZEHFpb1d0Pv",
+    "parent_tool_call_id": "call_T7s9oFTuMDaOVk2cidh5RYRE",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The presentation is most consistent with rhino-orbital-cerebral mucormycosis (ROCM), an acute invasive Mucorales sinus infection favored by poorly controlled diabetes and immunosuppression (including HIV); maxillary sinus disease with black necrotic eschar of the nares/palate is a classic angioinvasive pattern. Definitive diagnosis requires urgent endoscopic evaluation and tissue demonstrating fungal hyphae by histopathology/culture, but this is a clinical emergency and treatment should not await confirmation.",
+          "source_tools": [
+            {
+              "relevance": "ROCM review identifies it as an aggressive opportunistic infection in debilitated patients and highlights diabetes as a major risk factor.",
+              "tool_call_id": "call_nfS8FXCZzJwXJBOFY7nakGSD"
+            },
+            {
+              "relevance": "PubMed search retrieved literature describing rhino-sino-orbital-cerebral mucormycosis and diagnostic confirmation by KOH, culture, or histopathology.",
+              "tool_call_id": "call_cCScWVa7I4amxWsZ8Y7NBZNv"
+            },
+            {
+              "relevance": "Search results identify mucormycosis as the relevant disease in diabetic patients with rhino-orbital involvement.",
+              "tool_call_id": "call_T7s9oFTuMDaOVk2cidh5RYRE"
+            }
+          ]
+        },
+        {
+          "finding": "Among the listed symptoms, impaired extraocular movements (ophthalmoplegia/EOM restriction) is the strongest single indicator of extension to the orbital apex or cavernous sinus; it reflects involvement of the extraocular motor nerves/muscles and is supported by an ROCM observational study reporting extraocular movement restriction and cavernous-sinus involvement as common neurologic/orbital manifestations. Ptosis, diplopia, proptosis with chemosis, decreased corneal reflex, and V2 numbness are important accompanying cranial-nerve/orbital signs but are generally less specific individually.",
+          "source_tools": [
+            {
+              "relevance": "The ROCM observational study explicitly reports proptosis, vision loss, and extraocular movement restriction, with cavernous sinus involvement, and describes involvement of the optic nerve and extraocular muscles.",
+              "tool_call_id": "call_cCScWVa7I4amxWsZ8Y7NBZNv"
+            },
+            {
+              "relevance": "Imaging review states that spread to the cavernous sinus can occur via the orbital apex.",
+              "tool_call_id": "call_BzhfWafuhH6ARCEQ5auZMANh"
+            }
+          ]
+        },
+        {
+          "finding": "If the question is specifically asking for the strongest sign of intracranial rather than orbital-apical/cavernous-sinus extension, altered mental status is the most concerning choice; it suggests cerebral/meningeal involvement. Thus, clinically: choose impaired extraocular movements for orbital apex/cavernous sinus disease, while altered mental status signals possible intracranial spread and warrants immediate neuroimaging and specialist escalation.",
+          "source_tools": [
+            {
+              "relevance": "The ROCM study documents meningeal and parenchymal involvement as part of neuroaxis disease.",
+              "tool_call_id": "call_cCScWVa7I4amxWsZ8Y7NBZNv"
+            },
+            {
+              "relevance": "The imaging-spectrum paper describes spread from the orbital apex to the cavernous sinus and toward the frontal lobe via ophthalmic arteries/cribriform plate.",
+              "tool_call_id": "call_BzhfWafuhH6ARCEQ5auZMANh"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_IW76Qx5F4iED43bM6c6mN6g5",
+    "parent_tool_call_id": "call_YTmyBX7koXdpiyMVWMhqFuUT",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE",
+          "name": "Rhino-orbital-cerebral mucormycosis",
+          "observations": [
+            "Acute angioinvasive Mucorales sinus infection favored by poorly controlled diabetes and immunosuppression; black necrotic eschar of the nares or palate is a classic tissue-infarction sign."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Diagnosis and risk factors",
+              "tool_call_id": "call_nfS8FXCZzJwXJBOFY7nakGSD"
+            },
+            {
+              "relevance": "Clinical presentation and diagnosis",
+              "tool_call_id": "call_cCScWVa7I4amxWsZ8Y7NBZNv"
+            },
+            {
+              "relevance": "Clinical emergency and management context",
+              "tool_call_id": "call_T7s9oFTuMDaOVk2cidh5RYRE"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Orbital apex extension",
+          "observations": [
+            "Impaired extraocular movements indicate involvement of extraocular motor nerves or muscles and strongly suggest orbital-apex or cavernous-sinus extension in rhino-orbital-cerebral mucormycosis."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Most specific listed orbital complication sign",
+              "tool_call_id": "call_cCScWVa7I4amxWsZ8Y7NBZNv"
+            },
+            {
+              "relevance": "Association with cavernous-sinus involvement",
+              "tool_call_id": "call_BzhfWafuhH6ARCEQ5auZMANh"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Intracranial spread",
+          "observations": [
+            "Altered mental status is the most concerning listed sign when specifically assessing cerebral or meningeal extension, but it is less targeted than ophthalmoplegia for orbital-apex or cavernous-sinus disease."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Distinction between cerebral and orbital extension",
+              "tool_call_id": "call_cCScWVa7I4amxWsZ8Y7NBZNv"
+            },
+            {
+              "relevance": "Neurologic severity context",
+              "tool_call_id": "call_BzhfWafuhH6ARCEQ5auZMANh"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Rhino-orbital-cerebral mucormycosis",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Orbital apex extension"
+        },
+        {
+          "from_entity": "Rhino-orbital-cerebral mucormycosis",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Intracranial spread"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"Rhino-orbital-cerebral mucormycosis\", \"entityType\": \"DISEASE\", \"observations\": [\"Acute angioinvasive Mucorales sinus infection favored by poorly controlled diabetes and immunosuppression; black necrotic eschar of the nares or palate is a classic tissue-infarction sign.\"]}, {\"name\": \"Orbital apex extension\", \"entityType\": \"FINDING\", \"observations\": [\"Impaired extraocular movements indicate involvement of extraocular motor nerves or muscles and strongly suggest orbital-apex or cavernous-sinus extension in rhino-orbital-cerebral mucormycosis.\"]}, {\"name\": \"Intracranial spread\", \"entityType\": \"FINDING\", \"observations\": [\"Altered mental status is the most concerning listed sign when specifically assessing cerebral or meningeal extension, but it is less targeted than ophthalmoplegia for orbital-apex or cavernous-sinus disease.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"Rhino-orbital-cerebral mucormycosis\", \"to\": \"Orbital apex extension\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Rhino-orbital-cerebral mucormycosis\", \"to\": \"Intracranial spread\", \"relationType\": \"ASSOCIATED_WITH\"}]}}, \"provenance\": {\"tool_call_id\": \"call_IW76Qx5F4iED43bM6c6mN6g5\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_YTmyBX7koXdpiyMVWMhqFuUT\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "orchestrator",
+    "tool_name": "retrieve_from_graph",
+    "tool_call_id": "call_Da341WnyCj3SmbwGw2G1B3hN",
+    "parent_tool_call_id": "call_IW76Qx5F4iED43bM6c6mN6g5",
+    "round": 3,
+    "tool_input": {
+      "entity_names": "[\"Rhino-orbital-cerebral mucormycosis\",\"Orbital apex extension\",\"Intracranial spread\"]",
+      "get_full_map": false,
+      "max_entities": null,
+      "max_observations_per_entity": 10,
+      "query": null,
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"requested_entities\": [\"Rhino-orbital-cerebral mucormycosis\", \"Orbital apex extension\", \"Intracranial spread\"], \"results\": {\"entities\": [{\"name\": \"Rhino-orbital-cerebral mucormycosis\", \"entityType\": \"DISEASE\", \"observations\": [\"Acute angioinvasive Mucorales sinus infection favored by poorly controlled diabetes and immunosuppression; black necrotic eschar of the nares or palate is a classic tissue-infarction sign.\"]}, {\"name\": \"Orbital apex extension\", \"entityType\": \"FINDING\", \"observations\": [\"Impaired extraocular movements indicate involvement of extraocular motor nerves or muscles and strongly suggest orbital-apex or cavernous-sinus extension in rhino-orbital-cerebral mucormycosis.\"]}, {\"name\": \"Intracranial spread\", \"entityType\": \"FINDING\", \"observations\": [\"Altered mental status is the most concerning listed sign when specifically assessing cerebral or meningeal extension, but it is less targeted than ophthalmoplegia for orbital-apex or cavernous-sinus disease.\"]}], \"relations\": [{\"from\": \"Rhino-orbital-cerebral mucormycosis\", \"to\": \"Orbital apex extension\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Rhino-orbital-cerebral mucormycosis\", \"to\": \"Intracranial spread\", \"relationType\": \"ASSOCIATED_WITH\"}]}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

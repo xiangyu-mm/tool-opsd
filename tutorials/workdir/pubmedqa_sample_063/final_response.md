@@ -1,0 +1,3 @@
+Yes. The common **RAB27A** variant **rs2444043** was associated with fractional exhaled nitric oxide (FeNO) levels in adults. The combined adult discovery and replication result reached **P = 1.6 × 10⁻⁷**, based on European-ancestry cohorts: EGEA (n=610), Hutterites (n=601), and Talana replication (n=450). The report did not specify the effect allele or direction, and it did not find the association in children. The mouse airway study mentioned in the search is mechanistic context, not an independent human genetic replication.
+
+FINAL DECISION: YES

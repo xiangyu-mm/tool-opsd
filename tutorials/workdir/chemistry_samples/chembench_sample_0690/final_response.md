@@ -1,0 +1,1 @@
+{"answer": "N-[4-(2-ethoxyphenyl)-1,3-thiazol-2-yl]-3,4,5-trimethoxybenzamide"}

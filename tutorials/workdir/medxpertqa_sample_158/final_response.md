@@ -1,0 +1,1 @@
+**(H) Repeat cystoscopy with transurethral resection and fulguration.** High-grade T1 urothelial carcinoma warrants a repeat TURBT—typically within about 2–6 weeks—to assess for residual tumor and ensure muscle-invasive disease has not been missed. Intravesical BCG is generally considered after this second-look resection. **FINAL ANSWER: H**

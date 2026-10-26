@@ -1,0 +1,3 @@
+Bone scan for metastatic evaluation becomes recommended at the **unfavorable intermediate-risk** level; favorable intermediate-risk disease generally does not require routine staging imaging absent concerning features. This corresponds to **choice (I)**, supported by the retrieved guideline summaries (source tool calls: `call_nD9CpeUL2JFFvYWYpOCzETyf`, `call_VWdZ3rdTEpt5KpSfLym58ybO`).
+
+FINAL ANSWER: I

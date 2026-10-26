@@ -1,0 +1,1 @@
+{"answer":"CCCN(CC#Cc1ccccc1)C(=O)c1cnc2ccccn12"}

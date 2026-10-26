@@ -1,0 +1,5 @@
+**Overall, no evidence was found for widespread cross-transmission within the cohort or in the hospital.** The 2015 study analyzed 27 *Mycobacterium abscessus* isolates from 20 pediatric cystic fibrosis patients. Isolates from 16 patients were at least 34 SNPs apart, indicating they were unrelated. [PMID 25452595; search results: `call_58wIsI8DRUd8kA232VtIWz9C`, `call_5OBTmPA54n435ERNv9HtyPYm`]
+
+There was, however, a notable exception: isolates from a sibling pair were at most 17 SNPs apart, and the siblings had intense contact, supporting likely transmission between them. Another closely related pair (at most 24 SNPs apart) had no apparent epidemiological link, so genomic similarity alone did not establish transmission. Thus, the findings suggest possible transmission between siblings, but not general cross-transmission across the cohort.
+
+FINAL DECISION: NO

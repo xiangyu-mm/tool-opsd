@@ -1,0 +1,3 @@
+Yes, conditionally. In a randomized study of 176 adults (PMID: 27505217), an implicit high-level construal cue reduced actual energy-dense snack intake compared with a low-level construal condition when the visual cue-reminder was present (p = .02). Without the reminder, the reduction was not significant (p = .40). Thus, the evidence supports a cue-dependent reduction rather than a general effect of high-level construal alone.
+
+FINAL DECISION: YES

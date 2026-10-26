@@ -1,0 +1,5 @@
+Yes. The directly relevant study found that suicide attempters with bipolar disorder or major depressive disorder had **significantly lower serum triglycerides**, even after adjustment for BMI and waist circumference. In contrast, **total cholesterol, LDL cholesterol, HDL cholesterol, and leptin were not significantly different** from mood-disorder patients without a suicide-attempt history (PMID: 25451444).
+
+Supporting evidence also found lower triglycerides among recent suicide attempters with major depressive disorder (PMID: 24495778). However, findings in bipolar disorder are inconsistent: larger studies and a meta-analysis did not find significant lipid differences overall. Thus, the statement accurately describes the key mood-disorder study but should not be generalized to all mood-disorder populations.
+
+FINAL DECISION: YES

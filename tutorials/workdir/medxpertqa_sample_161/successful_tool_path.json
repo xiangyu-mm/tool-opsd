@@ -1,0 +1,227 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_o8kN2x4yS49eQcvXkBrQaBDB",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine the defining anatomic injury pattern of Young and Burgess APC-II (anterior-posterior compression type II) pelvic ring injuries, specifically whether pubic symphysis diastasis is present and whether the anterior sacroiliac ligaments, posterior sacroiliac ligaments, and sacrotuberous/sacrospinous ligaments are torn or intact. Identify authoritative sources or standard descriptions."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_2NDrBNzs9BCMpefA4ZhyBERL",
+    "parent_tool_call_id": "call_o8kN2x4yS49eQcvXkBrQaBDB",
+    "round": 1,
+    "tool_input": {
+      "task_name": "pelvic ring classification",
+      "boolean_query_text": "anterior posterior compression type II pelvic injury ligament disruption",
+      "top_k": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='anterior posterior compression type II pelvic injury ligament disruption',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='anterior posterior compression type II pelvic injury ligament disruption',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/pelvic_ring_classification.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pelvic_ring_classification.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/pelvic_ring_classification.csv'\nTotal results found: 12\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 23681412\nTitle: Magnetic resonance imaging for the evaluation of ligamentous injury in the pelvis: a prospective case-controlled study.\nSource: Journal of orthopaedic trauma (2014)\nAbstract: OBJECTIVES: Management of external rotation pelvic ring disruptions is based on which ligaments are disrupted within the pelvis. We hypothesized that magnetic resonance imaging (MRI) can evaluate the ligaments of the pelvic ring and differentiate injured from uninjured pelves. DESIGN: Prospective cohort study. SETTING: Level I trauma center. PATIENTS: Twenty-one patients with 25 acute external rotation injuries of the hemipelvis; control group of 26 patients without pelvic ring injury. INTERVENTION: All patients underwent the same MRI protocol reviewed by 1 musculoskeletal radiologist. MAIN OUTCOME MEASURES: Integrity of 5 structures: sacrospinous, sacrotuberous, anterior sacroiliac, and posterior sacroiliac ligaments and pelvic floor musculature. RESULTS: Visualization of sacrospinous, sacrotuberous, anterior sacroiliac, and posterior sacroiliac ligaments, and pelvic floor musculature was possible for 91%, 100%, 98%, 91%, and 100%, respectively, of all studied structures. No injuries were identified in control group patients in contrast to ligament injury observed with all injured pelves (0% versus 100%; P < 0.0001). Observed relationship of ligament injury to pelvic injury type g ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 7869162\nTitle: Box plate fixation of the symphysis pubis: biomechanical evaluation of a new technique.\nSource: Journal of orthopaedic trauma (1994)\nAbstract: The purpose of this study was to compare common techniques of pubic symphyseal fixation with a new method, the \"box plate,\" for fractures of the pelvis where the bone is osteopenic. This symphyseal fixation construct consists of two, two-hole, 4.5-mm narrow dynamic compression plates (DCP) oriented parallel to one another. One plate is recessed within the symphysis, and the other is located on the pubic tubercles. The plates are interlocked using two 6.5-mm fully threaded screws, forming a box-like construct. To determine the mechanical properties of this construct, five fresh, cadaveric pelvic specimens with a mean age of 75 years were harvested. The femora of each specimen were potted into containers and fixed to the base of a materials testing machine. The pelvis was constrained from rotating about the hip joints by anterior and posterior restraints. A vertical compressive load was applied through the lumbar spine. Force to a magnitude of 1,000 N was applied through three cycles. Gapping motions at the symphysis pubis (SP) and the sacroiliac (SI) joints, and flexion-extension of the sacrum with respect to the ilia were measured under the following conditions: (a) intact, (b) SP  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 36039168\nTitle: Evidence-Based Clinical Guidelines from the American Society of Pain and Neuroscience for the Use of Implantable Peripheral Nerve Stimulation in the Treatment of Chronic Pain\nSource: J Pain Res (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40397156\nTitle: The myth of 2.5 cm symphyseal diastasis\nSource: Arch Orthop Trauma Surg (2025)\nAbstract: ...<m>Type</m> B1.3: symphyseal separation > 2.5 cm on <m>pelvic</m> a.p. X-ray; bilateral <m>posterior</m> @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>injury</m>@@@ with <m>disruption</m> of the <m>anterior</m> @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@sacroiliac@@@ <m>ligaments</m> and suspected @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>injury</m>@@@ of both sacrospinous <m>ligaments</m>\n--------------------------------------------------------------------------------\nPMID: 35204475\nTitle: Imaging Review of Pelvic Ring Fractures and Its Complications in High-Energy Trauma\nSource: Diagnostics (Basel) (2022)\nAbstract: Indeed, <m>pelvic</m> stability depends mainly (ratio of 8:2) on the <m>pelvic</m> <m>ligaments</m> of the <m>posterior</m> tension band: <m>anterior</m> and <m>posterior</m> sacroiliac <m>ligaments</m>, iliolumbar <m>ligament</m>, sacrospinous <m>ligament</m>, and sacrotuberous <m>ligament</m>.\n--------------------------------------------------------------------------------\nPMID: 38726989\nTitle: Immediate management of a stable patient with unstable pelvis\nSource: EFORT Open Rev (2024)\nAbstract: APC <m>II</m>: rotationally unstable, vertically stable. @DISEASE_Pubic_Symphysis_Diastasis @DISEASE_MESH:D046548 @@@Pubic diastasis@@@ >2.5 cm, <m>anterior</m> <m>disruption</m> of sacroiliac <m>ligaments</m>, and @DISEASE_Diastasis_Bone @DISEASE_MESH:D000070631 @@@diastasis@@@ of the <m>anterior</m> part of the sacroiliac joint, with intact <m>posterior</m> sacroiliac <m>ligaments</m>; long <m>ligaments</m> are <m>disrupted</m>.\n--------------------------------------------------------------------------------\nPMID: 35346277\nTitle: Biomechanical evaluation of seven fixation methods to treat pubic symphysis diastasis using finite element analysis\nSource: J Orthop Surg Res (2022)\nAbstract: Internal fixation of the <m>anterior</m> plate combined with <m>posterior</m> percutaneous cannulated screws is the preferred method to treat @DISEASE_Pubic_Symphysis_Diastasis @DISEASE_MESH:D046548 @@@PSD@@@, considering that 54-97% of @DISEASE_Ring_Chromosomes @DISEASE_MESH:D012303 @@@<m>anterior</m> <m>pelvic</m> ring fractures@@@ are associated with @DISEASE_Ring_Chromosomes @DISEASE_MESH:D012303 @@@<m>posterior</m> <m>pelvic</m> ring <m>injuries</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 40710040\nTitle: Pelvic Fractures in Adults and the Importance of Associated Injuries:A Current Multi-Disciplinary Approach\nSource: Clin Pract (2025)\nAbstract: <m>Type</m> <m>II</m> <m>Disruption</m> of <m>anterior</m> and <m>posterior</m> SI <m>ligaments</m> (SI dislocation).\n--------------------------------------------------------------------------------\nPMID: 36261933\nTitle: Bilateral pelvic crescent fracture combined with left acetabular fracture: A case report\nSource: Int J Surg Case Rep (2022)\nAbstract: @DISEASE_Fractures_Compression @DISEASE_MESH:D050815 @@@Lateral <m>compression</m> <m>type</m> <m>II</m> <m>pelvic</m> <m>injuries</m>@@@ usually occur following a direct force over the <m>anterior</m> part of the iliac bone.\n--------------------------------------------------------------------------------\nPMID: 39087500\nTitle: Do we need another screw? Sacroiliac screw fixation in open-book pelvic ring injuries (APC type II)\nSource: EFORT Open Rev (2024)\nAbstract: @DISEASE_Fractures_Compression @DISEASE_MESH:D050815 @@@<m>Anterior</m>-<m>posterior</m> <m>compression</m> <m>type</m> <m>II</m> (APC <m>II</m>) <m>injuries</m>@@@ show symphysis widening and @DISEASE_Rupture @DISEASE_MESH:D012421 @@@rupture of the <m>anterior</m> sacroiliac complex@@@.\n--------------------------------------------------------------------------------\nPMID: 37575524\nTitle: Epidemiology of posterior urethral injury among adults with traumatic pelvic ring disruptions: a 10-year retrospective review from a trauma care centre in Southeast Nigeria\nSource: Pan Afr Med J (2023)\nAbstract: Epidemiology of @DISEASE_Urethritis @DISEASE_MESH:D014526 @@@<m>posterior</m> urethral <m>injury</m>@@@ among adults with traumatic @DISEASE_Ring_Chromosomes @DISEASE_MESH:D012303 @@@<m>pelvic</m> ring <m>disruptions</m>@@@: a 10-year retrospective review from a @DISEASE_Wounds_and_Injuries @DISEASE_MESH:D014947 @@@<m>trauma</m>@@@ care centre in Southeast Nigeria\n--------------------------------------------------------------------------------\nPMID: 37158445\nTitle: Surgical management of lumbosacral and sacral fractures: roles of the pelvic and spinal surgeons\nSource: EFORT Open Rev (2023)\nAbstract: <m>Type</m> A <m>injuries</m> have no impact on the stability of the <m>posterior</m> <m>pelvic</m> ring or spine, given their distant location from the weight-bearing axis.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "find_entities",
+    "tool_call_id": "call_F3OXjxmzdPBtYRtPAsvLBZbh",
+    "parent_tool_call_id": "call_o8kN2x4yS49eQcvXkBrQaBDB",
+    "round": 1,
+    "tool_input": {
+      "concept_type": "DISEASE",
+      "limit": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "query_text": "anterior posterior compression type II pelvic ring injury"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_find_entities\nimport pandas as pd\nresults = pubtator_api_find_entities(\n    query_text='anterior posterior compression type II pelvic ring injury', concept_type='DISEASE',\n    limit=10, max_retries=3, max_requests_per_second=3\n)\nif len(results) == 0:\n    print(\"No entities found. Please try again with different query.\")\nelse:\n    if isinstance(results, pd.DataFrame): print(results.to_markdown())\n    else: print(\"No entities found. Please try again with different query.\")\n\n```\n\n### Output:\n```\nNo entities found for query: 'anterior posterior compression type II pelvic ring injury'\nNo entities found. Please try again with different query.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_c1eiVLjDEGv9MK9LOaQMv9Z8",
+    "parent_tool_call_id": "call_F3OXjxmzdPBtYRtPAsvLBZbh",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "APC II|anterior sacroiliac|posterior sacroiliac|sacrospinous|sacrotuberous|symphysis",
+      "pmid": "23681412"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('23681412')\noutput = format_paper_content_output(result, filter_keywords='APC II|anterior sacroiliac|posterior sacroiliac|sacrospinous|sacrotuberous|symphysis')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 23681412 ===\n\nTitle: Magnetic resonance imaging for the evaluation of ligamentous injury in the pelvis: a prospective case-controlled study.\n\nJournal/Date: Journal of orthopaedic trauma (2014)\n\nMeSH Keywords: Adult, Case-Control Studies, Female, Humans, Ligaments, Magnetic Resonance Imaging, Male, Middle Aged\n\n\n--- ABSTRACT ---\n[OBJECTIVES]: Management of external rotation pelvic ring disruptions is based on which ligaments are disrupted within the pelvis. We hypothesized that magnetic resonance imaging (MRI) can evaluate the ligaments of the pelvic ring and differentiate injured from uninjured pelves.\n[DESIGN]: Prospective cohort study.\n[SETTING]: Level I trauma center.\n[PATIENTS]: Twenty-one patients with 25 acute external rotation injuries of the hemipelvis; control group of 26 patients without pelvic ring injury.\n[INTERVENTION]: All patients underwent the same MRI protocol reviewed by 1 musculoskeletal radiologist.\n[MAIN OUTCOME MEASURES]: Integrity of 5 structures: sacrospinous, sacrotuberous, anterior sacroiliac, and posterior sacroiliac ligaments and pelvic floor musculature.\n[RESULTS]: Visualization of sacrospinous, sacrotuberous, anterior sacroiliac, and posterior sacroiliac ligaments, and pelvic floor musculature was possible for 91%, 100%, 98%, 91%, and 100%, respectively, of all studied structures. No injuries were identified in control group patients in contrast to ligament injury observed with all injured pelves (0% versus 100%; P < 0.0001). Observed relationship of ligament injury to pelvic injury type generally agreed with the Young-Burgess classification system, with the important exception that patients with anterior-posterior compression type II injuries had damage to the sacrospinous ligament in only 50% of the cases.\n[CONCLUSIONS]: Ligamentous anatomy and injury about the pelvic ring appears to be easily evaluated with MRI, arguing that there may be a role for this imaging modality in managing these cases. Tearing of the sacrospinous ligament is variable among anterior-posterior compression type II injuries, arguing that the injury pattern can be subdivided into those with and without sacrospinous ligament tears.\n[LEVEL OF EVIDENCE]: Diagnostic Level II. See Instructions for Authors for a complete description of levels of evidence.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_xmmNKXZOUUOG9WEHiswwN76Z",
+    "parent_tool_call_id": "call_F3OXjxmzdPBtYRtPAsvLBZbh",
+    "round": 2,
+    "tool_input": {
+      "task_name": "APC ligament pattern",
+      "boolean_query_text": "\"APC II\" \"sacrospinous\" \"sacrotuberous\" pelvic",
+      "top_k": 10,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='\"APC II\" \"sacrospinous\" \"sacrotuberous\" pelvic',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='\"APC II\" \"sacrospinous\" \"sacrotuberous\" pelvic',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/APC_ligament_pattern.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/APC_ligament_pattern.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/APC_ligament_pattern.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 36623999\nTitle: A cadaveric biomechanical evaluation of anterior posterior compression II injuries.\nSource: Injury (2023)\nAbstract: PURPOSE: Pelvic fractures are associated with high morbidity and often require surgical intervention. An Anterior Posterior Compression (APC) II injury consists of disruption at the pubic symphysis and anterior sacroiliac joint. Studies investigating specific ligamentous contributions would aid in development of novel fixation techniques. The objective of this study is to determine the level of pelvic destabilization from progressive soft tissue disruptions associated with APC II injuries. METHODS: Six fresh-frozen cadaveric pelvises were dissected of soft tissues, preserving joint capsules and ligaments. Each pelvis was secured in a double-leg stance and joint motion was tracked with the specimens cyclically loaded to 60% body weight. Each specimen was measured in the intact state and again following stepwise destabilization to an APC II injury model (PS: sectioned pubic symphysis, IPS JOINT: PS + ipsilateral anterior sacroiliac, sacrotuberous, sacrospinous ligaments sectioned, IPS LIGS: IPS JOINT + ipsilateral interosseous ligaments sectioned, IPS JOINT+CONT ASI: IPS LIGS + contralateral anterior sacroiliac ligament disruption). RESULTS: Compared to the intact state, there was a  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 7869161\nTitle: Internal fixation of the unstable anterior pelvic ring: a biomechanical comparison of standard plating techniques and the retrograde medullary superior pubic ramus screw.\nSource: Journal of orthopaedic trauma (1994)\nAbstract: The purpose of this study was to evaluate pubic ramus fracture fixation. This biomechanical evaluation compared standard plating techniques with retrograde medullary screw fixation of a superior pubic ramus fracture in a pelvic fracture model. Six fresh-frozen, cadaveric pelvic specimens with a mean age of 79 years were harvested. These specimens were physiologically loaded according to the following modifications and instrumentations: (a) intact; (b) an APC-II unstable pelvic injury, specifically, unilateral superior and inferior rami osteotomies combined with ipsilateral anterior sacroiliac (SI) joint, sacrospinous, and sacrotuberous ligamentous disruptions, without fixation; (c) disrupted as in (b) but fixed anteriorly with a 10-hole 3.5-mm reconstruction plate contoured to the superior ramus and secured with four 3.5-mm cortical screws; (d) disrupted as in (b) but fixed anteriorly with a 10-hole 3.5-mm reconstruction plate contoured to the superior ramus and secured with six 3.5-mm cortical screws; (e) disrupted as in (b) but fixed anteriorly with a 4.5-mm retrograde medullary superior pubic ramus cortical screw 80 mm long (medial to the hip joint); and (f) disrupted as in (b)  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 39087500\nTitle: Do we need another screw? Sacroiliac screw fixation in open-book pelvic ring injuries (APC type II)\nSource: EFORT Open Rev (2024)\nAbstract: Other stabilizing components of the posterior <m>pelvic</m> ring include the iliolumbar, interosseous, and posterior sacroiliac ligaments, as well as <m>pelvic</m> floor components such as the <m>sacrotuberous</m> and <m>sacrospinous</m> ligaments.\n--------------------------------------------------------------------------------\nPMID: 36623999\nTitle: A cadaveric biomechanical evaluation of anterior posterior compression II injuries.\nSource: Injury (2023)\nAbstract: The objective of this study is to determine the level of <m>pelvic</m> destabilization from progressive soft tissue disruptions associated with @DISEASE_Fractures_Compression @DISEASE_MESH:D050815 @@@<m>APC II</m> injuries@@@.\n--------------------------------------------------------------------------------\nPMID: 35346277\nTitle: Biomechanical evaluation of seven fixation methods to treat pubic symphysis diastasis using finite element analysis\nSource: J Orthop Surg Res (2022)\nAbstract: The intact skeleton-ligament <m>pelvic</m> models were set as the control group (Fig. 1A). The @DISEASE_Pubic_Symphysis_Diastasis @DISEASE_MESH:D046548 @@@PSD@@@ models (classical @DISEASE_Brachydactyly_Type_B1 @DISEASE_MESH:C566196 @@@Tile B1@@@/@DISEASE_Brachydactyly_Type_B1 @DISEASE_MESH:C566196 @@@<m>APC-II</m> injury@@@) were simulated by removing the superior pubic, arcuate pubic, right <m>sacrospinous</m>, right <m>sacrotuberous</m>, and right anterior sacroiliac ligaments (Fig. 1B).\n--------------------------------------------------------------------------------\nPMID: 40397156\nTitle: The myth of 2.5 cm symphyseal diastasis\nSource: Arch Orthop Trauma Surg (2025)\nAbstract: Their main conclusions were that \"the stability of the <m>pelvic</m> ring depends upon the integrity of the posterior weight-bearing sacroiliac complex, with the major sacroiliac, <m>sacrotuberous</m> and <m>sacrospinous</m> ligaments\".\n--------------------------------------------------------------------------------\nPMID: 38062457\nTitle: Patterns of surgical complications after delayed fixation of peripartum pubic symphysis rupture: a report of 5 cases\nSource: Patient Saf Surg (2023)\nAbstract: The diagnosis was a chronic @DISEASE_Rupture @DISEASE_MESH:D012421 @@@symphysis rupture@@@ and @DISEASE_Pelvic_Infection @DISEASE_MESH:D034161 @@@<m>APC II</m> <m>pelvic</m> injury@@@. Open reduction and internal fixation using a 6-hole <m>pelvic</m> plate were performed (Fig. 4B).\n--------------------------------------------------------------------------------\nPMID: 7869161\nTitle: Internal fixation of the unstable anterior pelvic ring: a biomechanical comparison of standard plating techniques and the retrograde medullary superior pubic ramus screw.\nSource: J Orthop Trauma (1994)\nAbstract: The posterior disruptions of the <m>pelvic</m> ring were not fixed. The @DISEASE_Adenomatous_Polyposis_Coli @DISEASE_MESH:D011125 @@@<m>APC-II</m> injury@@@ created in this study resulted in significant (p < 0.05) motion at the disrupted rami and the injured SI joint, compared with the intact <m>pelvic</m> specimen.\n--------------------------------------------------------------------------------\nPMID: 27233837\nTitle: Percutaneous fixation of traumatic pubic symphysis diastasis using a TightRope and external fixator versus using a cannulated screw\nSource: J Orthop Surg Res (2016)\nAbstract: The injuries are classified into three types, i.e., APC-I (slight widening of pubic symphysis or anterior @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@sacroiliac@@@ joint, or both); <m>APC-II</m> (widened anterior @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@sacroiliac@@@ joint >2.5 cm, disrupted anterior @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@sacroiliac@@@, <m>sacrotuberous</m>, and <m>sacrospinous</m> ligaments, intact posterior @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@sacroiliac@@@ ligaments); and APC-III (complete @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@sacroiliac@@@ joint disruption with lateral displacement, disrupted anterior @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@sacroiliac@@@, <m>sacrotuberous</m>, and disrupted posterior @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@sacroiliac@@@ ligaments).\n--------------------------------------------------------------------------------\nPMID: 33795905\nTitle: Hemodynamically unstable pelvic fracture: A damage control surgical algorithm that fits your reality\nSource: Colomb Med (Cali) (2020)\nAbstract: Anterior @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@sacroiliac joint diastasis@@@. Disruption of <m>sacrospinous</m> and <m>sacrotuberous</m> ligaments. III: @DISEASE_Arthritis_Sacroiliac @DISEASE_MESH:C563037 @@@Sacroiliac dislocation@@@ with associated @DISEASE_Vascular_System_Injuries @DISEASE_MESH:D057772 @@@vascular injury@@@.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_KvhnaxpioPNv5ffgidLXpqNQ",
+    "parent_tool_call_id": "call_xmmNKXZOUUOG9WEHiswwN76Z",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The standard Young–Burgess APC-II ('open-book') pattern includes pubic symphysis widening/diastasis (classically >2.5 cm), disruption of the anterior sacroiliac complex/anterior SI ligaments, disruption of the sacrotuberous and sacrospinous ligaments, and preservation of the posterior sacroiliac ligaments; the injury is rotationally unstable but vertically stable.",
+          "source_tools": [
+            {
+              "relevance": "Direct standard classification summary: APC-II with pubic diastasis >2.5 cm, anterior SI disruption, intact posterior SI ligaments, and disruption of the long ligaments (sacrospinous/sacrotuberous).",
+              "tool_call_id": "call_2NDrBNzs9BCMpefA4ZhyBERL"
+            },
+            {
+              "relevance": "PubMed abstract of a contemporary review explicitly describing APC-II as symphysis widening with anterior SI-ligament disruption.",
+              "tool_call_id": "call_c2anWbTbczKD9NooHWRCfojz"
+            },
+            {
+              "relevance": "PubMed-indexed classification description stating APC-II has widened anterior SI joint, disrupted anterior SI, sacrotuberous and sacrospinous ligaments, with intact posterior SI ligaments.",
+              "tool_call_id": "call_xmmNKXZOUUOG9WEHiswwN76Z"
+            }
+          ]
+        },
+        {
+          "finding": "The posterior SI ligaments are the key intact posterior tension band in the usual APC-II definition; complete posterior SI disruption/separation indicates progression toward APC-III rather than APC-II.",
+          "source_tools": [
+            {
+              "relevance": "Classification summary contrasts APC-II (intact posterior SI ligaments) with APC-III (disrupted posterior SI ligaments).",
+              "tool_call_id": "call_xmmNKXZOUUOG9WEHiswwN76Z"
+            },
+            {
+              "relevance": "Review abstract describes APC-II as anterior SI disruption with posterior SI ligaments intact.",
+              "tool_call_id": "call_2NDrBNzs9BCMpefA4ZhyBERL"
+            }
+          ]
+        },
+        {
+          "finding": "There is an important qualification: sacrospinous-ligament tearing is not invariant in real APC-II injuries. A prospective MRI study found sacrospinous damage in only 50% of APC-II cases and concluded that APC-II can be subdivided into injuries with versus without sacrospinous tears; therefore, 'sacrospinous torn' is the conventional textbook pattern but not a universal imaging finding.",
+          "source_tools": [
+            {
+              "relevance": "Prospective MRI study directly reports sacrospinous injury in only 50% of APC-II cases and states the pattern may be subdivided by presence/absence of that tear.",
+              "tool_call_id": "call_c1eiVLjDEGv9MK9LOaQMv9Z8"
+            }
+          ]
+        },
+        {
+          "finding": "The most authoritative directly relevant evidence located is the original Young–Burgess-style classification as reproduced in peer-reviewed reviews and biomechanical/classification literature; the MRI study provides empirical evidence that the textbook ligament pattern has variability, especially for the sacrospinous ligament.",
+          "source_tools": [
+            {
+              "relevance": "Peer-reviewed contemporary review/classification evidence for the standard APC-II pattern.",
+              "tool_call_id": "call_2NDrBNzs9BCMpefA4ZhyBERL"
+            },
+            {
+              "relevance": "Prospective diagnostic study testing ligament integrity against Young–Burgess patterns.",
+              "tool_call_id": "call_c1eiVLjDEGv9MK9LOaQMv9Z8"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_C0tWf1xqo6PD0Glhvgk0rxgh",
+    "parent_tool_call_id": "call_o8kN2x4yS49eQcvXkBrQaBDB",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE / PHENOTYPE",
+          "name": "APC-II pelvic injury",
+          "observations": [
+            "Young–Burgess APC-II is an open-book pelvic-ring injury with pubic symphysis diastasis, anterior sacroiliac disruption, and sacrotuberous ligament disruption.",
+            "Posterior sacroiliac ligaments are preserved in the classic APC-II pattern, maintaining vertical stability while rotational instability is present.",
+            "Sacrotuberous and sacrospinous disruption is conventional, but MRI evidence indicates sacrospinous injury is variable in actual APC-II cases."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Classic APC-II anatomic pattern and stability",
+              "tool_call_id": "call_2NDrBNzs9BCMpefA4ZhyBERL"
+            },
+            {
+              "relevance": "Posterior SI ligaments preserved in APC-II",
+              "tool_call_id": "call_xmmNKXZOUUOG9WEHiswwN76Z"
+            },
+            {
+              "relevance": "Variable sacrospinous injury on MRI",
+              "tool_call_id": "call_c1eiVLjDEGv9MK9LOaQMv9Z8"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "APC-II classic ligament pattern",
+          "observations": [
+            "The defining multiple-choice pattern is pubic symphysis diastasis, torn anterior sacroiliac ligaments, torn sacrotuberous ligament, and intact posterior sacroiliac ligaments."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct match to the standard classification description",
+              "tool_call_id": "call_2NDrBNzs9BCMpefA4ZhyBERL"
+            },
+            {
+              "relevance": "Posterior SI preservation distinguishes APC-II from APC-III",
+              "tool_call_id": "call_xmmNKXZOUUOG9WEHiswwN76Z"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "APC-II pelvic injury",
+          "relation_type": "SUPPORTS",
+          "to_entity": "APC-II classic ligament pattern"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 2, \"entities\": [{\"name\": \"APC-II pelvic injury\", \"entityType\": \"DISEASE / PHENOTYPE\", \"observations\": [\"Young\\u2013Burgess APC-II is an open-book pelvic-ring injury with pubic symphysis diastasis, anterior sacroiliac disruption, and sacrotuberous ligament disruption.\", \"Posterior sacroiliac ligaments are preserved in the classic APC-II pattern, maintaining vertical stability while rotational instability is present.\", \"Sacrotuberous and sacrospinous disruption is conventional, but MRI evidence indicates sacrospinous injury is variable in actual APC-II cases.\"]}, {\"name\": \"APC-II classic ligament pattern\", \"entityType\": \"FINDING\", \"observations\": [\"The defining multiple-choice pattern is pubic symphysis diastasis, torn anterior sacroiliac ligaments, torn sacrotuberous ligament, and intact posterior sacroiliac ligaments.\"]}]}, \"relations_created\": {\"count\": 1, \"relations\": [{\"from\": \"APC-II pelvic injury\", \"to\": \"APC-II classic ligament pattern\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_C0tWf1xqo6PD0Glhvgk0rxgh\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_o8kN2x4yS49eQcvXkBrQaBDB\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

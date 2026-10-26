@@ -1,0 +1,1 @@
+{"answer":"[2-(cycloheptylamino)-2-oxoethyl] (E)-3-(3,4-dimethoxyphenyl)prop-2-enoate"}

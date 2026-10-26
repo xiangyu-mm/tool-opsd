@@ -1,0 +1,1 @@
+{"answer":"ethyl 4-ethyl-5-methyl-2-[(4-methylbenzoyl)amino]thiophene-3-carboxylate"}

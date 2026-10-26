@@ -1,0 +1,426 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_B82gOexOoEt7RPJaGw5gTGIb",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether preoperative multiparametric MRI (mp-MRI) of the prostate provides little clinically useful information for staging prostate carcinoma in routine/daily clinical practice. Find studies and reviews comparing mp-MRI local staging (extracapsular extension, seminal vesicle invasion, lymph-node involvement, overall T stage) against prostatectomy pathology or standard clinical staging, emphasizing diagnostic accuracy, limitations, and real-world impact. Identify evidence supporting or refuting the claim and report citations/years and quantitative accuracy where available."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_HWFfswf2RuJpid65GeepvQrM",
+    "parent_tool_call_id": "call_B82gOexOoEt7RPJaGw5gTGIb",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "prostate cancer mpMRI clinical staging routine practice impact management change",
+      "relation_query": null,
+      "task_name": "MRI clinical impact",
+      "top_k": 15
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='prostate cancer mpMRI clinical staging routine practice impact management change',\n        top_k=15,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='prostate cancer mpMRI clinical staging routine practice impact management change',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/MRI_clinical_impact.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/MRI_clinical_impact.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/MRI_clinical_impact.csv'\nTotal results found: 20\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 39555429\nTitle: Preoperative prostate magnetic resonance imaging does not impact surgical outcomes of radical prostatectomy\nSource: Indian J Urol (2024)\nAbstract: The former method is more consistent with <m>routine</m> <m>clinical</m> <m>practice</m>, and in our opinion, better represents the way in which <m>mpMRI</m> interpretation is typically incorporated into surgical planning.\n--------------------------------------------------------------------------------\nPMID: 33861056\nTitle: Prostate specific membrane antigen (PSMA) and Prostate Cancer Staging: is our current conventional staging obsolete?\nSource: Int Braz J Urol (2021)\nAbstract: <m>Prostate</m> specific membrane antigen (@GENE_FOLH1 @GENE_2346 @@@PSMA@@@) and @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>Prostate</m> <m>Cancer</m>@@@ <m>Staging</m>: is our current conventional <m>staging</m> obsolete?\n--------------------------------------------------------------------------------\nPMID: 33856136\nTitle: Multiparametric MRI in Active Surveillance of Prostate Cancer: An Overview and a Practical Approach\nSource: Korean J Radiol (2021)\nAbstract: ...Multiparametric MRI (<m>mpMRI</m>) of the <m>prostate</m> has become integral in the <m>management</m> of @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 37443677\nTitle: Up-to-Date Imaging and Diagnostic Techniques for Prostate Cancer: A Literature Review\nSource: Diagnostics (Basel) (2023)\nAbstract: Guevelou et al. summarized the potential <m>impact</m> of restaging according to @GENE_FOLH1 @GENE_2346 @@@PSMA@@@-PET/CT <m>changes</m> in the <m>management</m> of recurrent @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ after RP.\n--------------------------------------------------------------------------------\nPMID: 37973247\nTitle: Prostate Cancer Local Staging with Magnetic Resonance Imaging\nSource: Radiol Clin North Am (2024)\nAbstract: Overall, the integration of <m>mpMRI</m> into <m>clinical</m> decision-making for @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ <m>management</m> holds great value in improving <m>clinical</m> outcomes.\n--------------------------------------------------------------------------------\nPMID: 34430415\nTitle: MRI/PET Imaging in elevated PSA and localized prostate cancer: a narrative review\nSource: Transl Androl Urol (2021)\nAbstract: The importance of multiparametric MRI (<m>mpMRI</m>) and PET based imaging for the diagnosis and <m>staging</m> of @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ cannot be understated.\n--------------------------------------------------------------------------------\nPMID: 38787428\nTitle: PI-QUAL version 2: an update of a standardised scoring system for the assessment of image quality of prostate MRI\nSource: Eur Radiol (2024)\nAbstract: PI-QUAL v2 is a result of a collaborative international effort that engaged 20 experienced genitourinary radiologists specialising in <m>prostate</m> MRI, along with a group of six urologists actively incorporating <m>prostate</m> MRI into their <m>routine</m> <m>clinical</m> <m>practice</m>.\n--------------------------------------------------------------------------------\nPMID: 35407528\nTitle: Diffusion-Weighted MRI in the Genitourinary System\nSource: J Clin Med (2022)\nAbstract: It is clear that DWI is an essential part of the <m>mpMRI</m> in @DISEASE_Urinary_Bladder_Neoplasms @DISEASE_MESH:D001749 @@@bladder <m>cancer</m>@@@ <m>staging</m> and further <m>clinical</m> validations of the VI-RADS score could call for an increasing contribution of the technique in <m>routine</m> <m>practice</m>.\n--------------------------------------------------------------------------------\nPMID: 40265741\nTitle: The evolving role of positron emission tomography in precision prostate cancer biopsy\nSource: Eur J Clin Invest (2025)\nAbstract: Slow Adoption and Integration: PET/MRI adoption has been slow due to high costs, complex workflows and the lack of established protocols in <m>clinical</m> <m>practice</m>. Improved Patient <m>Management</m>: PET/MRI has shown to influence treatment decisions and improve <m>management</m> of <m>prostate</m> <m>cancer</m>, including <m>changes</m> in therapy based on findings.\n--------------------------------------------------------------------------------\nPMID: 41295552\nTitle: Prevalence and Significance of Incidental Findings in Multiparametric Magnetic Resonance Imaging of the Prostate\nSource: Tomography (2025)\nAbstract: ...Given the expanding use of <m>mpMRI</m> in @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ diagnostics, understanding the epidemiology of incidental findings:especially in relation to their <m>clinical</m> relevance:is essential for optimizing @SPECIES_9606 @@@patient@@@ <m>management</m>.\n--------------------------------------------------------------------------------\nPMID: 38028141\nTitle: Current role of PSMA-PET imaging in the clinical management of prostate cancer\nSource: Ther Adv Med Oncol (2023)\nAbstract: Current role of @GENE_FOLH1 @GENE_2346 @@@PSMA@@@-PET imaging in the <m>clinical</m> <m>management</m> of @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@\n--------------------------------------------------------------------------------\nPMID: 38780764\nTitle: ESR Essentials: using the right scoring system in prostate MRI:practice recommendations by ESUR\nSource: Eur Radiol (2024)\nAbstract: ...<m>Clinically</m> significant @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@\n--------------------------------------------------------------------------------\nPMID: 37364484\nTitle: Prostate MRI and image quality: The radiologist's perspective\nSource: Eur J Radiol (2023)\nAbstract: These cover @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ diagnosis and <m>management</m>, advising the use of multi-parametric MRI as the first-line investigation for all people with suspected <m>clinically</m> localized @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 38001728\nTitle: Multiparametric MRI in Era of Artificial Intelligence for Bladder Cancer Therapies\nSource: Cancers (Basel) (2023)\nAbstract: Many studies confirm the standardization and high degree of inter-reader agreement to discriminate @DISEASE_Non_Muscle_Invasive_Bladder_Neoplasms @DISEASE_MESH:D000093284 @@@muscle invasiveness@@@ in @DISEASE_Urinary_Bladder_Neoplasms @DISEASE_MESH:D001749 @@@bladder <m>cancer</m>@@@, supporting VI-RADS implementation in <m>routine</m> <m>clinical</m> <m>practice</m>.\n--------------------------------------------------------------------------------\nPMID: 36359439\nTitle: PSMA PET-CT in the Diagnosis and Staging of Prostate Cancer\nSource: Diagnostics (Basel) (2022)\nAbstract: Despite this, @GENE_FOLH1 @GENE_2346 @@@PSMA@@@ PET-CT represents the most accurate means of <m>staging</m> @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ and is <m>impacting</m> our <m>management</m> of PCa.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_W8yQ74TOVfvSN2lv7XPlb3yI",
+    "parent_tool_call_id": "call_HWFfswf2RuJpid65GeepvQrM",
+    "round": 2,
+    "tool_input": {
+      "boolean_query_text": "mpMRI prostatectomy pathology extracapsular extension sensitivity specificity multicenter staging",
+      "relation_query": null,
+      "task_name": "ECE MRI accuracy",
+      "top_k": 15
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='mpMRI prostatectomy pathology extracapsular extension sensitivity specificity multicenter staging',\n        top_k=15,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='mpMRI prostatectomy pathology extracapsular extension sensitivity specificity multicenter staging',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ECE_MRI_accuracy.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ECE_MRI_accuracy.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ECE_MRI_accuracy.csv'\nTotal results found: 24\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 37357123\nTitle: Multiparametric MRI is not sufficient for prostate cancer staging: A single institutional experience validated by a multi-institutional regional collaborative.\nSource: Urologic oncology (2023)\nAbstract: OBJECTIVE: Multiparametric magnetic resonance imaging (mpMRI) has been increasingly utilized in prostate cancer (CaP) diagnosis and staging. While Level 1 data supports MRI utility in CaP diagnosis, there is less data on staging utility. We sought to evaluate the real-world accuracy of mpMRI in staging localized CaP. MATERIALS AND METHODS: Men who underwent radical prostatectomy (RP) for CaP in 2021 at our institution were identified. Sensitivity, specificity, positive predictive value and negative predictive value of mpMRI in predicting pT2N0 organ confined disease , extracapsular extension , seminal vesicle invasion , lymph node involvement, and bladder neck invasion were evaluated. Associations between MRI accuracy and AUA risk stratification (AUA RS), MRI institution (MRI-I), MRI strength (1.5 vs. 3T) (MRI-S), and MRI timing (MRI-T) were assessed. These analyses were repeated using Pennsylvania Urologic Regional Collaborative (PURC) data. RESULTS: Institutional and community mpMRI CaP staging data demonstrated poor sensitivity (2.9%-49.2%% vs. 16.8%-24.4%), positive predictive value (40%-100% vs. 35.8%-68.2%), and negative predictive value (56.3%-94.3% vs. 68.4%-96.2%) in predi ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 39124692\nTitle: The Sensitivity and Specificity of Multiparametric Magnetic Resonance Imaging and Prostate-Specific Membrane Antigen Positron Emission Tomography/Computed Tomography for Predicting Seminal Vesicle Invasion in Clinically Significant Prostate Cancer: A Multicenter Retrospective Study.\nSource: Journal of clinical medicine (2024)\nAbstract: Background/Objectives: The presence of seminal vesicle invasion (SVI) in prostate cancer (PCa) is associated with poorer postoperative outcomes. This study evaluates the predictive value of magnetic resonance imaging (MRI) and prostate-specific membrane antigen positron emission tomography/computed tomography (PSMA PET/CT) for SVI in PCa. Methods: This cohort study included consecutive robotic prostatectomy patients for PCa at three Australian tertiary referral centres between April 2016 and September 2022. MRI and PSMA PET/CT results, clinicopathological variables, including age, BMI, prostate-specific antigen (PSA), PSA density, DRE, Biopsy Gleason score, Positive biopsy cores, PIRADS v2.1 score, MRI volume and MRI lesion size were extracted. The sensitivity, specificity, and accuracy of MRI and PSMA PET/CT for predicting SVI were compared with the histopathological results by receiver operating characteristic (ROC) analysis. Subgroup univariate and multivariate analysis was performed. Results: Of the 528 patients identified, 86 had SVI on final pathology. MRI had a low sensitivity of 0.162 (95% CI: 0.088-0.261) and a high specificity of 0.963 (95% CI: 0.940-0.979). The PSMA PET/ ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 41372855\nTitle: Deep learning-based diffusion-weighted imaging vs. conventionally obtained diffusion-weighted imaging in prostate cancer extracapsular extension detection: a multicenter retrospective study.\nSource: BMC medical imaging (2025)\nAbstract: BACKGROUND: Extracapsular extension (ECE) of prostate cancer (PCa) is a crucial determinant for preoperative staging, significantly influencing urologists’ surgical planning. While magnetic resonance imaging (MRI) aids staging by depicting ECE, its diagnostic accuracy is frequently constrained by poor image quality. Deep learning-based diffusion-weighted imaging (DL-DWI) holds potential for enhancing diagnostic accuracy through improved image quality. METHODS: This multicenter retrospective study enrolled 252 consecutive patients with clinically suspected PCa from five centers between June 2019 and September 2023. All patients underwent multiparametric MRI (mpMRI) followed by radical prostatectomy. A denoising diffusion probabilistic model (DDPM) was developed to synthesize high-b-value DL-DWI images. Two radiologic residents independently evaluated the image quality of DL-DWI and conventionally obtained DWI (C-DWI) using a five-point Likert scale. Objective image quality metrics including estimated signal-to-noise ratio (eSNR), contrast-to-noise ratio (CNR), edge rise distance (ERD), and edge rise slope (ERS) were quantitatively assessed and compared between sequences. Four radiol ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 32307562\nTitle: Independent external validation of nomogram to predict extracapsular extension in patients with prostate cancer.\nSource: European radiology (2020)\nAbstract: INTRODUCTION: The objective of this study was to perform an independent external validation of the Giganti-Coppola nomogram (GCN), which uses clinical and radiological parameters to predict prostate extracapsular extension (ECE) on the final pathology of patients undergoing radical prostatectomy (RP). MATERIAL AND METHODS: Seventy-two patients diagnosed with prostate cancer (PCa), who were RP candidates from two institutions, were prospectively included. All patients underwent preoperative multi-parametric magnetic resonance imaging (mpMRI) at 1.5 T, without the use of an endorectal coil, with multiplanar images in T1WI, T2WI, DWI, and DCE. The AUC and a calibration graph were used to validate the nomogram, using the regression coefficients of the Giganti-Coppola study. RESULTS: The original nomogram had an AUC of 0.90 (p = 0.001), with a sensitivity, specificity, positive predictive value, negative predictive value, and accuracy of 100%, 5.1%, 47.1%, 100%, and 48%, respectively. The calibration graph showed an overestimation of the nomogram for ECE. CONCLUSION: The GCN has an adequate ability in predicting ECE; however, in our sample, it showed limited accuracy and overestimated l ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 39124692\nTitle: The Sensitivity and Specificity of Multiparametric Magnetic Resonance Imaging and Prostate-Specific Membrane Antigen Positron Emission Tomography/Computed Tomography for Predicting Seminal Vesicle Invasion in Clinically Significant Prostate Cancer: A Multicenter Retrospective Study\nSource: J Clin Med (2024)\nAbstract: ...<m>Sensitivity</m> and <m>specificity</m> of multiparametric MRI in <m>extracapsular</m> <m>extension</m>.\n--------------------------------------------------------------------------------\nPMID: 35586139\nTitle: Integration of magnetic resonance imaging into prostate cancer nomograms\nSource: Ther Adv Urol (2022)\nAbstract: While <m>mpMRI</m> has a moderate <m>sensitivity</m> in predicting ECE and @DISEASE_Prostatic_malacoplakia_associated_with_prostatic_abscess @DISEASE_MESH:C537244 @@@SVI@@@, it has been incorporated in some models and has increased the model's ability to predict adverse <m>pathology</m>.\n--------------------------------------------------------------------------------\nPMID: 37283788\nTitle: Multiparametric Magnetic Resonance Imaging-based Prostate Specific Antigen Density and PI-RADSv2 score help identify Apical Prostate Cancer\nSource: J Cancer (2023)\nAbstract: Based on ROC analysis, the cut-off for <m>mpMRI</m>-based @DISEASE_Prostatitis @DISEASE_MESH:D011472 @@@PSAD@@@ to predict @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@APCa@@@ was 0.27 ng/ml/cm3, with a <m>sensitivity</m> of 58.26%, a <m>specificity</m> of 65.42%, a PPV of 77.91%, and an NPV of 42.81%, respectively.\n--------------------------------------------------------------------------------\nPMID: 34698089\nTitle: Prostate Magnetic Resonance Imaging Analyses, Clinical Parameters, and Preoperative Nomograms in the Prediction of Extraprostatic Extension\nSource: Clin Pract (2021)\nAbstract: ...Multiparametric MRI (<m>mpMRI</m>) of the prostate, when used to assess local <m>staging</m>, has a low <m>sensitivity</m> and high <m>specificity</m>.\n--------------------------------------------------------------------------------\nPMID: 36570646\nTitle: Temporal changes of PIRADS scoring by radiologists and correlation to radical prostatectomy pathological outcomes\nSource: Prostate Int (2022)\nAbstract: ...MRI-based prediction of <m>extracapsular</m> <m>extension</m>, seminal vesicle invasion, and @DISEASE_Urinary_Bladder_Neck_Obstruction @DISEASE_MESH:D001748 @@@bladder neck infiltration@@@\n--------------------------------------------------------------------------------\nPMID: 38771329\nTitle: The role of PSMA PET/CT in predicting downgrading in patients with Gleason score 4+4 prostate cancer in prostate biopsy\nSource: World J Urol (2024)\nAbstract: When both tests are used together, the ability to predict <m>extracapsular</m> <m>extension</m> is increased. In our study, we found that @GENE_FOLH1 @GENE_2346 @@@PSMA@@@ PET/CT is not only useful for <m>staging</m> purposes but can also be a predictor of the final pathological GS in @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@PCa@@@.\n--------------------------------------------------------------------------------\nPMID: 37052480\nTitle: Unilateral Pelvic Lymph Node Dissection in Prostate Cancer Patients Diagnosed in the Era of Magnetic Resonance Imaging-targeted Biopsy: A Study That Challenges the Dogma\nSource: J Urol (2023)\nAbstract: ...Abbreviations: ECE, <m>extracapsular</m> <m>extension</m>; IQR, interquartile range; ISUP, International Society of Urological <m>Pathology</m>; @DISEASE_Tertiary_Lymphoid_Structures @DISEASE_MESH:D000072717 @@@LNI@@@, @DISEASE_Lymphatic_Metastasis @DISEASE_MESH:D008207 @@@lymph node invasion@@@; <m>mpMRI</m>, multiparametric magnetic resonance imaging; @GENE_KLK3 @GENE_354 @@@PSA@@@, @GENE_KLK3 @GENE_354 @@@prostate-<m>specific</m> antigen@@@; SVI, seminal vesicle invasion.\n--------------------------------------------------------------------------------\nPMID: 37409092\nTitle: Combination of multiparametric magnetic resonance imaging and transperineal template-guided mapping prostate biopsy to determine potential candidates for focal therapy\nSource: Prostate Int (2023)\nAbstract: ...<m>Sensitivity</m> and <m>specificity</m> of <m>mpMRI</m> and TTMB prediction of hemiablation eligibility versus radical <m>prostatectomy</m> specimen findings (n = 120).\n--------------------------------------------------------------------------------\nPMID: 37943772\nTitle: Optimization and validation of 18F-DCFPyL PET radiomics-based machine learning models in intermediate- to high-risk primary prostate cancer\nSource: PLoS One (2023)\nAbstract: ...The AUC, <m>sensitivity</m> and <m>specificity</m> of the radiomics-based models per outcome.\n--------------------------------------------------------------------------------\nPMID: 34430415\nTitle: MRI/PET Imaging in elevated PSA and localized prostate cancer: a narrative review\nSource: Transl Androl Urol (2021)\nAbstract: Similarly, Hicks et al. performed a retrospective analysis of 32 @SPECIES_9606 @@@men@@@ who underwent 68Ga-@GENE_FOLH1 @GENE_2346 @@@PSMA@@@-11 PET/MRI prior to radical <m>prostatectomy</m> and reported that the region-<m>specific</m> <m>sensitivity</m> of PET/MRI and <m>mpMRI</m> alone was 74% and 50% compared to whole-mount histology.\n--------------------------------------------------------------------------------\nPMID: 36363581\nTitle: Micro-Ultrasound in the Diagnosis and Staging of Prostate and Bladder Cancer: A Comprehensive Review\nSource: Medicina (Kaunas) (2022)\nAbstract: Fasulo et al., 2022 Evaluation of the accuracy of MUS in predicting @DISEASE_Extranodal_Extension @DISEASE_MESH:D000079822 @@@EPE@@@ The presence of visible <m>extracapsular</m> <m>extension</m> at MUS predicted @DISEASE_Extranodal_Extension @DISEASE_MESH:D000079822 @@@EPE@@@ with a <m>sensitivity</m> of 72.1% and a <m>specificity</m> of 88%, an NPV of 80.5%, and a PPV of 83.0%, with an AUC of 80.4%.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_d6MYYvxLkyOq6KUZC2zTc8o6",
+    "parent_tool_call_id": "call_HWFfswf2RuJpid65GeepvQrM",
+    "round": 2,
+    "tool_input": {
+      "boolean_query_text": "mpMRI prostate cancer overall T stage pathology radical prostatectomy diagnostic accuracy",
+      "relation_query": null,
+      "task_name": "MRI T staging accuracy",
+      "top_k": 15
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='mpMRI prostate cancer overall T stage pathology radical prostatectomy diagnostic accuracy',\n        top_k=15,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='mpMRI prostate cancer overall T stage pathology radical prostatectomy diagnostic accuracy',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/MRI_T_staging_accuracy.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/MRI_T_staging_accuracy.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/MRI_T_staging_accuracy.csv'\nTotal results found: 20\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38575912\nTitle: Assessment of the accuracy of biparametric MRI/TRUS fusion-guided biopsy for index tumor evaluation using postoperative pathology specimens\nSource: BMC Urol (2024)\nAbstract: However, issues such as image quality and biopsy sampling errors can lead to <m>diagnostic</m> inaccuracies. Especially in @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ surgery, we often experience discrepancies between the preoperative evaluation and the <m>radical</m> <m>prostatectomy</m> specimen.\n--------------------------------------------------------------------------------\nPMID: 36601048\nTitle: Role of the Prostate Imaging Quality PI-QUAL Score for Prostate Magnetic Resonance Image Quality in Pathological Upstaging After Radical Prostatectomy: A Multicentre European Study\nSource: Eur Urol Open Sci (2022)\nAbstract: Regarding local staging, the <m>mpMRI</m> <m>T</m> <m>stage</m> corresponded exactly to the <m>stage</m> on <m>pathology</m> for the <m>radical</m> <m>prostatectomy</m> specimen in 71.2% of cases.\n--------------------------------------------------------------------------------\nPMID: 41511587\nTitle: Interreader agreement of intraprostatic prostate cancer detection, local extension and staging using [18F]PSMA-1007 PET and whole-mount radical prostatectomy specimens\nSource: EJNMMI Res (2026)\nAbstract: However, <m>overall</m>, these studies do not reveal a significant increase in <m>diagnostic</m> <m>accuracy</m> of [68Ga]Ga-@GENE_FOLH1 @GENE_2346 @@@PSMA@@@-11 PET compared to <m>mpMRI</m> in <m>T</m> staging.\n--------------------------------------------------------------------------------\nPMID: 37409092\nTitle: Combination of multiparametric magnetic resonance imaging and transperineal template-guided mapping prostate biopsy to determine potential candidates for focal therapy\nSource: Prostate Int (2023)\nAbstract: ISUP, International Society of Urological <m>Pathology</m>; @GENE_KLK3 @GENE_354 @@@PSA@@@, @GENE_KLK3 @GENE_354 @@@<m>prostate</m>-specific antigen@@@; RP, <m>radical</m> <m>prostatectomy</m>; <m>mpMRI</m>, multiparametric magnetic resonance imaging; TTMB, transperineal template-guided mapping biopsy.\n--------------------------------------------------------------------------------\nPMID: 35523484\nTitle: Machine learning in predicting extracapsular extension (ECE) of prostate cancer with MRI: a protocol for a systematic literature review\nSource: BMJ Open (2022)\nAbstract: Low@DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@-<m>stage</m> <m>cancer</m>@@@ includes @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@PCa@@@ confined to the <m>prostate</m> gland.\n--------------------------------------------------------------------------------\nPMID: 37286770\nTitle: Preoperative imaging accuracy in size determination of prostate cancer in men undergoing radical prostatectomy for clinically localised disease\nSource: Insights Imaging (2023)\nAbstract: Preoperative imaging <m>accuracy</m> in size determination of @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ in @SPECIES_9606 @@@men@@@ undergoing <m>radical</m> <m>prostatectomy</m> for clinically localised disease\n--------------------------------------------------------------------------------\nPMID: 36601046\nTitle: Effect of Preoperative Multiparametric Magnetic Resonance Imaging on Oncologic and Functional Outcomes Following Radical Prostatectomy\nSource: Eur Urol Open Sci (2022)\nAbstract: Of the 1259 @SPECIES_9606 @@@patients@@@ who underwent <m>radical</m> <m>prostatectomy</m> for localized @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@, 917 underwent preoperative CT and 342 <m>mpMRI</m>.\n--------------------------------------------------------------------------------\nPMID: 34241824\nTitle: Economic Evaluation of Transperineal versus Transrectal Devices for Local Anaesthetic Prostate Biopsies\nSource: Pharmacoecon Open (2021)\nAbstract: Treatment options for localised @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ include active surveillance, <m>radical</m> <m>prostatectomy</m> or <m>radical</m> radiotherapy depending on prognosis.\n--------------------------------------------------------------------------------\nPMID: 39175119\nTitle: Preliminary clinical practice of radical prostatectomy without preoperative biopsy\nSource: Chin Med J (Engl) (2024)\nAbstract: At present, biopsy is essential for the diagnosis of @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ (@DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@PCa@@@) before <m>radical</m> <m>prostatectomy</m> (RP).\n--------------------------------------------------------------------------------\nPMID: 33407381\nTitle: Predicting Gleason sum upgrading from biopsy to radical prostatectomy pathology: a new nomogram and its internal validation\nSource: BMC Urol (2021)\nAbstract: The independent predictors are @GENE_KLK3 @GENE_354 @@@<m>prostate</m> specific antigen@@@ (@GENE_KLK3 @GENE_354 @@@PSA@@@), greatest percentage of @DISEASE_Neoplasms @DISEASE_MESH:D009369 @@@<m>cancer</m>@@@ (GPC), clinical <m>T</m>-<m>stage</m> and <m>Prostate</m> Imaging Reporting and Data System (PI-RADS) score.\n--------------------------------------------------------------------------------\nPMID: 34801024\nTitle: Combining prostate health index and multiparametric magnetic resonance imaging in estimating the histological diameter of prostate cancer\nSource: BMC Urol (2021)\nAbstract: We retrospectively enrolled 72 @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ @SPECIES_9606 @@@patients@@@ who underwent <m>radical</m> <m>prostatectomy</m> and had received PHI tests and <m>mpMRI</m> before surgery.\n--------------------------------------------------------------------------------\nPMID: 35578110\nTitle: Pre-operative magnetic resonance imaging can predict prostate cancer with risk for positive surgical margins\nSource: Abdom Radiol (NY) (2022)\nAbstract: Analysis of @SPECIES_9606 @@@patients@@@ with pre-operative 3 <m>T</m> multiparametric <m>prostate</m> MRI (<m>mpMRI</m>) to determine reliable MRI-based risk predictors of @SPECIES_9606 @@@patients@@@ at risk for positive surgical margins (PSM) in robotic assisted <m>radical</m> <m>prostatectomy</m> (RPE).\n--------------------------------------------------------------------------------\nPMID: 37973247\nTitle: Prostate Cancer Local Staging with Magnetic Resonance Imaging\nSource: Radiol Clin North Am (2024)\nAbstract: <m>Overall</m>, the integration of <m>mpMRI</m> into clinical decision-making for @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ management holds great value in improving clinical outcomes.\n--------------------------------------------------------------------------------\nPMID: 35705343\nTitle: Use of 18F-NaF PET in the staging of skeletal metastases of newly diagnosed, high-risk prostate cancer patients: a nationwide cohort study\nSource: BMJ Open (2022)\nAbstract: Newly diagnosed high-risk @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>prostate</m> <m>cancer</m>@@@ @SPECIES_9606 @@@patients@@@ who underwent <m>radical</m> <m>prostatectomy</m> from 2011 to 2018.\n--------------------------------------------------------------------------------\nPMID: 32648380\nTitle: Predicting Insignificant Prostate Cancer: Analysis of the Pathological Outcomes of Candidates for Active Surveillance according to the Pre-International Society of Urological Pathology (Pre-ISUP) 2014 Era Versus the Post-ISUP2014 Era\nSource: World J Mens Health (2021)\nAbstract: PRIAS: @DISEASE_Prostatic_Neoplasms @DISEASE_MESH:D011471 @@@<m>Prostate</m> <m>Cancer</m>@@@ Research International: Active Surveillance, GS: Gleason score, @GENE_KLK3 @GENE_354 @@@PSA@@@: @GENE_KLK3 @GENE_354 @@@<m>prostate</m> specific antigen@@@, PSAD: @GENE_KLK3 @GENE_354 @@@<m>prostate</m> specific antigen@@@ density, ISUP: International Society of Urological <m>Pathology</m>, RP: <m>radical</m> <m>prostatectomy</m>, CP: cribriform pattern.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_bUOMMk7War2N2QtiPCfpT4O9",
+    "parent_tool_call_id": "call_d6MYYvxLkyOq6KUZC2zTc8o6",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "sensitivity specificity pooled ECE extracapsular extension seminal vesicle invasion overall T3 conclusions limitations",
+      "pmid": "26215604"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('26215604')\noutput = format_paper_content_output(result, filter_keywords='sensitivity specificity pooled ECE extracapsular extension seminal vesicle invasion overall T3 conclusions limitations')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (6):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m sensitivity specificity pooled ECE extracapsu ... e invasion overall T3 conclusions limitations\n      \u001b[90mpmid:\u001b[0m 26215604\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m sensitivity specificity positive predictive v ... n lymph node community regional collaborative\n      \u001b[90mpmid:\u001b[0m 37357123\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m oncologic functional outcomes propensity matc ... currence urinary continence erectile function\n      \u001b[90mpmid:\u001b[0m 36601046\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m randomized MRI no MRI positive surgical margins 438 patients results\n      \u001b[90mpmid:\u001b[0m 25813692\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m T stage corresponded exactly pathology 71.2% PI-QUAL upstaging\n      \u001b[90mpmid:\u001b[0m 36601048\n\n  \u001b[1m\u001b[93m[6] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m MRI lymph node sensitivity specificity AUC pooled pathology pelvic lymph node dissection\n      \u001b[90mpmid:\u001b[0m 34745959\n\n=== PMID: 26215604 ===\n\nTitle: Accuracy of Magnetic Resonance Imaging for Local Staging of Prostate Cancer: A Diagnostic Meta-analysis.\n\nJournal/Date: European urology (2016)\n\nMeSH Keywords: Dimensional Measurement Accuracy, Humans, Magnetic Resonance Imaging, Male, Neoplasm Invasiveness, Neoplasm Staging, Prostate, Prostatic Neoplasms\n\n\n--- ABSTRACT ---\n[CONTEXT]: Correct assessment of tumour stage is crucial for prostate cancer (PCa) management.\n[OBJECTIVE]: To assess the diagnostic accuracy of magnetic resonance imaging (MRI) for local PCa staging and explore the influence of different imaging protocols.\n[EVIDENCE ACQUISITION]: We searched the PubMed, Embase, and Cochrane databases from 2000 up to August 2014. We included studies that used MRI for detection of extracapsular extension (ECE; T3a), seminal vesicle invasion (SVI; T3b), or overall stage T3 PCa, with prostatectomy as the reference standard. Methodologic quality was assessed using the Quality Assessment of Diagnostic Accuracy Studies tool by two independent reviewers. Data necessary to complete 2×2 tables were obtained, and patient, study, and imaging characteristics were extracted. Accuracy was reported for the most experienced or first reader. Results were pooled and plotted in summary receiver operating characteristics plots.\n[EVIDENCE SYNTHESIS]: A total of 75 studies (9796 patients) could be analysed. Pooled data for ECE (45 studies, 5681 patients), SVI (34 studies, 5677 patients), and overall stage T3 detection (38 studies, 4001 patients) showed sensitivity and specificity of 0.57 (95% confidence interval [CI] 0.49-0.64) and 0.91 (95% CI 0.88-0.93), 0.58 (95% CI 0.47-0.68) and 0.96 (95% CI 0.95-0.97), and 0.61 (95% CI 0.54-0.67) and 0.88 (95% CI 0.85-0.91), respectively. Functional imaging in addition to T2-weighted imaging and use of higher field strengths (3 T) improved sensitivity for ECE and SVI. ECE sensitivity was not improved by endorectal coil use.\n[CONCLUSIONS]: MRI has high specificity but poor and heterogeneous sensitivity for local PCa staging. An endorectal coil showed no additional benefit for ECE detection, but slightly improved sensitivity for SVI detection. Higher field strengths and the use of functional imaging techniques can slightly improve sensitivity.\n[PATIENT SUMMARY]: We pooled the results from all previous studies that evaluated magnetic resonance imaging (MRI) for detection of tumour growth outside the prostate. MRI is not sensitive enough to find all tumours with extraprostatic growth.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_0i3d0nAQhmJJI8ha3lXDSZSd",
+    "parent_tool_call_id": "call_d6MYYvxLkyOq6KUZC2zTc8o6",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "sensitivity specificity positive predictive value negative predictive value pT2N0 extracapsular extension seminal vesicle invasion lymph node community regional collaborative",
+      "pmid": "37357123"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('37357123')\noutput = format_paper_content_output(result, filter_keywords='sensitivity specificity positive predictive value negative predictive value pT2N0 extracapsular extension seminal vesicle invasion lymph node community regional collaborative')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 37357123 ===\n\nTitle: Multiparametric MRI is not sufficient for prostate cancer staging: A single institutional experience validated by a multi-institutional regional collaborative.\n\nJournal/Date: Urologic oncology (2023)\n\nMeSH Keywords: Male, Humans, Multiparametric Magnetic Resonance Imaging, Extranodal Extension, Neoplasm Staging, Magnetic Resonance Imaging, Prostatic Neoplasms, Prostatectomy\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: Multiparametric magnetic resonance imaging (mpMRI) has been increasingly utilized in prostate cancer (CaP) diagnosis and staging. While Level 1 data supports MRI utility in CaP diagnosis, there is less data on staging utility. We sought to evaluate the real-world accuracy of mpMRI in staging localized CaP.\n[MATERIALS AND METHODS]: Men who underwent radical prostatectomy (RP) for CaP in 2021 at our institution were identified. Sensitivity, specificity, positive predictive value and negative predictive value of mpMRI in predicting pT2N0 organ confined disease , extracapsular extension , seminal vesicle invasion , lymph node involvement, and bladder neck invasion were evaluated. Associations between MRI accuracy and AUA risk stratification (AUA RS), MRI institution (MRI-I), MRI strength (1.5 vs. 3T) (MRI-S), and MRI timing (MRI-T) were assessed. These analyses were repeated using Pennsylvania Urologic Regional Collaborative (PURC) data.\n[RESULTS]: Institutional and community mpMRI CaP staging data demonstrated poor sensitivity (2.9%-49.2%% vs. 16.8%-24.4%), positive predictive value (40%-100% vs. 35.8%-68.2%), and negative predictive value (56.3%-94.3% vs. 68.4%-96.2%) in predicting surgical pathologic features - in contrast, specificity (89.1%-100% vs. 93.9%-98.6%) was adequate. mpMRI accuracy for extracapsular extension, seminal vesicle invasion, and lymph node involvement was significantly (p < 0.001) associated with AUA RS. There was no association between mpMRI accuracy and MRI-I, MRI-S, and MRI-T.\n[CONCLUSION]: Despite enthusiasm for its use, in a real-world setting, mpMRI appears to be a poor staging study for localized CaP and is unreliable as the sole means of staging patients prior to prostatectomy. mpMRI should be used cautiously as a staging tool for CaP, and should be interpreted considering individual patient risk strata.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_Him34NYUXnKJXGlAfyhrRB3m",
+    "parent_tool_call_id": "call_d6MYYvxLkyOq6KUZC2zTc8o6",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "oncologic functional outcomes propensity matched CT mpMRI positive surgical margins biochemical recurrence urinary continence erectile function",
+      "pmid": "36601046"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('36601046')\noutput = format_paper_content_output(result, filter_keywords='oncologic functional outcomes propensity matched CT mpMRI positive surgical margins biochemical recurrence urinary continence erectile function')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 36601046 ===\n\nTitle: Effect of Preoperative Multiparametric Magnetic Resonance Imaging on Oncologic and Functional Outcomes Following Radical Prostatectomy.\n\nJournal/Date: European urology open science (2023)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Advancements in imaging technology have been associated with changes to operative planning in treatment of localized prostate cancer. The impact of these changes on postoperative outcomes is understudied.\n[OBJECTIVE]: To compare oncologic and functional outcomes between men who had computed tomography (CT) and those who had multiparametric magnetic resonance imaging (mpMRI) prior to undergoing radical prostatectomy.\n[DESIGN SETTING AND PARTICIPANTS]: In this retrospective cohort study, we identified all men who underwent radical prostatectomy (n = 1259) for localized prostate cancer at our institution between 2009 and 2016. Of these, 917 underwent preoperative CT and 342 mpMRI.\n[OUTCOME MEASUREMENTS AND STATISTICAL ANALYSIS]: Biochemical recurrence-free survival, positive margin status, postoperative complications, and 1-yr postprostatectomy functional scores (using the 26-item Expanded Prostate Cancer Index Composite [EPIC-26] questionnaire) were compared between those who underwent preoperative CT and those who underwent mpMRI using propensity score weighted Cox proportional hazard regression, logistic regression, and linear regression models.\n[RESULTS AND LIMITATIONS]: Baseline and 1-yr follow-up EPIC-26 data were available for 449 (36%) and 685 (54%) patients, respectively. After propensity score weighting, no differences in EPIC-26 functional domains were observed between the imaging groups at 1-yr follow-up. Positive surgical margin rates (odds ratio 1.03, 95% confidence interval [CI] 0.77-1.38, p = 0.8) and biochemical recurrence-free survival (hazard ratio 1.21, 95% CI 0.84-1.74, p = 0.3) were not significantly different between groups. Early and late postoperative complications occurred in 219 and 113 cases, respectively, and were not different between imaging groups. Our study is limited by a potential selection bias from the lack of functional scores for some patients.\n[CONCLUSIONS]: In this single-center study of men with localized prostate cancer undergoing radical prostatectomy, preoperative mpMRI had minimal impact on functional outcomes and oncologic control compared with conventional imaging. These findings challenge the assumptions that preoperative mpMRI improves operative planning and perioperative outcomes.\n[PATIENT SUMMARY]: In this study, we assessed whether the type of prostate imaging performed prior to surgery for localized prostate cancer impacted outcomes. We found that urinary and sexual function, cancer control, and postoperative complications were similar regardless of whether magnetic resonance imaging or computed tomography was utilized prior to surgery.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nPatient characteristics\n\nOf the 1259 patients who underwent radical prostatectomy for localized prostate cancer, 917 underwent preoperative CT and 342 mpMRI. Following propensity score weighting, baseline characteristics were well balanced (Table 1).\n\nSurgical and pathologic characteristics are summarized in Table 2. Overall, approximately one-quarter (n = 322) of patients had pathologic st\n\n...[Remainder Truncated to Maintain LLM Context Budget]\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_ev2F2nI6UgZiO0dZdSm3QG85",
+    "parent_tool_call_id": "call_d6MYYvxLkyOq6KUZC2zTc8o6",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "randomized MRI no MRI positive surgical margins 438 patients results",
+      "pmid": "25813692"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25813692')\noutput = format_paper_content_output(result, filter_keywords='randomized MRI no MRI positive surgical margins 438 patients results')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 25813692 ===\n\nTitle: Does preoperative magnetic resonance imaging reduce the rate of positive surgical margins at radical prostatectomy in a randomised clinical trial?\n\nJournal/Date: European urology (2015)\n\nMeSH Keywords: Aged, Humans, Logistic Models, Magnetic Resonance Imaging, Male, Middle Aged, Neoplasm, Residual, Preoperative Care\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Magnetic resonance imaging (MRI) has the potential to help the surgeon tailor radical prostatectomy (RP) more accurately according to the location and extent of the tumour and thereby reduce the rate of positive surgical margins (PSMs).\n[OBJECTIVE]: To evaluate the benefit of performing MRI prior to RP.\n[DESIGN, SETTING, AND PARTICIPANTS]: This single-institution randomised trial included 438 patients between December 2009 and June 2012 who were scheduled for robot-assisted laparoscopic prostatectomy. The study was registered (ClinicalTrials.gov identifier NCT01347320).\n[INTERVENTION]: Patients were preoperatively randomly assigned to non-MRI or MRI groups.\n[OUTCOME MEASUREMENTS AND STATISTICAL ANALYSIS]: The primary end point was the difference in the PSM rates between the two groups. Secondary end points were the rates of PSMs in clinical subgroups. Summary statistics were extracted from descriptive analyses, chi-square, or Fisher exact test, and logistic regression was used to analyse the data according to the intention-to-treat principle.\n[RESULTS AND LIMITATIONS]: A total of 216 patients were randomised to non-MRI; 222 were randomised to MRI. There were 49 cases (23%) of PSMs in the non-MRI group and 43 cases (19%) in the MRI group (p=0.4). The relative and absolute risk reduction was 15% and 4%, respectively. Patients with cT1 constituted 55% of the cohort, in which the rate of PSMs was 27% in the non-MRI group and 16% in the MRI group (p=0.035). The relative and absolute risk reduction was 41% and 11%, respectively. A limitation was suboptimal communication between the radiologist and urologist.\n[CONCLUSIONS]: MRI prior to RP did not reduce the overall risk for PSMs in this patient cohort. However, at subgroup analysis we observed a possible benefit of MRI in patients with cT1.\n[PATIENT SUMMARY]: This study could not demonstrate a definite benefit of performing magnetic resonance imaging before surgery for all patients. However, there was a possible improved result in patients in which physical examination could not detect the cancer.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_DPUyEBtLrX8Am0mYKGulno9o",
+    "parent_tool_call_id": "call_d6MYYvxLkyOq6KUZC2zTc8o6",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "T stage corresponded exactly pathology 71.2% PI-QUAL upstaging",
+      "pmid": "36601048"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('36601048')\noutput = format_paper_content_output(result, filter_keywords='T stage corresponded exactly pathology 71.2% PI-QUAL upstaging')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 36601048 ===\n\nTitle: Role of the Prostate Imaging Quality PI-QUAL Score for Prostate Magnetic Resonance Image Quality in Pathological Upstaging After Radical Prostatectomy: A Multicentre European Study.\n\nJournal/Date: European urology open science (2023)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Increasing use of multiparametric magnetic resonance imaging (mpMRI) has come with heterogeneity in image quality. The Prostate Imaging Quality (PI-QUAL) score is under scrutiny to assess its usefulness in predicting clinical outcomes.\n[OBJECTIVE]: To compare upstaging of localized disease on mpMRI (mrT2) to locally invasive disease in radical prostatectomy (RP) specimens (≥pT3a) in relation to PI-QUAL.\n[DESIGN SETTING AND PARTICIPANTS]: Patients treated with RP between 2015 and 2020 who underwent 1.5-3-T mpMRI within 6 mo before surgery and had systematic and mpMRI-US targeted biopsies were included. mpMRI scans were retrospectively assigned a PI-QUAL score, and prospectively acquired Prostate Imaging-Recording and Data System (PI-RADS) scores (version 2.0 or 2.1) were used. PI-QUAL scores were categorized as nondiagnostic (PI-QUAL <3), sufficient (PI-QUAL 3), or optimal (PI-QUAL >3).\n[OUTCOME MEASUREMENTS AND STATISTICAL ANALYSIS]: We assessed the relationship between the PI-QUAL score and upstaging using multivariate logistic regression. mpMRI, clinical, and pathological findings were compared using χ2 tests and analysis of variance.\n[RESULTS AND LIMITATIONS]: We identified 351 patients, of whom 40 (11.4%) had PI-QUAL <3, 57 (16.3%) had PI-QUAL 3, and 254 (72.3%) had PI-QUAL >3 scores. The distribution of PI-QUAL <3 (0-33.6%; p < 0.001) and PI-QUAL >3 (37.3-100%; p < 0.001) scores varied widely among centers. PI-QUAL ≥3 in comparison to PI-QUAL <3 was associated with a lower rate of upstaging (19% vs 35%; p = 0.02), greater detection of mrT3a and mrT3b prostate cancer (17.0% vs 2.5%; p = 0.016), a higher rate of PI-RADS 5 lesions (47% vs 27.5%; p = 0.002), a higher number of suspicious lesion (PI-RADS ≥3: 34.7% vs 15%; p = 0.012), and higher detection rates for aggregated (50.7% vs 22.5%; p = 0.001) and late (21.2% vs 0%; p < 0.001) extraprostatic extension. On multivariate analysis, PI-QUAL<3 was associated with more frequent upstaging in the RP specimen (odds ratio 3.4; p = 0.01).\n[CONCLUSIONS]: In comparison to PI-QUAL ≥3, PI-QUAL <3 was significantly associated with a higher rate of upstaging from organ-confined disease on mpMRI to locally advanced disease on pathology, lower detection rates for PI-RADS 5 lesions and extraprostatic extension, and a lower number of suspicious lesions.\n[PATIENT SUMMARY]: Poor image quality for magnetic resonance imaging (MRI) scans of the prostate is associated with underestimation of the stage of prostate cancer.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_aeiyTcIhKeOrLIRD67KDiHJW",
+    "parent_tool_call_id": "call_d6MYYvxLkyOq6KUZC2zTc8o6",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "MRI lymph node sensitivity specificity AUC pooled pathology pelvic lymph node dissection",
+      "pmid": "34745959"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('34745959')\noutput = format_paper_content_output(result, filter_keywords='MRI lymph node sensitivity specificity AUC pooled pathology pelvic lymph node dissection')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 34745959 ===\n\nTitle: Head-to-Head Comparison of 68Ga-PSMA-11 PET/CT and Multiparametric MRI for Pelvic Lymph Node Staging Prior to Radical Prostatectomy in Patients With Intermediate to High-Risk Prostate Cancer: A Meta-Analysis.\n\nJournal/Date: Frontiers in oncology (2021)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\n[PURPOSE]: To compare the diagnostic performance of 68Ga-PSMA-11 PET/CT and mpMRI for pelvic lymph node staging prior to radical prostatectomy in prostate cancer (PCa) patients based on per patient data.\n[METHODS]: PubMed and Embase databases were searched until October 2020 for eligible studies evaluating head-to-head comparison of 68Ga-PSMA-PET/CT and mpMRI for the detection of pelvic lymph node metastases (PLNMs) using pelvic lymph node dissection (PLND) as gold standard. The pooled sensitivity, specificity, and area under the summary receiver-operating characteristics curve (AUC) were determined for the two imaging modalities.\n[RESULTS]: Nine studies with 640 patients were included. The pooled sensitivity, specificity, and AUC for 68Ga-PSMA-11 PET/CT vs. mpMRI were 0.71 (95% CI: 0.48-0.86) vs. 0.40 (95% CI: 0.16-0.71), 0.92 (95% CI: 0.88-0.95) vs. 0.92 (95% CI: 0.80-0.97), and 0.92 (95% CI: 0.88-0.95) vs. 0.82 (95% CI: 0.79-0.86), respectively. There was substantial heterogeneity for both imaging modalities, and meta-regression analysis revealed that the number of patients, prevalence of PLNMs, PSA level, reference standard, and risk classification might be the potential causes of heterogeneity.\n[CONCLUSION]: This meta-analysis of head-to-head comparison studies confirms that there is a trend toward a higher sensitivity and diagnostic accuracy of 68Ga-PSMA-11 PET/CT compared to mpMRI for the detection of PLNMs in PCa patients. Nevertheless, according to current guidelines, PLND still needs to be recommended in case of negative results from 68Ga-PSMA-11 PET/CT due to significant risk of malignancy.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nLiterature Search and Study Selection\n\nThe initial search retrieved 414 articles, and 398 were excluded upon review of titles and abstracts. The remaining 16 articles were carefully assessed by full text, and another seven were excluded for the following reasons: insufficient reference standard (n = 2); data not retrievable for analysis (n = 2); not evaluated in the same patient population (n = 1); with only nodal-based data (n = 1); and tracers other than 68Ga-PSMA-11 (n =1). Finally, nine articles including patient-based data on the head-to-head comparison of diagnostic performance of 68Ga-PSMA-11 PET/CT and mpMRI were eligible for further analysis. A PRISMA flow diagram of the study selection process is shown in  Figure 1 .\n\nStudy Description and Quality Assessment\n\nThe study a...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 15,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_gNSVg7Ydik2qZyrNyLoLnArE",
+    "parent_tool_call_id": "call_aeiyTcIhKeOrLIRD67KDiHJW",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "The strongest pooled evidence supports limited sensitivity rather than no value: a 2016 diagnostic meta-analysis of 75 studies/9,796 patients using prostatectomy pathology found MRI sensitivity/specificity of 57%/91% for extracapsular extension (ECE/T3a), 58%/96% for seminal-vesicle invasion (SVI/T3b), and 61%/88% for overall T3 disease. The authors concluded that MRI has high specificity but poor and heterogeneous sensitivity; 3-T and functional sequences only modestly improved sensitivity.",
+          "source_tools": [
+            {
+              "relevance": "Direct systematic review/meta-analysis with pathology reference standard and pooled estimates",
+              "tool_call_id": "call_bUOMMk7War2N2QtiPCfpT4O9"
+            }
+          ]
+        },
+        {
+          "finding": "A 2023 real-world single-institution plus Pennsylvania regional-collaborative study directly supports the claim that mpMRI alone is insufficient for routine staging. Against prostatectomy pathology, institutional/community sensitivity across pT2N0, ECE, SVI, lymph-node involvement and bladder-neck invasion was only 2.9%-49.2% and 16.8%-24.4%, respectively; specificity was much better (89.1%-100% and 93.9%-98.6%). Accuracy was associated with clinical risk stratum, not MRI institution, 1.5 versus 3 T strength, or MRI timing; the authors advised against using mpMRI as the sole staging method.",
+          "source_tools": [
+            {
+              "relevance": "Direct real-world pathology-validated study across multiple staging endpoints",
+              "tool_call_id": "call_0i3d0nAQhmJJI8ha3lXDSZSd"
+            }
+          ]
+        },
+        {
+          "finding": "For lymph-node staging specifically, a 2021 head-to-head meta-analysis of 9 studies/640 patients using pelvic lymph-node dissection as the reference standard found mpMRI pooled sensitivity 0.40 (95% CI 0.16-0.71), specificity 0.92 (0.80-0.97), and AUC 0.82 (0.79-0.86). Thus a negative mpMRI cannot reliably exclude nodal disease; PSMA PET/CT performed better for sensitivity (0.71) while retaining specificity 0.92, although even negative PSMA imaging did not eliminate the need for PLND in guideline-based care.",
+          "source_tools": [
+            {
+              "relevance": "Direct pooled nodal accuracy against PLND pathology",
+              "tool_call_id": "call_aeiyTcIhKeOrLIRD67KDiHJW"
+            }
+          ]
+        },
+        {
+          "finding": "Recent multicenter evidence confirms the SVI limitation: among 528 prostatectomy patients, 86 had SVI on final pathology; MRI sensitivity was only 0.162 (95% CI 0.088-0.261) with specificity 0.963 (0.940-0.979). This pattern means MRI-positive SVI is relatively credible, but MRI misses most pathologic SVI.",
+          "source_tools": [
+            {
+              "relevance": "Multicenter contemporary mpMRI study with prostatectomy pathology reference",
+              "tool_call_id": "call_W8yQ74TOVfvSN2lv7XPlb3yI"
+            }
+          ]
+        },
+        {
+          "finding": "Overall stage agreement can be clinically meaningful but is imperfect and highly dependent on image quality: a 2023 multicenter European study found MRI T stage exactly matched prostatectomy pathology in 71.2% of cases; nondiagnostic/poor-quality scans (PI-QUAL <3) had more pathological upstaging (35% vs 19% for PI-QUAL >=3; OR 3.4, p=0.01). This refutes the absolute claim that mpMRI provides little information in every setting, while demonstrating substantial under-staging when image quality is poor.",
+          "source_tools": [
+            {
+              "relevance": "Multicenter pathology-correlated T-stage/image-quality study",
+              "tool_call_id": "call_DPUyEBtLrX8Am0mYKGulno9o"
+            }
+          ]
+        },
+        {
+          "finding": "Evidence for routine clinical impact is weak or negative. In a randomized 438-patient trial (2015), preoperative MRI did not significantly reduce positive surgical margins overall: 19% versus 23% without MRI (p=0.4), although a cT1 subgroup showed a possible benefit (16% vs 27%, p=0.035). In a 2023 propensity-weighted cohort of 1,259 prostatectomy patients, mpMRI versus CT produced no significant difference in positive-margin rate (OR 1.03, 95% CI 0.77-1.38), biochemical-recurrence-free survival (HR 1.21, 0.84-1.74), complications, or 1-year functional outcomes.",
+          "source_tools": [
+            {
+              "relevance": "Randomized clinical-impact trial",
+              "tool_call_id": "call_ev2F2nI6UgZiO0dZdSm3QG85"
+            },
+            {
+              "relevance": "Large comparative outcomes cohort",
+              "tool_call_id": "call_Him34NYUXnKJXGlAfyhrRB3m"
+            }
+          ]
+        },
+        {
+          "finding": "The balanced conclusion is that the claim is substantially supported if it means 'mpMRI is not sufficiently accurate to replace pathology, nomograms, or risk-adapted surgical/lymph-node staging in routine practice,' especially because sensitivity is poor for microscopic/focal ECE, SVI, and nodal disease. It is overstated if it means 'mpMRI has no clinically useful information': high specificity can confirm gross locally advanced disease, MRI can help side/extent-of-disease and operative planning in selected patients, and performance improves with high-quality 3-T functional imaging and expert interpretation. The evidence base is also limited by retrospective designs, heterogeneous protocols/readers, selection and referral bias, and pathology-based cohorts enriched for surgery candidates.",
+          "source_tools": [
+            {
+              "relevance": "Synthesis directly supported by pooled accuracy, real-world validation, image-quality, and outcomes studies",
+              "tool_call_id": "call_bUOMMk7War2N2QtiPCfpT4O9"
+            },
+            {
+              "relevance": "Synthesis directly supported by real-world collaborative study",
+              "tool_call_id": "call_0i3d0nAQhmJJI8ha3lXDSZSd"
+            },
+            {
+              "relevance": "Synthesis directly supported by randomized and comparative outcomes studies",
+              "tool_call_id": "call_ev2F2nI6UgZiO0dZdSm3QG85"
+            },
+            {
+              "relevance": "Synthesis directly supported by image-quality study",
+              "tool_call_id": "call_DPUyEBtLrX8Am0mYKGulno9o"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_dRzqPCzcgAOS931SEiJK7VFk",
+    "parent_tool_call_id": "call_B82gOexOoEt7RPJaGw5gTGIb",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE",
+          "name": "Prostate carcinoma",
+          "observations": [
+            "Preoperative mp-MRI has limited sensitivity for pathologic extracapsular extension, seminal-vesicle invasion, overall T3 disease, and pelvic lymph-node metastases, despite generally high specificity.",
+            "mp-MRI is best interpreted as complementary to clinical risk assessment, biopsy findings, nomograms, and selected PSMA-PET rather than as a stand-alone staging test."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Overall synthesis of staging evidence",
+              "tool_call_id": "call_bUOMMk7War2N2QtiPCfpT4O9"
+            },
+            {
+              "relevance": "Routine real-world staging performance",
+              "tool_call_id": "call_0i3d0nAQhmJJI8ha3lXDSZSd"
+            },
+            {
+              "relevance": "Nodal staging performance",
+              "tool_call_id": "call_aeiyTcIhKeOrLIRD67KDiHJW"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "mpMRI local staging",
+          "observations": [
+            "A 2016 meta-analysis of 75 studies and 9,796 patients found sensitivity/specificity of 57%/91% for ECE, 58%/96% for SVI, and 61%/88% for overall T3 disease against prostatectomy pathology.",
+            "The authors characterized MRI as high-specificity but poor and heterogeneous-sensitivity staging, with only modest improvement from 3-T imaging and functional sequences."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Pooled local staging accuracy",
+              "tool_call_id": "call_bUOMMk7War2N2QtiPCfpT4O9"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "mpMRI routine staging",
+          "observations": [
+            "A 2023 institutional and Pennsylvania regional study found sensitivity of only 2.9%-49.2% institutionally and 16.8%-24.4% regionally across pT2N0, ECE, SVI, nodal, and bladder-neck endpoints, while specificity was 89.1%-100% and 93.9%-98.6%.",
+            "The investigators advised against using mp-MRI as the sole staging method in routine practice."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Real-world validation",
+              "tool_call_id": "call_0i3d0nAQhmJJI8ha3lXDSZSd"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "mpMRI nodal staging",
+          "observations": [
+            "A 2021 meta-analysis of 9 studies and 640 patients found mp-MRI sensitivity 0.40, specificity 0.92, and AUC 0.82 for pelvic lymph-node metastases against lymph-node dissection.",
+            "The low sensitivity means a negative mp-MRI cannot reliably exclude nodal disease."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Pelvic nodal staging accuracy",
+              "tool_call_id": "call_aeiyTcIhKeOrLIRD67KDiHJW"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "mpMRI SVI detection",
+          "observations": [
+            "In a 2024 multicenter cohort of 528 prostatectomy patients, MRI sensitivity for pathologic SVI was 0.162 and specificity was 0.963.",
+            "MRI-positive SVI was relatively credible, but MRI missed most pathologic SVI."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Contemporary multicenter SVI accuracy",
+              "tool_call_id": "call_W8yQ74TOVfvSN2lv7XPlb3yI"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "mpMRI T-stage agreement",
+          "observations": [
+            "A 2023 multicenter study found exact MRI-to-pathology T-stage agreement in 71.2% of cases.",
+            "Poor-quality scans (PI-QUAL <3) had more pathologic upstaging than higher-quality scans (35% vs 19%; OR 3.4, p=0.01)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Overall T-stage agreement and image-quality effect",
+              "tool_call_id": "call_DPUyEBtLrX8Am0mYKGulno9o"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "mpMRI clinical impact",
+          "observations": [
+            "A randomized 438-patient trial found no significant overall reduction in positive margins with preoperative MRI (19% vs 23%, p=0.4).",
+            "A 2023 propensity-weighted cohort of 1,259 prostatectomy patients found no significant mpMRI-versus-CT differences in positive margins, biochemical-recurrence-free survival, complications, or one-year functional outcomes."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Randomized surgical outcome evidence",
+              "tool_call_id": "call_ev2F2nI6UgZiO0dZdSm3QG85"
+            },
+            {
+              "relevance": "Comparative real-world outcome evidence",
+              "tool_call_id": "call_Him34NYUXnKJXGlAfyhrRB3m"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "mpMRI local staging",
+          "relation_type": "INCONCLUSIVE_FOR",
+          "to_entity": "Prostate carcinoma"
+        },
+        {
+          "from_entity": "mpMRI routine staging",
+          "relation_type": "REFUTES",
+          "to_entity": "Prostate carcinoma"
+        },
+        {
+          "from_entity": "mpMRI nodal staging",
+          "relation_type": "REFUTES",
+          "to_entity": "Prostate carcinoma"
+        },
+        {
+          "from_entity": "mpMRI SVI detection",
+          "relation_type": "REFUTES",
+          "to_entity": "Prostate carcinoma"
+        },
+        {
+          "from_entity": "mpMRI T-stage agreement",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Prostate carcinoma"
+        },
+        {
+          "from_entity": "mpMRI clinical impact",
+          "relation_type": "REFUTES",
+          "to_entity": "Prostate carcinoma"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 7, \"entities\": [{\"name\": \"Prostate carcinoma\", \"entityType\": \"DISEASE\", \"observations\": [\"Preoperative mp-MRI has limited sensitivity for pathologic extracapsular extension, seminal-vesicle invasion, overall T3 disease, and pelvic lymph-node metastases, despite generally high specificity.\", \"mp-MRI is best interpreted as complementary to clinical risk assessment, biopsy findings, nomograms, and selected PSMA-PET rather than as a stand-alone staging test.\"]}, {\"name\": \"mpMRI local staging\", \"entityType\": \"FINDING\", \"observations\": [\"A 2016 meta-analysis of 75 studies and 9,796 patients found sensitivity/specificity of 57%/91% for ECE, 58%/96% for SVI, and 61%/88% for overall T3 disease against prostatectomy pathology.\", \"The authors characterized MRI as high-specificity but poor and heterogeneous-sensitivity staging, with only modest improvement from 3-T imaging and functional sequences.\"]}, {\"name\": \"mpMRI routine staging\", \"entityType\": \"FINDING\", \"observations\": [\"A 2023 institutional and Pennsylvania regional study found sensitivity of only 2.9%-49.2% institutionally and 16.8%-24.4% regionally across pT2N0, ECE, SVI, nodal, and bladder-neck endpoints, while specificity was 89.1%-100% and 93.9%-98.6%.\", \"The investigators advised against using mp-MRI as the sole staging method in routine practice.\"]}, {\"name\": \"mpMRI nodal staging\", \"entityType\": \"FINDING\", \"observations\": [\"A 2021 meta-analysis of 9 studies and 640 patients found mp-MRI sensitivity 0.40, specificity 0.92, and AUC 0.82 for pelvic lymph-node metastases against lymph-node dissection.\", \"The low sensitivity means a negative mp-MRI cannot reliably exclude nodal disease.\"]}, {\"name\": \"mpMRI SVI detection\", \"entityType\": \"FINDING\", \"observations\": [\"In a 2024 multicenter cohort of 528 prostatectomy patients, MRI sensitivity for pathologic SVI was 0.162 and specificity was 0.963.\", \"MRI-positive SVI was relatively credible, but MRI missed most pathologic SVI.\"]}, {\"name\": \"mpMRI T-stage agreement\", \"entityType\": \"FINDING\", \"observations\": [\"A 2023 multicenter study found exact MRI-to-pathology T-stage agreement in 71.2% of cases.\", \"Poor-quality scans (PI-QUAL <3) had more pathologic upstaging than higher-quality scans (35% vs 19%; OR 3.4, p=0.01).\"]}, {\"name\": \"mpMRI clinical impact\", \"entityType\": \"FINDING\", \"observations\": [\"A randomized 438-patient trial found no significant overall reduction in positive margins with preoperative MRI (19% vs 23%, p=0.4).\", \"A 2023 propensity-weighted cohort of 1,259 prostatectomy patients found no significant mpMRI-versus-CT differences in positive margins, biochemical-recurrence-free survival, complications, or one-year functional outcomes.\"]}]}, \"relations_created\": {\"count\": 6, \"relations\": [{\"from\": \"mpMRI local staging\", \"to\": \"Prostate carcinoma\", \"relationType\": \"INCONCLUSIVE_FOR\"}, {\"from\": \"mpMRI routine staging\", \"to\": \"Prostate carcinoma\", \"relationType\": \"REFUTES\"}, {\"from\": \"mpMRI nodal staging\", \"to\": \"Prostate carcinoma\", \"relationType\": \"REFUTES\"}, {\"from\": \"mpMRI SVI detection\", \"to\": \"Prostate carcinoma\", \"relationType\": \"REFUTES\"}, {\"from\": \"mpMRI T-stage agreement\", \"to\": \"Prostate carcinoma\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"mpMRI clinical impact\", \"to\": \"Prostate carcinoma\", \"relationType\": \"REFUTES\"}]}}, \"provenance\": {\"tool_call_id\": \"call_dRzqPCzcgAOS931SEiJK7VFk\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_B82gOexOoEt7RPJaGw5gTGIb\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

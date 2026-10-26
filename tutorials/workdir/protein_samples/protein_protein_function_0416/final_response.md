@@ -1,0 +1,3 @@
+The 244-aa sequence is an **exact full-length match** to *Mycoplasmoides genitalium* protein MG293 (UniProt **P47535**). It contains a **GDPD domain** (PF03009), and its annotation supports **phosphoric diester hydrolase activity**—the ability to hydrolyze phosphodiester bonds.
+
+It is therefore likely to participate in **lipid metabolism**, potentially by processing glycerophosphodiester compounds. The specific substrate and reaction have not been established by the available evidence, so that more specific role remains tentative.

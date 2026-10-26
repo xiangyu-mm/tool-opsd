@@ -1,0 +1,299 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_1rHjvG0alUu9RY1YmpE4I82t",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine whether published comparative clinical studies evaluate failure rates across three implantable cardioverter-defibrillator (ICD) lead models/types in the same study. Find the study identity, the three leads, design/population, and comparative failure-rate results; distinguish direct three-lead comparisons from pairwise comparisons."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_dQMaYXepbvDAfoT6lLZwS4Qf",
+    "parent_tool_call_id": "call_1rHjvG0alUu9RY1YmpE4I82t",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "implantable cardioverter defibrillator leads comparative failure rates three lead models study",
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "relation_query": null,
+      "task_name": "ICD lead comparison",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='implantable cardioverter defibrillator leads comparative failure rates three lead models study',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='implantable cardioverter defibrillator leads comparative failure rates three lead models study',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/ICD_lead_comparison.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ICD_lead_comparison.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/ICD_lead_comparison.csv'\nTotal results found: 11\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 41631601\nTitle: Difficulty and Complications of Lead Extraction-Is ICD Lead Design Important?\nSource: Pacing and clinical electrophysiology : PACE (2026)\nAbstract: BACKGROUND: Transvenous removal of implantable cardioverter-defibrillator (ICD) leads is considered to be more difficult and risky. The goal was to explore the impact of ICD lead design on transvenous lead extraction (TLE) safety and effectiveness. METHODS: Analysis of 3929 TLE procedures (including 1068 with ICD lead extraction) were analyzed retrospectively. RESULTS: The extracted ICD leads were about three years younger than pacemaker (PM) leads (medians: 61.00 vs. 97.00 months). The rate of major TLE complications (MC) was significantly higher in the PM lead extraction group (2.25% vs. 0.75%; p = 0.002) and complete procedural success was achieved significantly less often (by 4.11%; p < 0.001 in entire group of patients and by 3.74%; p < 0.001 in patients matched according to age of extracted lead). However, no significant differences were found in the scores of TLE complexity and major complications during extraction of ICD leads produced by different manufacturers. Lower rates of complete procedural success, compared to Medtronic ICD leads, were found in patients with Abbott and Biotronik ICD leads (99.45% vs. 97.32%; p = 0.009 and 96.65%; p = 0.003). CONCLUSIONS: 1. ICD lead ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 41110508\nTitle: Contemporary issues in implantable cardioverter-defibrillators: Personalising device therapy\nSource: Indian Heart J (2025)\nAbstract: ...6 Boersma L, et al. <m>Implant</m> and Midterm Outcomes of the Subcutaneous <m>Implantable</m> <m>Cardioverter</m>-<m>Defibrillator</m> Registry: The EFFORTLESS <m>Study</m>.\n--------------------------------------------------------------------------------\nPMID: 37724686\nTitle: Clinical course of hypertrophic cardiomyopathy patients implanted with a transvenous or subcutaneous defibrillator\nSource: Europace (2023)\nAbstract: ...ICD, <m>implantable</m> <m>cardioverter</m>-<m>defibrillator</m>; S-ICD, subcutaneous <m>implantable</m> <m>cardioverter</m>-<m>defibrillator</m>; TV-ICD, transvenous <m>implantable</m> <m>cardioverter</m>-<m>defibrillator</m>.\n--------------------------------------------------------------------------------\nPMID: 38179411\nTitle: A Systematic Review and Meta-analysis of the Prevalence and Risk Factors in Cardiac Implantable Electronic Device Malfunction\nSource: J Saudi Heart Assoc (2023)\nAbstract: ...<m>Implantable</m> <m>Cardioverter</m>-<m>Defibrillator</m>\n--------------------------------------------------------------------------------\nPMID: 38932072\nTitle: In Vivo Durability of Polyurethane Insulated Implantable Cardioverter Defibrillator (ICD) Leads\nSource: Polymers (Basel) (2024)\nAbstract: Van Malderen et al. conducted a <m>study</m> presenting the <m>failure</m> <m>rates</m> of <m>three</m> different <m>leads</m> available in the market.\n--------------------------------------------------------------------------------\nPMID: 34427926\nTitle: Cost-minimization analysis of a wearable cardioverter defibrillator in adult patients undergoing ICD explant procedures: Clinical and economic implications\nSource: Clin Cardiol (2021)\nAbstract: At the same time, associated costs are increasing globally, which corresponds to the overall increase in the <m>rates</m> of ICD <m>implantations</m> and multiplying device and <m>lead</m> replacements over the years.\n--------------------------------------------------------------------------------\nPMID: 40844453\nTitle: Characteristics of Effective Antitachycardia Pacing for Ventricular Tachycardia\nSource: JACC Asia (2025)\nAbstract: The fluoroscopic image using contrast injection through the side port of the catheter enhances the probability of the <m>lead</m> being placed in the true septum. Because septal <m>lead</m> deployment is the only manageable and controllable factor that could increase the success <m>rate</m> of ATP post-<m>implantation</m>, it is essential for operators to put every effort into <m>implanting</m> the RV <m>lead</m> in the true septum, which possibly <m>leads</m> to better @SPECIES_9606 @@@patient@@@ outcomes.\n--------------------------------------------------------------------------------\nPMID: 34768676\nTitle: Risk Factors for Lead-Related Venous Obstruction: A Study of 2909 Candidates for Lead Extraction\nSource: J Clin Med (2021)\nAbstract: Multiple @CHEMICAL_Lead @CHEMICAL_MESH:D007854 @@@<m>lead</m>@@@ <m>implantation</m> or additional @CHEMICAL_Lead @CHEMICAL_MESH:D007854 @@@<m>lead</m>@@@ <m>implantation</m> with abandonment of inactive <m>leads</m> induces further damage to the endothelium.\n--------------------------------------------------------------------------------\nPMID: 37757839\nTitle: Safety and success of transvenous lead extraction using excimer laser sheaths: a meta-analysis of over 1700 patients\nSource: Europace (2023)\nAbstract: ...Fifteen <m>studies</m> reported procedural success <m>rates</m> and nine <m>studies</m> reported clinical success <m>rates</m>, variably reporting per @SPECIES_9606 @@@patient@@@ and/or per targeted <m>lead</m>.\n--------------------------------------------------------------------------------\nPMID: 38398488\nTitle: Do Implantable Cardioverter-Defibrillators Prevent Sudden Cardiac Death in End-Stage Renal Disease Patients on Dialysis?\nSource: J Clin Med (2024)\nAbstract: The high incidence of @DISEASE_Death_Sudden_Cardiac @DISEASE_MESH:D016757 @@@sudden cardiac deaths@@@ suggests that this population could benefit from <m>implantable</m> <m>cardioverter</m>-<m>defibrillator</m> therapy. The introduction of <m>implantable</m> <m>cardioverter</m>-<m>defibrillators</m> significantly decreased the <m>rate</m> of all-cause mortality; however, the benefits of this therapy among @SPECIES_9606 @@@patients@@@ with @DISEASE_Renal_Insufficiency_Chronic @DISEASE_MESH:D051436 @@@chronic kidney disease@@@ remain controversial since the <m>studies</m> provide conflicting results.\n--------------------------------------------------------------------------------\nPMID: 34662385\nTitle: The extravascular implantable cardioverter-defibrillator: characterization of anatomical parameters impacting substernal implantation and defibrillation efficacy\nSource: Europace (2022)\nAbstract: ...The aim of this <m>study</m> is to provide a thorough, quantified assessment of the substernal space as the site of extravascular <m>implantable</m> <m>cardioverter</m>-<m>defibrillator</m> (ICD) <m>lead</m> placement using computed tomography (CT) scans and summarizing adverse events and defibrillation efficacy across anatomical findings.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_sSLsqN81lwYnr5BnKGkOZevd",
+    "parent_tool_call_id": "call_dQMaYXepbvDAfoT6lLZwS4Qf",
+    "round": 2,
+    "tool_input": {
+      "boolean_query_text": "Van Malderen three different ICD leads failure rate",
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "relation_query": null,
+      "task_name": "Van Malderen leads",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='Van Malderen three different ICD leads failure rate',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='Van Malderen three different ICD leads failure rate',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/Van_Malderen_leads.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/Van_Malderen_leads.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] search_papers\u001b[0m\n      \u001b[90mboolean_query_text:\u001b[0m Van Malderen three different ICD leads failure rate\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mrelation_query:\u001b[0m None\n      \u001b[90mtask_name:\u001b[0m Van Malderen leads\n      \u001b[90mtop_k:\u001b[0m 10\n\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/Van_Malderen_leads.csv'\nTotal results found: 3\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38932072\nTitle: In Vivo Durability of Polyurethane Insulated Implantable Cardioverter Defibrillator (ICD) Leads\nSource: Polymers (Basel) (2024)\nAbstract: ...<m>Van</m> <m>Malderen</m> et al. conducted a study presenting the <m>failure</m> <m>rates</m> of <m>three</m> <m>different</m> <m>leads</m> available in the market.\n--------------------------------------------------------------------------------\nPMID: 36834739\nTitle: Brugada Syndrome: From Molecular Mechanisms and Genetics to Risk Stratification\nSource: Int J Mol Sci (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 40767905\nTitle: Beyond the type 1 pattern: comprehensive risk stratification in Brugada syndrome\nSource: J Interv Card Electrophysiol (2025)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_lQq2TWPJw2IHUEEAwzNaEwmP",
+    "parent_tool_call_id": "call_sSLsqN81lwYnr5BnKGkOZevd",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "Van Malderen|three leads|failure rate|failure rates|lead models|comparison|Sprint Fidelis|Riata|Endotak",
+      "pmid": "38932072"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('38932072')\noutput = format_paper_content_output(result, filter_keywords='Van Malderen|three leads|failure rate|failure rates|lead models|comparison|Sprint Fidelis|Riata|Endotak')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Van Malderen|three leads|failure rate|failure ... odels|comparison|Sprint Fidelis|Riata|Endotak\n      \u001b[90mpmid:\u001b[0m 38932072\n\n=== PMID: 38932072 ===\n\nTitle: In Vivo Durability of Polyurethane Insulated Implantable Cardioverter Defibrillator (ICD) Leads.\n\nJournal/Date: Polymers (2024)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nThe 6935M Sprint Quattro Secure S and 6947M Sprint Quattro Secure are high voltage leads designed to administer a maximum of 40 joules of energy for terminating ventricular tachycardia or ventricular fibrillation. Both leads utilize silicone insulation and a polyurethane outer coating. The inner coil is shielded with polytetrafluoroethylene (PTFE) tubing, while other conductors are enveloped in ethylene tetrafluoroethylene (ETFE), contributing to the structural integrity and functionality of these leads. Polyurethane is a preferred material for the outer insulation of cardiac leads due to its flexibility and biocompatibility, while silicone rubber ensures chemical stability within the body, minimizing inflammatory or rejection responses. Thirteen implantable cardioverter defibrillator (ICD) leads were obtained from the Wright State University Anatomical Gift Program. The as-received devices exhibited varied in vivo implantation durations ranging from less than a month to 89 months, with an average in vivo duration of 41 ± 27 months. Tests were conducted using the Test Resources Q series system, ensuring compliance with ASTM Standard D 1708-02a and ASTM Standard D 412-06a. During testing, a load was applied to the intact lead, with careful inspection for surface defects before each test. Results of load to failure, percentage elongation, percentage elongation at 5 N, ultimate tensile strength, and modulus of elasticity were calculated. The findings revealed no significant differences in these parameters across all in vivo exposure durations. The residual properties of these ICD leads demonstrated remarkable stability and performance over a wide range of in vivo exposure durations, with no statistically significant degradation or performance changes observed.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\n3. Results\n\n3.1. Maximum Load to Failure\n\nThis study focused on assessing the maximum load required to induce failure in the outer insulation of ICD leads, considering three key factors: in vivo duration, age, and gender. In vivo duration denotes the duration the leads were exposed to the in vivo environment within the human body. Age was categorized into three groups: A—younger than 65 years old, B—between 65 and 75 years old, and C—older than 75 years old. Gender classification included male and female categories (six females and seven males).\n\nAs shown in Figure 4, the maximum load to failure exhibited a range of values, with a maximum of 74.3 N, a minimum of 52.1 N, a median of 66.2 N, and a mean of 65.6 N. It is noteworthy that the in vivo exposure durations varied from one month to a...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_Sw0dIdEyGk2V7ULippahmJyc",
+    "parent_tool_call_id": null,
+    "round": 2,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 4,
+      "search_target": "Find PubMed studies directly comparing failure rates of three distinct implantable cardioverter-defibrillator leads within one cohort/study. Search variations of 'three ICD leads', lead failure, survival, comparison, and identify exact models, study design, follow-up, failure rates/hazard ratios. Determine if such comparative study exists."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 5,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_S6qrWEKsKViqq7QRwQcidSzx",
+    "parent_tool_call_id": "call_Sw0dIdEyGk2V7ULippahmJyc",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "three ICD leads lead failure survival comparison",
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "relation_query": null,
+      "task_name": "three lead comparison",
+      "top_k": 100
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='three ICD leads lead failure survival comparison',\n        top_k=100,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 10 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='three ICD leads lead failure survival comparison',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/three_lead_comparison.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/three_lead_comparison.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] search_papers\u001b[0m\n      \u001b[90mboolean_query_text:\u001b[0m three ICD leads lead failure survival comparison\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n      \u001b[90mrelation_query:\u001b[0m None\n      \u001b[90mtask_name:\u001b[0m three lead comparison\n      \u001b[90mtop_k:\u001b[0m 100\n\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/three_lead_comparison.csv'\nTotal results found: 102\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 31691064\nTitle: Comparison of the performance of implantable cardioverter-defibrillator leads among manufacturers.\nSource: Journal of interventional cardiac electrophysiology : an international journal of arrhythmias and pacing (2020)\nAbstract: BACKGROUND: Leads are often considered the weakest link in implantable cardioverter-defibrillator (ICD) systems, and lead dysfunction is a major concern for ICD recipients. The aim of this study was to compare the lead performance from three different manufacturers. METHODS: We retrospectively reviewed consecutive patients who underwent ICD system implantation at Chiba University Hospital, Japan, between March 2008 and September 2017. The following leads were implanted in our center: Durata (St. Jude Medical, St. Paul, MN, USA, now Abbott) (n = 105), Linox and LinoxSmart (Biotronik, Berlin, Germany) (n = 66), and Sprint Quattro (Medtronic, Minneapolis, MN, USA) (n = 126). RESULTS: A total of 297 ICD leads were analyzed. Failure rates for Durata, Linox/LinoxSmart, and Sprint Quattro were 0.20%/patient year, 0.95%/patient year, and 1.84%/patient year, respectively, during a mean follow-up of 4.8, 6.4, and 3.0 years, respectively. The cumulative ICD lead survival probability was 98.9%, 100%, and 87.5%, after 5 years, respectively. The survival probability over the entire follow-up time as measured by the log-rank test was lower for Sprint Quattro leads than for either Durata (p = 0.01 ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 33565195\nTitle: Multi-lead cephalic venous access and long-term performance of high-voltage leads.\nSource: Journal of cardiovascular electrophysiology (2021)\nAbstract: BACKGROUND: Cardiac resynchronization therapy-defibrillator (CRT-D) implantation via the cephalic vein is feasible and safe. Recent evidence has suggested a higher implantable cardioverter-defibrillator (ICD) lead failure in multi-lead defibrillator therapy via the cephalic route. We evaluated the relationship between CRT-D implantation via the cephalic and ICD lead failure. METHODS: Data was collected from three CRT-D implanting centers between October 2008 and September 2017. In total 633 patients were included. Patient and lead characteristics with ICD lead failure were recorded. Comparison of \"cephalic\" (ICD lead via cephalic) versus \"non-cephalic\" (ICD lead via non-cephalic route) cohorts was performed. Kaplan-Meier survival and a Cox-regression analysis were applied to assess variables associated with lead failure. RESULTS: The cephalic and non-cephalic cohorts were equally male (81.9% vs. 78%; p = .26), similar in age (69.7 ± 11.5 vs. 68.7 ± 11.9; p = .33) and body mass index (BMI) (27.7 ± 5.1 vs. 27.1 ± 5.7; p = .33). Most ICD leads were implanted via the cephalic vein (73.5%) and patients had a mean of 2.9 ± 0.28 leads implanted via this route. The rate of ICD lead failure ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 33565195\nTitle: Multi-lead cephalic venous access and long-term performance of high-voltage leads.\nSource: J Cardiovasc Electrophysiol (2021)\nAbstract: We evaluated the relationship between CRT-D implantation via the cephalic and <m>ICD</m> @DISEASE_Lead_Poisoning @DISEASE_MESH:D007855 @@@<m>lead</m>@@@ <m>failure</m>.\n--------------------------------------------------------------------------------\nPMID: 38173057\nTitle: 2023 Canadian Surgery Forum\nSource: Can J Surg (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36851830\nTitle: Pediatric Epicardial Devices: Early and Midterm Outcomes\nSource: World J Pediatr Congenit Heart Surg (2023)\nAbstract: This study evaluated 965 transvenous <m>ICD</m> <m>leads</m> implanted in 878 @SPECIES_9606 @@@patients@@@, and <m>three</m>-year transvenous <m>ICD</m> @CHEMICAL_Lead @CHEMICAL_MESH:D007854 @@@<m>lead</m>@@@ <m>survival</m> was demonstrated with be only 60% in @SPECIES_9606 @@@patients@@@ younger than 8 years old.\n--------------------------------------------------------------------------------\nPMID: 36498645\nTitle: Early Experience with the Biotronik Protego ICD Lead\nSource: J Clin Med (2022)\nAbstract: In the last decade, some high-voltage <m>ICD</m> <m>leads</m> have been overshadowed by poor long-term performance and higher <m>lead</m> <m>failure</m> rates compared to other contemporary high voltage <m>leads</m>.\n--------------------------------------------------------------------------------\nPMID: 36612613\nTitle: Efficacy and Safety of Transvenous Lead Extraction at the Time of Upgrade from Pacemakers to Cardioverter-Defibrillators and Cardiac Resynchronization Therapy\nSource: Int J Environ Res Public Health (2022)\nAbstract: In clinical practice, most upgrades from PM to @DISEASE_252500 @DISEASE_OMIM:252500 @@@<m>ICD</m>@@@/CRT coincide with system revision/<m>lead</m> extraction due to <m>lead</m> <m>failure</m>.\n--------------------------------------------------------------------------------\nPMID: 34395560\nTitle: Lead Abandonment and Subcutaneous Implantable Cardioverter-Defibrillator (S-ICD) Implantation in a Cohort of Patients With ICD Lead Malfunction\nSource: Front Cardiovasc Med (2021)\nAbstract: According to the literature, the annual rate of transvenous <m>ICD</m> <m>lead</m> <m>failure</m> may reach 20% in 10-year-old <m>leads</m>, and in recent years an unexpectedly high <m>failure</m> rate, related to structural issues, has been reported for some specific <m>lead</m> types.\n--------------------------------------------------------------------------------\nPMID: 37927638\nTitle: Evolution of Pacemakers and Implantable Cardioverter Defibrillators (ICDs) in Cardiology\nSource: Cureus (2023)\nAbstract: Following implantation, noninvasive regular <m>lead</m> evaluations should be done every <m>three</m> to six months to rule out the possibility of <m>lead</m> <m>failure</m>, as the <m>lead</m>-related problem requires surgical revision.\n--------------------------------------------------------------------------------\nPMID: 36378803\nTitle: Rationale and design of the Lead Evaluation for Defibrillation and Reliability study: Safety and efficacy of a novel ICD lead design Rationale and design of the Lead Evaluation for Defibrillation and Reliability study: safety and efficacy of a novel ICD lead design\nSource: J Cardiovasc Electrophysiol (2023)\nAbstract: Despite enhancements in design and technologies, the <m>ICD</m> <m>lead</m> is the most vulnerable component of the <m>ICD</m> system and <m>failure</m> of <m>ICD</m> <m>leads</m> remains a significant clinical problem.\n--------------------------------------------------------------------------------\nPMID: 35187560\nTitle: QRS micro-fragmentation as a mortality predictor \nSource: Eur Heart J (2022)\nAbstract: The 1st, 2nd, and 3rd components correspond to a <m>three</m>-dimensional representation of the ECG (as if the XYZ <m>leads</m> were rotated to contain the maximum signal in <m>lead</m> X, most of the signal perpendicular to X in <m>Lead</m> Y, and the reminder of the <m>three</m>-dimensional representation in <m>Lead</m> Z).\n--------------------------------------------------------------------------------\nPMID: 32613315\nTitle: Eligibility for subcutaneous implantable cardioverter-defibrillator in patients with left ventricular assist device\nSource: J Interv Card Electrophysiol (2021)\nAbstract: In case of a @DISEASE_Neuromyelitis_Optica @DISEASE_MESH:D009471 @@@device infection@@@ or <m>lead</m> <m>failure</m> requiring the extraction of the complete @DISEASE_252500 @DISEASE_OMIM:252500 @@@<m>ICD</m>@@@ system including intracardiac <m>leads</m>, studies have shown a considerable morbidity and mortality.\n--------------------------------------------------------------------------------\nPMID: 37071637\nTitle: Changes in eligibility for a subcutaneous cardioverter-defibrillator after implantation of a left ventricular assist device-A prospective analysis\nSource: PLoS One (2023)\nAbstract: Further analysis revealed that lower S wave amplitudes in <m>leads</m> I (p = 0.009), II (p = 0.006) and aVF (p = 0.006) in the twelve-<m>lead</m> ECG before LVAD implantation were associated with S-<m>ICD</m> ineligibility after LVAD implantation.\n--------------------------------------------------------------------------------\nPMID: 35200687\nTitle: ICD Outcome in Pediatric Cardiomyopathies\nSource: J Cardiovasc Dev Dis (2022)\nAbstract: Complications requiring surgical revision included four <m>lead</m> dislodgements (<m>three</m> transvenous, and one subcutaneous). All <m>leads</m> were repositioned.\n--------------------------------------------------------------------------------\nPMID: 37714697\nTitle: QRS complex and T wave planarity for the efficacy prediction of automatic implantable defibrillators\nSource: Heart (2023)\nAbstract: The non-planarity values shown were derived from the analysis of all eight independent <m>leads</m> of standard 12-<m>lead</m> ECGs. See the online supplemental material for the same <m>comparison</m> of non-planarity values derived from the ECG <m>leads</m> of the modelled chest belt (see the text for details).\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_WsItLumNl82JSVk3OkkoqSm9",
+    "parent_tool_call_id": "call_S6qrWEKsKViqq7QRwQcidSzx",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "Durata Linox Sprint Quattro failure rate patient year survival hazard ratio log-rank",
+      "pmid": "31691064"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('31691064')\noutput = format_paper_content_output(result, filter_keywords='Durata Linox Sprint Quattro failure rate patient year survival hazard ratio log-rank')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m Durata Linox Sprint Quattro failure rate patient year survival hazard ratio log-rank\n      \u001b[90mpmid:\u001b[0m 31691064\n\n=== PMID: 31691064 ===\n\nTitle: Comparison of the performance of implantable cardioverter-defibrillator leads among manufacturers.\n\nJournal/Date: Journal of interventional cardiac electrophysiology : an international journal of arrhythmias and pacing (2020)\n\nMeSH Keywords: Defibrillators, Implantable, Germany, Humans, Japan, Registries, Retrospective Studies\n\n\n--- ABSTRACT ---\n[BACKGROUND]: Leads are often considered the weakest link in implantable cardioverter-defibrillator (ICD) systems, and lead dysfunction is a major concern for ICD recipients. The aim of this study was to compare the lead performance from three different manufacturers.\n[METHODS]: We retrospectively reviewed consecutive patients who underwent ICD system implantation at Chiba University Hospital, Japan, between March 2008 and September 2017. The following leads were implanted in our center: Durata (St. Jude Medical, St. Paul, MN, USA, now Abbott) (n = 105), Linox and LinoxSmart (Biotronik, Berlin, Germany) (n = 66), and Sprint Quattro (Medtronic, Minneapolis, MN, USA) (n = 126).\n[RESULTS]: A total of 297 ICD leads were analyzed. Failure rates for Durata, Linox/LinoxSmart, and Sprint Quattro were 0.20%/patient year, 0.95%/patient year, and 1.84%/patient year, respectively, during a mean follow-up of 4.8, 6.4, and 3.0 years, respectively. The cumulative ICD lead survival probability was 98.9%, 100%, and 87.5%, after 5 years, respectively. The survival probability over the entire follow-up time as measured by the log-rank test was lower for Sprint Quattro leads than for either Durata (p = 0.011) or Linox/LinoxSmart (p = 0.028). The difference between Durata and Linox/LinoxSmart was not significant (p = 0.393).\n[CONCLUSIONS]: In this single-center retrospective study, the performance of Sprint Quattro was lower than the performance of Linox/LinoxSmart and Durata leads. Large-scale, multi-center studies or manufacturer-independent registries may be necessary to confirm or reject self-reported survival probabilities from manufacturers' product performance reports.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_ME45BM1Xitsn9glL4h0CA1uq",
+    "parent_tool_call_id": "call_WsItLumNl82JSVk3OkkoqSm9",
+    "round": 3,
+    "tool_input": {
+      "boolean_query_text": "Durata Linox LinoxSmart Sprint Quattro ICD lead survival failure",
+      "max_requests_per_second": 3,
+      "max_retries": 3,
+      "relation_query": null,
+      "task_name": "model-specific leads",
+      "top_k": 30
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='Durata Linox LinoxSmart Sprint Quattro ICD lead survival failure',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='Durata Linox LinoxSmart Sprint Quattro ICD lead survival failure',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/model-specific_leads.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/model-specific_leads.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/model-specific_leads.csv'\nTotal results found: 3\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 31691064\nTitle: Comparison of the performance of implantable cardioverter-defibrillator leads among manufacturers.\nSource: Journal of interventional cardiac electrophysiology : an international journal of arrhythmias and pacing (2020)\nAbstract: BACKGROUND: Leads are often considered the weakest link in implantable cardioverter-defibrillator (ICD) systems, and lead dysfunction is a major concern for ICD recipients. The aim of this study was to compare the lead performance from three different manufacturers. METHODS: We retrospectively reviewed consecutive patients who underwent ICD system implantation at Chiba University Hospital, Japan, between March 2008 and September 2017. The following leads were implanted in our center: Durata (St. Jude Medical, St. Paul, MN, USA, now Abbott) (n = 105), Linox and LinoxSmart (Biotronik, Berlin, Germany) (n = 66), and Sprint Quattro (Medtronic, Minneapolis, MN, USA) (n = 126). RESULTS: A total of 297 ICD leads were analyzed. Failure rates for Durata, Linox/LinoxSmart, and Sprint Quattro were 0.20%/patient year, 0.95%/patient year, and 1.84%/patient year, respectively, during a mean follow-up of 4.8, 6.4, and 3.0 years, respectively. The cumulative ICD lead survival probability was 98.9%, 100%, and 87.5%, after 5 years, respectively. The survival probability over the entire follow-up time as measured by the log-rank test was lower for Sprint Quattro leads than for either Durata (p = 0.01 ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 31691064\nTitle: Comparison of the performance of implantable cardioverter-defibrillator leads among manufacturers.\nSource: J Interv Card Electrophysiol (2020)\nAbstract: RESULTS: A total of 297 <m>ICD</m> leads were analyzed. <m>Failure</m> rates for <m>Durata</m>, <m>Linox</m>/<m>LinoxSmart</m>, and <m>Sprint</m> <m>Quattro</m> were 0.20%/@SPECIES_9606 @@@patient@@@ year, 0.95%/@SPECIES_9606 @@@patient@@@ year, and 1.84%/@SPECIES_9606 @@@patient@@@ year, respectively, during a mean follow-up of 4.8, 6.4, and 3.0 years, respectively.\n--------------------------------------------------------------------------------\nPMID: 28255544\nTitle: Externalized conductors and insulation failure in Biotronik defibrillator leads: History repeating or a false alarm?\nSource: World J Clin Cases (2017)\nAbstract: Taken togheter these 3 studies (with the limitations that we will discuss thereafter) analyzed 668 Biotronik <m>ICD</m> leads and showed a worrisome incidence of <m>Linox</m> leads <m>failure</m>, ranging from 3.4% to 9.7% (vs 1% of Endotak Reliance and <m>Sprint</m> <m>Quattro</m> leads and 0.4% of <m>Durata</m>).\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_odRh0xAZXSop9vuc7HHov6BJ",
+    "parent_tool_call_id": "call_ME45BM1Xitsn9glL4h0CA1uq",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Yes. PubMed identifies a direct within-study comparison of three ICD lead groups in one cohort: Durata (n=105), Linox/LinoxSmart (n=66; grouped together), and Sprint Quattro (n=126), in a retrospective single-center study of consecutive implants at Chiba University Hospital, Japan (March 2008–September 2017; 297 leads).",
+          "source_tools": [
+            {
+              "relevance": "Initial PubMed search identifies the study, cohort, models, and design.",
+              "tool_call_id": "call_S6qrWEKsKViqq7QRwQcidSzx"
+            },
+            {
+              "relevance": "Full abstract confirms study methods and lead groups.",
+              "tool_call_id": "call_WsItLumNl82JSVk3OkkoqSm9"
+            }
+          ]
+        },
+        {
+          "finding": "Reported failure rates were 0.20%, 0.95%, and 1.84% per patient-year for Durata, Linox/LinoxSmart, and Sprint Quattro, respectively; corresponding mean follow-up was 4.8, 6.4, and 3.0 years. Five-year lead survival was 98.9%, 100%, and 87.5%, respectively.",
+          "source_tools": [
+            {
+              "relevance": "Abstract provides rate, follow-up, and five-year survival estimates.",
+              "tool_call_id": "call_WsItLumNl82JSVk3OkkoqSm9"
+            }
+          ]
+        },
+        {
+          "finding": "Sprint Quattro had lower survival by log-rank comparison versus Durata (p=0.011) and Linox/LinoxSmart (p=0.028); Durata versus Linox/LinoxSmart was not significant (p=0.393). No hazard ratios are reported in the accessible abstract/content, so HR estimates cannot be supplied from this evidence.",
+          "source_tools": [
+            {
+              "relevance": "Full abstract supplies pairwise log-rank p-values and confirms no reported HR in the abstract.",
+              "tool_call_id": "call_WsItLumNl82JSVk3OkkoqSm9"
+            },
+            {
+              "relevance": "Model-specific search independently identifies the same comparative study.",
+              "tool_call_id": "call_ME45BM1Xitsn9glL4h0CA1uq"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_jWFxmYDGU38epvZCArTtkNBc",
+    "parent_tool_call_id": "call_Sw0dIdEyGk2V7ULippahmJyc",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:31691064",
+          "observations": [
+            "Retrospective single-center study at Chiba University Hospital, Japan, evaluating 297 ICD leads implanted from March 2008 through September 2017.",
+            "Compared three lead groups: Durata (n=105), Linox/LinoxSmart (n=66), and Sprint Quattro (n=126)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct three-group ICD lead comparison and study design",
+              "tool_call_id": "call_S6qrWEKsKViqq7QRwQcidSzx"
+            },
+            {
+              "relevance": "Lead groups and cohort details",
+              "tool_call_id": "call_WsItLumNl82JSVk3OkkoqSm9"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL",
+          "name": "Durata ICD lead",
+          "observations": [
+            "Failure rate was 0.20% per patient-year; five-year survival was 98.9%; mean follow-up was 4.8 years."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Comparative failure-rate result",
+              "tool_call_id": "call_WsItLumNl82JSVk3OkkoqSm9"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL",
+          "name": "Linox/LinoxSmart ICD lead",
+          "observations": [
+            "Failure rate was 0.95% per patient-year; five-year survival was 100%; mean follow-up was 6.4 years."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Comparative failure-rate result",
+              "tool_call_id": "call_WsItLumNl82JSVk3OkkoqSm9"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL",
+          "name": "Sprint Quattro ICD lead",
+          "observations": [
+            "Failure rate was 1.84% per patient-year; five-year survival was 87.5%; mean follow-up was 3.0 years.",
+            "Survival was lower than Durata (log-rank p=0.011) and Linox/LinoxSmart (p=0.028); comparison with Durata versus Linox/LinoxSmart was not significant (p=0.393)."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Comparative survival and statistical results",
+              "tool_call_id": "call_WsItLumNl82JSVk3OkkoqSm9"
+            },
+            {
+              "relevance": "No hazard ratios available in accessible evidence",
+              "tool_call_id": "call_ME45BM1Xitsn9glL4h0CA1uq"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:31691064",
+          "relation_type": "COMPARES",
+          "to_entity": "Durata ICD lead"
+        },
+        {
+          "from_entity": "PMID:31691064",
+          "relation_type": "COMPARES",
+          "to_entity": "Linox/LinoxSmart ICD lead"
+        },
+        {
+          "from_entity": "PMID:31691064",
+          "relation_type": "COMPARES",
+          "to_entity": "Sprint Quattro ICD lead"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 4, \"entities\": [{\"name\": \"PMID:31691064\", \"entityType\": \"PAPER\", \"observations\": [\"Retrospective single-center study at Chiba University Hospital, Japan, evaluating 297 ICD leads implanted from March 2008 through September 2017.\", \"Compared three lead groups: Durata (n=105), Linox/LinoxSmart (n=66), and Sprint Quattro (n=126).\"]}, {\"name\": \"Durata ICD lead\", \"entityType\": \"CHEMICAL\", \"observations\": [\"Failure rate was 0.20% per patient-year; five-year survival was 98.9%; mean follow-up was 4.8 years.\"]}, {\"name\": \"Linox/LinoxSmart ICD lead\", \"entityType\": \"CHEMICAL\", \"observations\": [\"Failure rate was 0.95% per patient-year; five-year survival was 100%; mean follow-up was 6.4 years.\"]}, {\"name\": \"Sprint Quattro ICD lead\", \"entityType\": \"CHEMICAL\", \"observations\": [\"Failure rate was 1.84% per patient-year; five-year survival was 87.5%; mean follow-up was 3.0 years.\", \"Survival was lower than Durata (log-rank p=0.011) and Linox/LinoxSmart (p=0.028); comparison with Durata versus Linox/LinoxSmart was not significant (p=0.393).\"]}]}, \"relations_created\": {\"count\": 3, \"relations\": [{\"from\": \"PMID:31691064\", \"to\": \"Durata ICD lead\", \"relationType\": \"COMPARES\"}, {\"from\": \"PMID:31691064\", \"to\": \"Linox/LinoxSmart ICD lead\", \"relationType\": \"COMPARES\"}, {\"from\": \"PMID:31691064\", \"to\": \"Sprint Quattro ICD lead\", \"relationType\": \"COMPARES\"}]}}, \"provenance\": {\"tool_call_id\": \"call_jWFxmYDGU38epvZCArTtkNBc\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_Sw0dIdEyGk2V7ULippahmJyc\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

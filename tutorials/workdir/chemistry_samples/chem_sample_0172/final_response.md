@@ -1,0 +1,1 @@
+{"answer": "O=C(Nc1ccc(S(=O)(=O)Nc2ncccn2)cc1)c1cc2c(ccc3ccccc32)o1"}

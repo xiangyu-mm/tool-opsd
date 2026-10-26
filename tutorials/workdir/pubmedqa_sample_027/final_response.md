@@ -1,0 +1,5 @@
+Yes. In a single-center observational study of 50 heart-transplant recipients, higher immune-monitoring ATP assay results measured about 64 days after transplant were associated with greater plaque progression on serial IVUS over one year. Progression was significant for maximal intimal area, percent stenosis, plaque volume, and maximal intimal thickness (PMID:25429902; search evidence: `call_HGHCpB0AQigDehWjzd3Kplwb`).
+
+At the study-derived cutoff of 406 ng ATP/mL, rapid maximal intimal thickness progression (≥0.5 mm) occurred in 10/12 recipients above the cutoff versus 5/38 below it; the reported risk ratio was 11.7 (p<0.001). This supports an association, not proof that elevated immune monitoring causes plaque progression. The evidence summarized here is from one observational study and does not establish comparable results for other immune markers.
+
+FINAL DECISION: YES

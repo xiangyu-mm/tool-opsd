@@ -1,0 +1,3 @@
+Yes. A human study reported a significant association between cord-blood **FGFR2 DNA methylation at three CpGs** and high birth-weight centile. High centile was defined as above the 85th; reported p-values were 0.004–0.027. The study used a small discovery group (n=12) and a pyrosequencing investigation cohort (n=110). This supports an association, but does not establish causation; the reported outcome was birth-weight centile, not specifically macrosomia or large-for-gestational-age. (PMID: 25431941)
+
+FINAL DECISION: YES

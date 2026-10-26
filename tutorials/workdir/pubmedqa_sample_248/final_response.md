@@ -1,0 +1,7 @@
+**Yes—according to the primary study’s operational definition.** von Heckel, Stephan, and Hutter’s 2016 study, *“Canalization of gene expression is a major signature of regulatory cold adaptation in temperate Drosophila melanogaster”* (PMID: **27502401**), compared cold-shock expression in tropical African and temperate European flies. Cold shock affected about 25% of genes, and among 16 genes with population-specific responses, 14 showed greater differential expression in the African population. The authors interpreted the generally weaker response in European flies as expression canalization.
+
+**Important qualification:** in that study, canalization chiefly means an attenuated cold-induced response—not a direct demonstration of lower expression variance among individuals or replicate lines. A 2022 follow-up across population pairs (PMID: **35380655**) adds nuance: regulatory evolution can neutralize ancestral plasticity, while some expression changes in cold-adapted populations may be more vulnerable to inbreeding perturbation. So canalization is a prominent reported signature, but not a complete or unqualified account of regulatory cold adaptation.
+
+Plan completed: literature searched, evidence assessed, and findings recorded and reviewed in the knowledge graph.
+
+FINAL DECISION: YES

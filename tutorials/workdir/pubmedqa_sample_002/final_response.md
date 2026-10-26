@@ -1,0 +1,5 @@
+**Yes, in a human airway cell-culture model, with a qualification.** A primary study (PMID: 25429648) found that ciliated-enriched bronchial epithelial cultures expressed sPLA₂-IIA, -V, and -X and secreted sPLA₂ apically. When sPLA₂ was added to goblet-enriched cultures, it stimulated cysteinyl leukotriene release, and sPLA₂-V increased mucin secretion.
+
+The evidence supports the proposed effects in vitro, particularly for sPLA₂-V. It does not directly establish that sPLA₂ naturally released by ciliated cells was transferred to goblet cells and caused those responses; the measured eicosanoid result was specifically cysteinyl leukotriene release, not a broad survey of eicosanoids. (PMID: 25429648; search evidence: `call_zk7Z58LquXKk4swI7N58t5vS`, `call_SNUHHbySp18dpwCOoUDJE3qg`)
+
+FINAL DECISION: YES

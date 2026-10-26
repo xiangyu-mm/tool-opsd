@@ -1,0 +1,1 @@
+{"answer": "methyl 3-[[2-[(2S)-3-oxopiperazin-1-ium-2-yl]acetyl]amino]benzoate"}

@@ -1,0 +1,437 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_B0Atm2BTAqABmhSnR4F0Qhyf",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether endurance exercise modulates heat shock protein (hSP/HSP) expression in human leukocytes. Search for human studies of acute or chronic endurance exercise (e.g., running, cycling, training) measuring HSP70/HSPA1A, HSP27/HSPB1, HSP90, or other heat-shock proteins in peripheral blood leukocytes, mononuclear cells, lymphocytes, neutrophils, or whole blood. Extract exercise protocol, leukocyte population, timing, direction and magnitude of expression changes, and whether findings are consistent."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_BlGsuoXtiI8aGOJRmfR6U3DP",
+    "parent_tool_call_id": "call_B0Atm2BTAqABmhSnR4F0Qhyf",
+    "round": 1,
+    "tool_input": {
+      "task_name": "HSP27 HSP90 exercise leukocytes",
+      "boolean_query_text": "human exercise HSP27 HSP90 leukocytes lymphocytes neutrophils blood",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='human exercise HSP27 HSP90 leukocytes lymphocytes neutrophils blood',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='human exercise HSP27 HSP90 leukocytes lymphocytes neutrophils blood',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/HSP27_HSP90_exercise_leukocytes.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/HSP27_HSP90_exercise_leukocytes.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/HSP27_HSP90_exercise_leukocytes.csv'\nTotal results found: 12\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38540672\nTitle: Molecular Challenges and Opportunities in Climate Change-Induced Kidney Diseases\nSource: Biomolecules (2024)\nAbstract: HSPs are a small family of chaperones found in different types of organisms ranging between bacteria, @SPECIES_4932 @@@yeast@@@, and @SPECIES_9606 @@@<m>humans</m>@@@. The better characterized HSPs are named according to their mass in kilodaltons, such as: @GENE_HSP90AA1 @GENE_3320 @@@<m>HSP90</m>@@@, @GENE_HSPA4 @GENE_3308 @@@HSP70@@@, HSP60/65, @GENE_HMOX1 @GENE_3162 @@@HSP32@@@, and @GENE_HSPB2 @GENE_3316 @@@<m>HSP27</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 36670857\nTitle: Heat Shock Protein Response to Stress in Poultry: A Review\nSource: Animals (Basel) (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 32808366\nTitle: Heat shock protein 60 and cardiovascular diseases: An intricate love-hate story\nSource: Med Res Rev (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35911735\nTitle: The Immune Pathogenesis of Acute-On-Chronic Liver Failure and the Danger Hypothesis\nSource: Front Immunol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37108659\nTitle: Nanoparticle-Based Interventions for Liver Transplantation\nSource: Int J Mol Sci (2023)\nAbstract: Protective effects conferred by these techniques correlate with the upregulation of heat shock proteins (HSPs), e.g., @GENE_HSPB1 @GENE_15507 @@@<m>HSP27</m>@@@, @GENE_HSPA1A @GENE_193740 @@@HSP72@@@ and @GENE_HSP84_3 @GENE_104434 @@@<m>HSP90</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 40910268\nTitle: Role of cellular senescence in hepatic diseases (Review)\nSource: Int J Mol Med (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37760003\nTitle: Curcumin as a Potential Antioxidant in Stress Regulation of Terrestrial, Avian, and Aquatic Animals: A Review\nSource: Antioxidants (Basel) (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35046810\nTitle: Current Advances in Coptidis Rhizoma for Gastrointestinal and Other Cancers\nSource: Front Pharmacol (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 30360490\nTitle: Glutamine: Metabolism and Immune Function, Supplementation and Clinical Translation\nSource: Nutrients (2018)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 31750312\nTitle: Biomarkers in Stress Related Diseases/Disorders: Diagnostic, Prognostic, and Therapeutic Values\nSource: Front Mol Biosci (2019)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 26082317\nTitle: Second International Meeting of ISEV 2013: Boston, USA, April 17th-20th, 2013\nSource: J Extracell Vesicles (2013)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 26077418\nTitle: Abstracts from the Third International Meeting of ISEV 2014 Rotterdam, The Netherlands, April 30th - May 3rd, 2014\nSource: J Extracell Vesicles (2014)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_uxPoHiz7Ec4uHV540nCCgSsK",
+    "parent_tool_call_id": "call_BlGsuoXtiI8aGOJRmfR6U3DP",
+    "round": 2,
+    "tool_input": {
+      "task_name": "exercise HSP70 PBMC study",
+      "boolean_query_text": "exercise HSP70 peripheral blood mononuclear cells human",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='exercise HSP70 peripheral blood mononuclear cells human',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='exercise HSP70 peripheral blood mononuclear cells human',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/exercise_HSP70_PBMC_study.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/exercise_HSP70_PBMC_study.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (4):\u001b[0m\n  \u001b[1m\u001b[93m[1] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m exercise HSP70 PBMC study\n      \u001b[90mboolean_query_text:\u001b[0m exercise HSP70 peripheral blood mononuclear cells human\n      \u001b[90mtop_k:\u001b[0m 30\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[2] search_papers\u001b[0m\n      \u001b[90mtask_name:\u001b[0m exercise HSP27 PBMC study\n      \u001b[90mboolean_query_text:\u001b[0m exercise HSP27 peripheral blood mononuclear cells human\n      \u001b[90mtop_k:\u001b[0m 20\n      \u001b[90mmax_requests_per_second:\u001b[0m 3\n      \u001b[90mmax_retries:\u001b[0m 3\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m exercise protocol|HSP70|Hsp70|HSP27|Hsp27|PBM ... blood sampling|immediately|hours|fold|percent\n      \u001b[90mpmid:\u001b[0m 34853628\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m exercise protocol|Hsp70|Hsp27|PBMC|leukocyte|immediately|hours|fold|percent\n      \u001b[90mpmid:\u001b[0m 25460722\n\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/exercise_HSP70_PBMC_study.csv'\nTotal results found: 60\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 38771358\nTitle: The biphasic activity of autophagy and heat shock protein response in peripheral blood mononuclear cells following acute resistance exercise in resistance-trained males.\nSource: European journal of applied physiology (2024)\nAbstract: PURPOSE: Autophagy and heat shock protein (HSP) response are proteostatic systems involved in the acute and adaptive responses to exercise. These systems may upregulate sequentially following cellular stress including acute exercise, however, currently few data exist in humans. This study investigated the autophagic and HSP responses to acute intense lower body resistance exercise in peripheral blood mononuclear cells (PBMCs) with and without branched-chain amino acids (BCAA) supplementation. METHODS: Twenty resistance-trained males (22.3 ± 1.5 yr; 175.4 ± .7 cm; 86.4 ± 15.6 kg) performed a bout of intense lower body resistance exercise and markers of autophagy and HSP70 were measured immediately post- (IPE) and 2, 4, 24, 48, and 72 h post-exercise. Prior to resistance exercise, 10 subjects were randomly assigned to BCAA supplementation of 0.22 g/kg/d for 5 days pre-exercise and up to 72 h following exercise while the other 10 subjects consumed a placebo (PLCB). RESULTS: There were no difference in autophagy markers or HSP70 expression between BCAA and PLCB groups. LC3II protein expression was significantly lower 2 and 4 h post-exercise compared to pre-exercise. LC3II: I ratio was  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 25062931\nTitle: The effects of acute oral glutamine supplementation on exercise-induced gastrointestinal permeability and heat shock protein expression in peripheral blood mononuclear cells.\nSource: Cell stress & chaperones (2015)\nAbstract: Chronic glutamine supplementation reduces exercise-induced intestinal permeability and inhibits the NF-κB pro-inflammatory pathway in human peripheral blood mononuclear cells. These effects were correlated with activation of HSP70. The purpose of this paper is to test if an acute dose of oral glutamine prior to exercise reduces intestinal permeability along with activation of the heat shock response leading to inhibition of pro-inflammatory markers. Physically active subjects (N = 7) completed baseline and exercise intestinal permeability tests, determined by the percent ratio of urinary lactulose (5 g) to rhamnose (2 g). Exercise included two 60-min treadmill runs at 70 % of VO2max at 30 °C after ingestion of glutamine (Gln) or placebo (Pla). Plasma levels of endotoxin and TNF-α, along with peripheral blood mononuclear cell (PBMC) protein expression of HSP70 and IκBα, were measured pre- and post-exercise and 2 and 4 h post-exercise. Permeability increased in the Pla trial compared to that at rest (0.06 ± 0.01 vs. 0.02 ± 0.018) and did not increase in the Gln trial. Plasma endotoxin was lower at the 4-h time point in the Gln vs. 4 h in the Pla (6.715 ± 0.046 pg/ml vs. 7.952 ± 1.11  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 18198664\nTitle: Exercise-recruited NK cells display exercise-associated eHSP-70.\nSource: Exercise immunology review (2007)\nAbstract: It is hypothesized that increased plasma or serum concentrations of extracellular heat shock proteins (eHSP) serve as a danger signal to the innate immune system. Cellular binding of eHSP leads to activation of NK cells and monocytes, as measured by their increased cytokine production, mitotic division and killing capacity. We examined whether eHSP binds to NK lymphocytes in vivo in athletes performing endurance exercise in the heat. Eighteen trained male runners ran at 70% VO2max at 35 degrees C and 40% relative humidity. Venous blood collected before, after and 1.5 h after exercise was analysed for leukocyte distribution, phenotype and eHSP70. NK cell-enriched samples were examined for co-localization of CD94 and eHSP70 expression. Plasma eHSP-70 concentration was measured by ELISA. Subjects ran for approximately 50 min, which elicited a reversible leukocytosis. NK cell count increased 83% (p < 0.01) immediately after exercise, then decreased to 66% of the resting level 1.5 h after exercise (p < 0.05). Plasma eHSP concentration increased 167% after exercise and remained elevated (by up to 71%) 1.5 h after exercise (p < 0.01). eHSP was expressed on both NK cells and monocytes at a ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 25714619\nTitle: Heat shock response and autophagy--cooperation and control.\nSource: Autophagy (2015)\nAbstract: Protein quality control (proteostasis) depends on constant protein degradation and resynthesis, and is essential for proper homeostasis in systems from single cells to whole organisms. Cells possess several mechanisms and processes to maintain proteostasis. At one end of the spectrum, the heat shock proteins modulate protein folding and repair. At the other end, the proteasome and autophagy as well as other lysosome-dependent systems, function in the degradation of dysfunctional proteins. In this review, we examine how these systems interact to maintain proteostasis. Both the direct cellular data on heat shock control over autophagy and the time course of exercise-associated changes in humans support the model that heat shock response and autophagy are tightly linked. Studying the links between exercise stress and molecular control of proteostasis provides evidence that the heat shock response and autophagy coordinate and undergo sequential activation and downregulation, and that this is essential for proper proteostasis in eukaryotic systems.\n--------------------------------------------------------------------------------\nPMID: 17977914\nTitle: Exercise-heat acclimation in humans alters baseline levels and ex vivo heat inducibility of HSP72 and HSP90 in peripheral blood mononuclear cells.\nSource: American journal of physiology. Regulatory, integrative and comparative physiology (2008)\nAbstract: The induction of cellular acquired thermal tolerance (ATT) during heat acclimation (HA) in humans is not well described. This study determined whether exercise-HA modifies the human heat shock protein (HSP)72 and HSP90 responses and whether changes are correlated with physiological adaptations to HA. Using a 10-day HA protocol comprising daily exercise (treadmill walking) in a hot environment (T(a) = 49 degrees C, 20% RH), we analyzed baseline and ex vivo heat-induced expression of HSP72 and HSP90 in peripheral blood mononuclear cells (PBMCs) isolated prior to exercise from eight subjects on day 1 and 10 of the HA protocol. Classical physiological responses to HA were observed, including significantly reduced heart rate and core body temperature, and significantly increased sweating rate. Baseline levels of HSP72 and HSP90 were significantly increased following acclimation by 17.7 +/- 6.1% and 21.1 +/- 6.5%, respectively. Ex vivo induction of HSP72 in PBMCs exposed to heat shock (43 degrees C) was blunted on day 10 compared with day 1. A correlation was identified (r(2) = 0.89) between changes in core temperature elevation and ex vivo HSP90 responses to heat shock between days 1 an ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 30269563\nTitle: The effect of aging on the autophagic and heat shock response in human peripheral blood mononuclear cells.\nSource: Physiology international (2018)\nAbstract: Autophagy is a lysosome degradation pathway through which damaged organelles and macromolecules are degraded within the cell. A decrease in activity of the autophagic process has been linked to several age-associated pathologies, including triglyceride accumulation, mitochondrial dysfunction, muscle degeneration, and cardiac malfunction. Here, we examined the differences in the autophagic response using autophagy-inducer rapamycin (Rapa) in peripheral blood mononuclear cells (PBMCs) from young (21.8 ± 1.9 years) and old (64.0 ± 3.7 years) individuals. Furthermore, we tested the interplay between the heat shock response and autophagy systems. Our results showed a significant increase in LC3-II protein expression in response to Rapa treatment in young but not in old individuals. This was associated with a decreased response in MAP1LC3B mRNA levels, but not SQSTM1/p62. Furthermore, HSPA1A mRNA was upregulated only in young individuals, despite no differences in HSP70 protein expression. The combined findings suggest a suppressed autophagic response following Rapa treatment in older individuals.\n--------------------------------------------------------------------------------\nPMID: 16385841\nTitle: Immunostimulatory functions of membrane-bound and exported heat shock protein 70.\nSource: Exercise immunology review (2005)\nAbstract: In the search for tumor-specific antigens, microbial and eukaryotic heat shock proteins (HSP) have been identified. Intracellularly, HSPs function as molecular chaperones supporting folding and transport of a great variety of polypeptides and proteins under normal physiological conditions and following stress stimuli. Furthermore, interferon-gamma and elevated body temperature induced by exercise have been found to increase serum levels of HSPs in humans. Extracellularly localized or plasma membrane-bound HSPs elicit a potent anti-cancer immune response mediated either by the adaptive or innate immune system. Following uptake of HSP (HSP70 and gp96)-peptide complexes by antigen presenting cells (APCs) and \"cross-presentation\" of HSP-chaperoned peptides on MHC class I molecules, a CD8-specific T cell response is induced. Apart from chaperoning tumor-specific peptides, HSPs per se provide activatory signals for the innate immune system. Binding of peptide-free HSP70 to APCs via Toll-like receptors (TLRs) initiates the secretion of pro-inflammatory cytokines and thus results in a broad non-specific immunostimulation. An unusual membrane localization of Hsp70, the major heat-inducible  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 25483693\nTitle: VaxCelerate II: rapid development of a self-assembling vaccine for Lassa fever.\nSource: Human vaccines & immunotherapeutics (2014)\nAbstract: Development of effective vaccines against emerging infectious diseases (EID) can take as much or more than a decade to progress from pathogen isolation/identification to clinical approval. As a result, conventional approaches fail to produce field-ready vaccines before the EID has spread extensively. Lassa is a prototypical emerging infectious disease endemic to West Africa for which no successful vaccine is available. We established the VaxCelerate Consortium to address the need for more rapid vaccine development by creating a platform capable of generating and pre-clinically testing a new vaccine against specific pathogen targets in less than 120 d A self-assembling vaccine is at the core of the approach. It consists of a fusion protein composed of the immunostimulatory Mycobacterium tuberculosis heat shock protein 70 (MtbHSP70) and the biotin binding protein, avidin. Mixing the resulting protein (MAV) with biotinylated pathogen-specific immunogenic peptides yields a self-assembled vaccine (SAV). To meet the time constraint imposed on this project, we used a distributed R&D model involving experts in the fields of protein engineering and production, bioinformatics, peptide synthe ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 30276476\nTitle: Dietary curcumin supplementation does not alter peripheral blood mononuclear cell responses to exertional heat stress.\nSource: European journal of applied physiology (2018)\nAbstract: INTRODUCTION: Curcumin reduces gut barrier damage and plasma cytokine responses to exertional heat stress. However, the role of peripheral blood mononuclear cell (PBMC) in this response remains unclear. PURPOSE: This work investigated the effect of 3 days of 500 mg/day dietary curcumin supplementation on PBMC responses to exertional heat stress in non-heat acclimated humans. METHODS: Eight participants ran (65% VO2max) for 60 min in an environmental chamber (37 °C/25% RH) two times (curcumin/placebo). Blood samples were collected pre, post, 1 h post, and 4 h post-exercise. PBMC were isolated from blood samples and the protein content of markers along the TLR4 signaling pathway (TLR4, MyD88, pNF-κB, NF-κB), indicators of cellular energy status (SIRT1 and p-AMPK), and mediators of cellular heat shock response (pHSF-1 and HSP70) were examined with Western blot. Data were analyzed with two-way (condition × time) RM-ANOVAs with Newman-Keuls post hocs. RESULTS: As compared to placebo, curcumin did not alter protein expression in PBMC (p > 0.05). However, in both study conditions at 1 h post-reductions were noted in TLR 4 (- 21.5%; p = 0.03), HSP70 (- 11.0%; p = 0.04), pAMPK (- 48.5%; p < ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 21374645\nTitle: HSP70 expression: does it a novel fatigue signalling factor from immune system to the brain?\nSource: Cell biochemistry and function (2011)\nAbstract: Integrative physiology studies have shown that immune system and central nervous system interplay very closely towards behavioural modulation. Since the 70-kDa heat shock proteins (HSP70s), whose heavy expression during exercise is well documented in the skeletal muscle and other tissues, is also extremely well conserved in nature during all evolutionary periods of species, it is conceivable that HSP70s might participate of physiologic responses such as fatigue induced by some types of physical exercise. In this way, increased circulating levels of extracellular HSP70 (eHSP70) could be envisaged as an immunomodulatory mechanism induced by exercise, besides other chemical messengers (e.g. cytokines) released during an exercise effort, that are able to binding a number of receptors in neural cells. Studies from this laboratory led us to believe that increased levels of eHSP70 in the plasma during exercise and the huge release of eHSP70 from lymphocytes during high-load exercise bouts may participate in the fatigue sensation, also acting as a danger signal from the immune system.\n--------------------------------------------------------------------------------\nPMID: 36232420\nTitle: CD3+/CD56+ NKT-like Cells Show Imbalanced Control Immediately after Exercise in Delayed-Onset Muscle Soreness.\nSource: International journal of molecular sciences (2022)\nAbstract: The purpose of the study was to carry out an immunophenotypical characterization with a special focus on natural killer cells of junior swimmers from the Hungarian National Swim Team before and after an intensive acute exercise. Nineteen swimmers, ten females and nine males, completed the exercise protocol. Sixteen swimmers experienced delayed-onset muscle soreness. Most of our findings substantiated earlier results, such as the increase in the percentage of the CD3-/CD56+ natural killer cells and the CD3-/CD56dim+ NK cells, and the decrease in the percentage of CD3+ T cells among lymphocytes after the exercise protocol. The drop of natural killer cell activity back to the pre-exercise level was in line with earlier findings. Interestingly, the percentage of CD3+/CD56+ NKT-like cells did not change significantly in those three swimmers who did not report delayed-onset muscle soreness. On the contrary, the percentage of CD3+/CD56+ NKT-like cells among lymphocytes increased in fourteen and decreased in two swimmers reporting delayed-onset muscle soreness. This study for the first time demonstrated a link between the delayed-onset muscle soreness and the imbalanced control of CD3+/CD5 ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 24285149\nTitle: Effects of oral glutamine supplementation on exercise-induced gastrointestinal permeability and tight junction protein expression.\nSource: Journal of applied physiology (Bethesda, Md. : 1985) (2014)\nAbstract: The objectives of this study are threefold: 1) to assess whether 7 days of oral glutamine (GLN) supplementation reduces exercise-induced intestinal permeability; 2) whether supplementation prevents the proinflammatory response; and 3) whether these changes are associated with upregulation of the heat shock response. On separate occasions, eight human subjects participated in baseline testing and in GLN and placebo (PLA) supplementation trials, followed by a 60-min treadmill run. Intestinal permeability was higher in the PLA trial compared with baseline and GLN trials (0.0604 ± 0.047 vs. 0.0218 ± 0.008 and 0.0272 ± 0.007, respectively; P < 0.05). IκBα expression in peripheral blood mononuclear cells was higher 240 min after exercise in the GLN trial compared with the PLA trial (1.411 ± 0.523 vs. 0.9839 ± 0.343, respectively; P < 0.05). In vitro using the intestinal epithelial cell line Caco-2, we measured effects of GLN supplementation (0, 4, and 6 mM) on heat-induced (37° or 41.8°C) heat shock protein 70 (HSP70), heat shock factor-1 (HSF-1), and occludin expression. HSF-1 and HSP70 levels increased in 6 mM supplementation at 41°C compared with 0 mM at 41°C (1.785 ± 0.495 vs. 0.6681 ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 22294379\nTitle: Changes in lymphocyte HSP70 levels in women handball players throughout 1 year of training: the role of estrogen levels.\nSource: Journal of physiology and biochemistry (2012)\nAbstract: Heat shock protein 70 (HSP70) is a chaperone that maintains protein conformation during heat stress. It has recently been observed that HSP70 may be released from cells in response to increased energy demand (e.g., exercise) and/or oxidative stress. Since HSP70 levels should change in response to athletic training, we have investigated whether blood HSP70 levels in young women handball players change over a complete training season. Thirty women handball players (12-24 years old) were divided into low (≥30 pg mL(-1)) (LE) and normal (30-330 pg mL(-1)) (NE) estradiol groups. HSP70 levels in lymphocytes and plasma and blood redox parameters were evaluated over 1 year (2009), with sampling at the beginning, middle, and end of the season. We observed no changes in superoxide dismutase activity or protein carbonyl or extracellular HSP70 levels, while catalase activity increased at the middle of the season in the NE group, and the thiobarbituric acid species levels in both groups were higher at the beginning of the season than at the middle or end. The lymphocyte HSP70 content was higher at the middle and end than at the beginning of the season in the NE group and also higher in the LE g ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 18846326\nTitle: Influence of exercise at high temperature on blood biochemical indexes and HSP72 expression in adult males.\nSource: Journal of Huazhong University of Science and Technology. Medical sciences = Hua zhong ke ji da xue xue bao. Yi xue Ying De wen ban = Huazhong keji daxue xuebao. Yixue Yingdewen ban (2008)\nAbstract: The influence of exercise at high temperature on adult males' routine blood indexes and biochemical indexes and the expression of HSP72 in peripheral blood lymphocytes (PBLs) was studied in order to provide theoretical ground for health supervision of adults receiving exercise at high temperature. 180 adult males were selected and divided into exercise group and control group, in which the exercise group was subdivided into subgroup 1 and subgroup 2 receiving exercise at high temperature in the afternoon and in the morning, respectively. Peripheral venous blood was phlebotomized before and after the exercise to examine routine blood indexes and blood biochemical indexes. The expression levels of HSP72 in PBLs were detected by flow cytometry. The results showed that the routine blood indexes and biochemical indexes in each group were within the range of normal values of male adults. There was no significant difference between each exercise group and control group in indexes before exercise. After exercise, the expression levels of HSP72 in PBLs in exercise groups were higher than those before exercise, and HSP72 expression levels in subgroup 1 were obviously higher than those in sub ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 32192153\nTitle: Soluble Epoxide Hydrolase 2 Expression Is Elevated in Obese Humans and Decreased by Physical Activity.\nSource: International journal of molecular sciences (2020)\nAbstract: Epoxide hydrolase 2 (EPHX2) is an emerging therapeutic target in several immunometabolic disorders. EPHX2 metabolizes anti-inflammatory epoxyeicosatrienoic acids into pro-inflammatory diols. The contribution of EPHX2 activity to human obesity remains unexplored. We compared the expression of EPHX2 between lean and obese humans (n = 20 each) in subcutaneous adipose tissue (SAT) and peripheral blood mononuclear cells (PBMCs) using RT-PCR, Western Blot analysis, immunohistochemistry, and confocal microscopy before and after a 3-month physical activity regimen. We also assessed EPHX2 levels during preadipocyte differentiation in humans and mice. EPHX2 mRNA and protein expression were significantly elevated in obese subjects, with concomitant elevated endoplasmic reticulum (ER) stress components (the 78-kDa glucose-regulated protein; GRP78, and the Activating transcription factor 6; ATF6) and inflammatory markers (Tumor necrosis factor-α; TNFα, and Interleukin 6; IL6) as compared to controls (p < 0.05). EPHX2 mRNA levels strongly correlated with adiposity markers. In obese individuals, physical activity attenuated EPHX2 expression levels in both the SAT and PBMCs, with a parallel decrea ... [Truncated]\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 6,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_vzKCF8x75ugxkOPWSgu7ELK9",
+    "parent_tool_call_id": "call_BlGsuoXtiI8aGOJRmfR6U3DP",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "exercise protocol|HSP70|Hsp70|HSP27|Hsp27|PBMC|leukocyte|blood sampling|immediately|hours|fold|percent",
+      "pmid": "34853628"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('34853628')\noutput = format_paper_content_output(result, filter_keywords='exercise protocol|HSP70|Hsp70|HSP27|Hsp27|PBMC|leukocyte|blood sampling|immediately|hours|fold|percent')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 34853628 ===\n\nTitle: Systemic Response of Antioxidants, Heat Shock Proteins, and Inflammatory Biomarkers to Short-Lasting Exercise Training in Healthy Male Subjects.\n\nJournal/Date: Oxidative medicine and cellular longevity (2021)\n\nMeSH Keywords: Adult, Antioxidants, Biomarkers, Exercise, Healthy Volunteers, Heat-Shock Proteins, Humans, Inflammation\n\n\n--- ABSTRACT ---\nRegular physical activity can enhance immune function and effectively prevents the spread of the cytokine response, thus reducing systemic low-grade inflammation and improving various immune markers. Moreover, regular exercise maintains redox homeostasis in skeletal muscle and other tissues, including immune cells, but the interconnection between the anti-inflammatory effects of exercise with the redox status of immune cells is still poorly understood. With the aim to verify the overall beneficial effect of regular training on the immune system, we have examined the acute and short-term effect of a 5-day exercise program on the modulation of protein and lipid oxidation, antioxidants (i.e., superoxide dismutase-1 (SOD1) and superoxide dismutase-2 (SOD2), glutathione peroxide 1 (GPx1), thioredoxin reductase-1 (TrxR1), and catalase (CAT)), and heat shock protein expression (i.e., heat shock protein-70 (HSP70) and heat shock protein-27 (HSP27)), at both mRNA and protein levels, as well as the activation of the nuclear factor kappa light chain enhancer of activated B cells (NFκB) in peripheral blood mononuclear cells (PBMCs). Moreover, plasmatic markers of oxidative stress, inflammation, and stress response (i.e., protein carbonyl content, interleukin-6 (IL6), interleukin-8 (IL8), interleukin-10 (IL10), interleukin-17E (IL17E), interleukin-17F (IL17F), interleukin-21 (IL21), interleukin-22 (IL22), and interleukin-23 (IL23)) were analyzed in active untrained young adult subjects. Even in the absence of an increased amount of protein or lipid oxidation, we confirmed a PBMC upregulation of SOD1 (1.26 ± 0.07 fold change, p < 0.05), HSP70 (1.59 ± 0.28 fold change, p < 0.05), and HSP27 gene expression (1.49 ± 0.09 fold change, p < 0.05) after 3 hours from the first bout of exercise, followed by an increase in proteins' amount at 24 hours (SOD1, 1.80 ± 0.34 fold change; HSP70, 3.40 ± 0.58 fold change; and HSP27, 1.81 ± 0.20 fold change, p < 0.05) and return to basal levels after the 5 days of aerobic training. Indeed, the posttraining basal levels of oxidized molecules in plasma and PBMCs were statistically lower than the pretraining levels (carbonyl content, 0.50 ± 0.05 fold change, p < 0.01), paralleled by a lower expression of SOD2, Gpx1, and TrxR1, at mRNA (SOD2, 0.63 ± 0.06; GPx1, 0.69 ± 0.07; and TrxR1, 0.69 ± 0.12 fold change, p < 0.05) and protein (TrxR1, 0.49 ± 0.11 fold change, p < 0.05) levels. These results verified the existence of an early phase of redox adaptation to physical exercise already achievable after 5 days of moderate, regular aerobic training. More interestingly, this phenomenon was paralleled by the degree of NFκB activation in PBMCs and the decrease of plasmatic proinflammatory cytokines IL8, IL21, and IL22 in the posttraining period, suggesting an interconnected, short-term efficacy of aerobic exercise towards systemic oxidative stress and inflammation.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\n3. Results\n\n3\n\n...[Remainder Truncated to Maintain LLM Context Budget]\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_vX3kkudwp3eGFMixLqSYSdBw",
+    "parent_tool_call_id": "call_BlGsuoXtiI8aGOJRmfR6U3DP",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "exercise protocol|Hsp70|Hsp27|PBMC|leukocyte|immediately|hours|fold|percent",
+      "pmid": "25460722"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25460722')\noutput = format_paper_content_output(result, filter_keywords='exercise protocol|Hsp70|Hsp27|PBMC|leukocyte|immediately|hours|fold|percent')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 25460722 ===\n\nTitle: Oxidative stress responses to a graded maximal exercise test in older adults following explosive-type resistance training.\n\nJournal/Date: Redox biology (2014)\n\nMeSH Keywords: Aged, Apoptosis, Female, Glutathione, Humans, Leukocytes, Mononuclear, Male, Malondialdehyde\n\n\n--- ABSTRACT ---\nWe recently demonstrated that low frequency, moderate intensity, explosive-type resistance training (EMRT) is highly beneficial in elderly subjects towards muscle strength and power, with a systemic adaptive response of anti-oxidant and stress-induced markers. In the present study, we aimed to evaluate the impact of EMRT on oxidative stress biomarkers induced in old people (70-75 years) by a single bout of acute, intense exercise. Sixteen subjects randomly assigned to either a control, not exercising group (n=8) or a trained group performing EMRT protocol for 12-weeks (n=8), were submitted to a graded maximal exercise stress test (GXT) at baseline and after the 12-weeks of EMRT protocol, with blood samples collected before, immediately after, 1 and 24h post-GXT test. Blood glutathione (GSH, GSSG, GSH/GSSG), plasma malonaldehyde (MDA), protein carbonyls and creatine kinase (CK) levels, as well as PBMCs cellular damage (Comet assay, apoptosis) and stress-protein response (Hsp70 and Hsp27 expression) were evaluated. The use of multiple biomarkers allowed us to confirm that EMRT per se neither affected redox homeostasis nor induced any cellular and oxidative damage. Following the GXT, the EMRT group displayed a higher GSH/GSSG ratio and a less pronounced increase in MDA, protein carbonyls and CK levels compared to control group. Moreover, we found that Hsp70 and Hsp27 proteins were induced after GXT only in EMRT group, while any significant modification within 24h was detected in untrained group. Apoptosis rates and DNA damage did not show any significant variation in relation to EMRT and/or GXT. In conclusion, the adherence to an EMRT protocol is able to induce a cellular adaptation allowing healthy elderly trained subjects to cope with the oxidative stress induced by an acute exercise more effectively than the aged-matched sedentary subjects.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nRedox homeostasis, oxidative damage and creatine kinase release\n\nThe PRE-GXT value of antioxidant status and cellular damage parameters were comparable between groups (PRE samples, subsets A&B). Indeed their value appeared to be unrelated to training, since we observed similar values also between groups (B-PRE control vs. trained) (Figs. 1 and 2 and Table 2). Subjects showed significant responses to the GXT in all groups (Figs. 1 and 2 and Table 2). Actually, a similar trend was observed for all biochemical parameters at baseline (subset A) and after 12 weeks (subset B) (Figs. 1 and 2 and Table 2). Significant group×time differences were found both for oxidized glutathione and for glutathione ratio (GSH/GSSG) (p<0.05). After 12 weeks, immediately and 1 h after GXT (B-POST and B-1 ...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 8,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_5RaikkWFcSHCG1h1U9XwTQ92",
+    "parent_tool_call_id": "call_vX3kkudwp3eGFMixLqSYSdBw",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "treadmill|run|cycling|exercise|HSP27|HSP70|HSP90|HSP60|immediately|7 days|controls|baseline|decreased|increased",
+      "pmid": "19032901"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('19032901')\noutput = format_paper_content_output(result, filter_keywords='treadmill|run|cycling|exercise|HSP27|HSP70|HSP90|HSP60|immediately|7 days|controls|baseline|decreased|increased')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (5):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m treadmill|run|cycling|exercise|HSP27|HSP70|HS ... |7 days|controls|baseline|decreased|increased\n      \u001b[90mpmid:\u001b[0m 19032901\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m run|75% VO2max|18|28|HSP27|HSP70|leukocytes|mRNA|protein|immediately|hours\n      \u001b[90mpmid:\u001b[0m 14670005\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m ultra-marathon|6-h run|Hsp70|Hsp27|Hsp32|mononuclear|immediately|2 and 24 h|mRNA|increased|unchanged\n      \u001b[90mpmid:\u001b[0m 18651163\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m handball|training season|lymphocyte HSP70|beginning|middle|end|plasma|higher|percent\n      \u001b[90mpmid:\u001b[0m 22294379\n\n  \u001b[1m\u001b[93m[5] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m 60-min treadmill|70 % VO2max|HSP70|PBMC|pre|post|2 and 4 h|glutamine|placebo|fold|increase\n      \u001b[90mpmid:\u001b[0m 25062931\n\n=== PMID: 19032901 ===\n\nTitle: Differential heat shock protein responses to strenuous standardized exercise in chronic fatigue syndrome patients and matched healthy controls.\n\nJournal/Date: Clinical and investigative medicine. Medecine clinique et experimentale (2008)\n\nMeSH Keywords: Biomarkers, Blotting, Western, Chaperonin 60, Exercise, Exercise Test, Fatigue Syndrome, Chronic, Female, HSP27 Heat-Shock Proteins\n\n\n--- ABSTRACT ---\n[PURPOSE]: Since physical exertion is known to exacerbate the symptoms of chronic fatigue syndrome (CFS) and metabolic changes and including oxidative stress can modulate heat shock protein (HSP) expression responses, we sought to determine whether HSP expression is altered in CFS patients before and after exercise. Heat shock proteins (HSPs) in peripheral blood mononuclear cells (PBMC) were examined from 6 chronic fatigue syndrome (CFS) patients and 7 controls before and after a standardized treadmill exercise. Basal hsp27 was significantly higher among CFS patients compared to controls, and decreased immediately post-exercise, remaining below basal levels even at 7 days. A similar pattern was observed for HSP60, which gradually decreased in CFS patients but increased in controls post-exercise. These findings suggest an abnormal adaptive response to oxidative stress in CFS, and raise the possibility that HSP profiling may provide a more objective biologic marker for this illness.\n[METHODS]: HSP27, HSP60, HSP70 and HSP90 expression from 6 CFS patients and 7 age- and sex-matched controls were examined by western blot analysis of peripheral blood mononuclear cells immediately before, after, and at 1 day and 7 days following a standardized treadmill exercise.\n[RESULTS]: Basal HSP27 was higher among CFS patients than in controls (0.54 +/- 0.13 vs. 0.19 +/- 0.06, mean +/- SEM; P < 0.01). In addition, these levels in CFS patients decreased immediately post-exercise (0.25 +/- 0.09; P < 0.05) and remained below basal levels at day 1 post-exercises (0.18 +/- 0.05; P < 0.05). P < 0.05). This declining expression of HSP27 during the post-exercise period among CFS patients was confirmed by one-way ANOVA analysis with repeated measures (P < 0.05). In contrast, HSP27 levels remained relatively constant following exercise among control subjects. Similar patterns of declining HSP levels in CFS patients were also observed for HSP60 (0.94 +/- 0.40 vs. 1.32 +/- 0.46; P < 0.05), and for HSP90 (0.34 +/- 0.09 vs. 0.49 +/- 0.10; P < 0.05) at day 7 post-exercise compared with basal levels, respectively. In contrast, HSP60 levels in control subjects increased at day 1 (1.09 +/- 0.27) and day 7 (1.24 +/- 0.50) post-exercise compared to corresponding levels immediately post-exercise (0.55 +/- 0.06) (P < 0.05, respectively).\n[CONCLUSION]: These preliminary findings suggest an abnormal or defective adaptive response to oxidative stress in CFS, and raise the possibility that HSP profiling may provide a more objective biologic marker for this illness.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 9,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_mKG7VqjpqRCPuNSUp6v2icI9",
+    "parent_tool_call_id": "call_vX3kkudwp3eGFMixLqSYSdBw",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "run|75% VO2max|18|28|HSP27|HSP70|leukocytes|mRNA|protein|immediately|hours",
+      "pmid": "14670005"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('14670005')\noutput = format_paper_content_output(result, filter_keywords='run|75% VO2max|18|28|HSP27|HSP70|leukocytes|mRNA|protein|immediately|hours')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 14670005 ===\n\nTitle: Inverse response of leukocyte heat shock proteins and DNA damage to exercise and heat.\n\nJournal/Date: Free radical research (2003)\n\nMeSH Keywords: Adaptation, Physiological, Adult, Apoptosis, Comet Assay, DNA Damage, DNA Primers, Flow Cytometry, Gene Expression\n\n\n--- ABSTRACT ---\nElevated ambient temperature may exert an additional impact on the exercise-induced expression of heat shock proteins (HSP) and DNA damage in leukocytes. The protective functions of HSP include antioxidative and antiapoptotic effects and may prevent damage to DNA. Twelve athletes completed a continuous run (75% VO2max) on the treadmill, six at 28 degrees C and six at 18 degrees C room temperature. Leukocyte expression of HSP27 and inducible HSP70 was analyzed on mRNA- (RT-PCR) and protein-level (flow cytometry), while DNA damage was quantified by the comet assay. High ambient temperature induced an additional accumulation of HSP-mRNA and -protein in leukocytes compared with the exercise-induced expression at 18 degrees C. HSP27 showed a special heat sensitivity. Surprisingly, the increase of DNA damage was less pronounced after exercise at 28 degrees C compared to 18 degrees C although heat shock in vitro clearly induced DNA damage. The inverse relation between HSP and DNA damage may indicate functions of HSP which protect against exercise-induced DNA-damage in terms of thermotolerance or apoptosis.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_9Hd9HSTcDOMWMQg0aClVEzu3",
+    "parent_tool_call_id": "call_vX3kkudwp3eGFMixLqSYSdBw",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "ultra-marathon|6-h run|Hsp70|Hsp27|Hsp32|mononuclear|immediately|2 and 24 h|mRNA|increased|unchanged",
+      "pmid": "18651163"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('18651163')\noutput = format_paper_content_output(result, filter_keywords='ultra-marathon|6-h run|Hsp70|Hsp27|Hsp32|mononuclear|immediately|2 and 24 h|mRNA|increased|unchanged')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 18651163 ===\n\nTitle: Effects of ultra-marathon on circulating DNA and mRNA expression of pro- and anti-apoptotic genes in mononuclear cells.\n\nJournal/Date: European journal of applied physiology (2008)\n\nMeSH Keywords: Adult, Apoptosis, DNA, Female, HSP27 Heat-Shock Proteins, HSP70 Heat-Shock Proteins, Heme Oxygenase-1, Humans\n\n\n--- ABSTRACT ---\nWe investigated the effects of an ultra-marathon on cell-free plasma DNA as well as on mRNA expression of pro-apoptotic (Bax, Bad), anti-apoptotic (Bcl-2) and cell-protective (Hsp70, Hsp27 and Hsp32) genes in mononuclear blood cells (MNCs). Blood samples were drawn from 14 athletes before and immediately after 6-h run. In addition, blood samples were also collected and analyzed 2 and 24 h after the end of the run. Levels of plasma DNA were significantly increased immediately after the marathon (P < 0.001) and were still higher 2 h later (P < 0.005), but significantly lower than those immediately after the race (P < 0.05). Cell-free plasma DNA returned to pre-race levels 24 h after the run. mRNA expressions of Hsp70, Hsp32 and Bax significantly increased in MNCs after the race, whereas Hsp27 and Bad mRNA expression levels showed no significant changes. Bcl-2 expressions decreased immediately after the race (P < 0.001), but increased in the 24 h later (P < 0.05). We conclude that apoptotic ladders of cell-free DNA following exhaustive exercise originate from apoptotic cells and that not only skeletal muscle cells but also leukocytes contribute to this phenomenon.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_zwVXF09vCGFGjiBRB6OfNEtB",
+    "parent_tool_call_id": "call_vX3kkudwp3eGFMixLqSYSdBw",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "handball|training season|lymphocyte HSP70|beginning|middle|end|plasma|higher|percent",
+      "pmid": "22294379"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('22294379')\noutput = format_paper_content_output(result, filter_keywords='handball|training season|lymphocyte HSP70|beginning|middle|end|plasma|higher|percent')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 22294379 ===\n\nTitle: Changes in lymphocyte HSP70 levels in women handball players throughout 1 year of training: the role of estrogen levels.\n\nJournal/Date: Journal of physiology and biochemistry (2012)\n\nMeSH Keywords: Adolescent, Estrogens, Exercise, Female, HSP70 Heat-Shock Proteins, Humans, Lymphocytes, Oxidation-Reduction\n\n\n--- ABSTRACT ---\nHeat shock protein 70 (HSP70) is a chaperone that maintains protein conformation during heat stress. It has recently been observed that HSP70 may be released from cells in response to increased energy demand (e.g., exercise) and/or oxidative stress. Since HSP70 levels should change in response to athletic training, we have investigated whether blood HSP70 levels in young women handball players change over a complete training season. Thirty women handball players (12-24 years old) were divided into low (≥30 pg mL(-1)) (LE) and normal (30-330 pg mL(-1)) (NE) estradiol groups. HSP70 levels in lymphocytes and plasma and blood redox parameters were evaluated over 1 year (2009), with sampling at the beginning, middle, and end of the season. We observed no changes in superoxide dismutase activity or protein carbonyl or extracellular HSP70 levels, while catalase activity increased at the middle of the season in the NE group, and the thiobarbituric acid species levels in both groups were higher at the beginning of the season than at the middle or end. The lymphocyte HSP70 content was higher at the middle and end than at the beginning of the season in the NE group and also higher in the LE group than in the NE group at the beginning of the season. These results suggest that plasma estradiol levels may play an important role in exercise training and that the intracellular HSP70 content, a biomarker for inflammation, is affected by both estradiol levels and exercise-induced oxidative stress.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_Gz6vh9qlAdNnYzQio3wNnddf",
+    "parent_tool_call_id": "call_vX3kkudwp3eGFMixLqSYSdBw",
+    "round": 3,
+    "tool_input": {
+      "filter_keywords": "60-min treadmill|70 % VO2max|HSP70|PBMC|pre|post|2 and 4 h|glutamine|placebo|fold|increase",
+      "pmid": "25062931"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25062931')\noutput = format_paper_content_output(result, filter_keywords='60-min treadmill|70 % VO2max|HSP70|PBMC|pre|post|2 and 4 h|glutamine|placebo|fold|increase')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 25062931 ===\n\nTitle: The effects of acute oral glutamine supplementation on exercise-induced gastrointestinal permeability and heat shock protein expression in peripheral blood mononuclear cells.\n\nJournal/Date: Cell stress & chaperones (2015)\n\nMeSH Keywords: Administration, Oral, Adolescent, Adult, Dietary Supplements, Double-Blind Method, Exercise, Female, Gastrointestinal Tract\n\n\n--- ABSTRACT ---\nChronic glutamine supplementation reduces exercise-induced intestinal permeability and inhibits the NF-κB pro-inflammatory pathway in human peripheral blood mononuclear cells. These effects were correlated with activation of HSP70. The purpose of this paper is to test if an acute dose of oral glutamine prior to exercise reduces intestinal permeability along with activation of the heat shock response leading to inhibition of pro-inflammatory markers. Physically active subjects (N = 7) completed baseline and exercise intestinal permeability tests, determined by the percent ratio of urinary lactulose (5 g) to rhamnose (2 g). Exercise included two 60-min treadmill runs at 70 % of VO2max at 30 °C after ingestion of glutamine (Gln) or placebo (Pla). Plasma levels of endotoxin and TNF-α, along with peripheral blood mononuclear cell (PBMC) protein expression of HSP70 and IκBα, were measured pre- and post-exercise and 2 and 4 h post-exercise. Permeability increased in the Pla trial compared to that at rest (0.06 ± 0.01 vs. 0.02 ± 0.018) and did not increase in the Gln trial. Plasma endotoxin was lower at the 4-h time point in the Gln vs. 4 h in the Pla (6.715 ± 0.046 pg/ml vs. 7.952 ± 1.11 pg/ml). TNF-α was lower 4 h post-exercise in the Gln vs. Pla (1.64 ± 0.09 pg/ml vs. 1.87 ± 0.12 pg/ml). PBMC expression of IkBα was higher 4 h post-exercise in the Gln vs. 4 h in the Pla (1.29 ± 0.43 vs. 0.8892 ± 0.040). HSP70 was higher pre-exercise and 2 h post-exercise in the Gln vs. Pla (1.35 ± 0.21 vs. 1.000 ± 0.000 and 1.65 ± 0.21 vs. 1.27 ± 0.40). Acute oral glutamine supplementation prevents an exercise-induced rise in intestinal permeability and suppresses NF-κB activation in peripheral blood mononuclear cells.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_f7NNrT3GhOLckkQpFx1ZoIfT",
+    "parent_tool_call_id": "call_Gz6vh9qlAdNnYzQio3wNnddf",
+    "round": 4,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Yes. Acute endurance exercise generally increases heat-shock responses in human circulating leukocytes, but magnitude and direction depend on heat stress, exercise dose, HSP, and sampling time. In 12 athletes running continuously at 75% VO2max, leukocyte HSP27 and inducible HSP70 mRNA/protein increased; the response was greater at 28°C than 18°C, with HSP27 particularly heat-sensitive. Exact fold changes were not reported in the abstract.",
+          "source_tools": [
+            {
+              "relevance": "Direct human endurance running study measuring leukocyte HSP27/HSP70 at mRNA and protein levels",
+              "tool_call_id": "call_mKG7VqjpqRCPuNSUp6v2icI9"
+            }
+          ]
+        },
+        {
+          "finding": "A 6-hour ultra-marathon in 14 athletes increased Hsp70 mRNA in blood mononuclear cells immediately post-race; Hsp27 mRNA did not change. Samples were taken pre-race, immediately post-race, and 2 and 24 h later, but the abstract does not quantify Hsp70 magnitude or report later Hsp70 time points.",
+          "source_tools": [
+            {
+              "relevance": "Direct human endurance ultra-marathon study with mononuclear-cell Hsp70/Hsp27 mRNA and serial timing",
+              "tool_call_id": "call_9Hd9HSTcDOMWMQg0aClVEzu3"
+            }
+          ]
+        },
+        {
+          "finding": "A 5-day moderate aerobic-training protocol in healthy young men produced a clear transient PBMC response: after the first exercise bout, HSP70 mRNA rose 1.59-fold and HSP27 mRNA 1.49-fold at 3 h; protein increased by 24 h (HSP70 3.40-fold, HSP27 1.81-fold), then returned to basal levels after 5 days of training.",
+          "source_tools": [
+            {
+              "relevance": "Most detailed acute-versus-short-term endurance-training PBMC study with quantitative HSP70/HSP27 results",
+              "tool_call_id": "call_vzKCF8x75ugxkOPWSgu7ELK9"
+            }
+          ]
+        },
+        {
+          "finding": "Chronic training can raise basal leukocyte HSP expression, but adaptation is not uniform. After 10 days of exercise heat acclimation, PBMC baseline HSP72 and HSP90 increased 17.7% and 21.1%, respectively, while ex-vivo heat-induced HSP72 expression was blunted. In a year-long handball training season, lymphocyte HSP70 content increased from the beginning to the middle/end of season in women with normal estradiol; extracellular/plasma HSP70 did not change.",
+          "source_tools": [
+            {
+              "relevance": "Direct human training studies of PBMC HSP72/HSP90 and lymphocyte HSP70 with quantitative chronic-training results",
+              "tool_call_id": "call_uxPoHiz7Ec4uHV540nCCgSsK"
+            },
+            {
+              "relevance": "Direct human seasonal training study with lymphocyte versus plasma HSP70 distinction",
+              "tool_call_id": "call_zwVXF09vCGFGjiBRB6OfNEtB"
+            }
+          ]
+        },
+        {
+          "finding": "Training status modifies the acute response. In older adults, a graded maximal exercise test after 12 weeks of explosive resistance training induced PBMC Hsp70 and Hsp27 proteins, whereas the same acute test produced no significant HSP change in untrained controls within 24 h. This supports training-dependent priming, although the protocol is resistance rather than endurance.",
+          "source_tools": [
+            {
+              "relevance": "Human trained-versus-untrained comparison with PBMC Hsp70/Hsp27 protein response and serial post-exercise sampling",
+              "tool_call_id": "call_vX3kkudwp3eGFMixLqSYSdBw"
+            }
+          ]
+        },
+        {
+          "finding": "Findings are not universally increases. In a small treadmill study of chronic-fatigue-syndrome patients versus controls, PBMC HSP27 was high at baseline in patients and fell immediately post-exercise and remained below baseline at day 1; HSP60 and HSP90 also declined by day 7, whereas controls showed stable HSP27 and increased HSP60. This indicates disease-specific dysregulation rather than a consistent normal response.",
+          "source_tools": [
+            {
+              "relevance": "Direct human treadmill study measuring PBMC HSP27/HSP60/HSP70/HSP90 before and through 7 days after exercise",
+              "tool_call_id": "call_5RaikkWFcSHCG1h1U9XwTQ92"
+            }
+          ]
+        },
+        {
+          "finding": "Supplementation and environmental context can confound interpretation. In seven active subjects performing two 60-min treadmill runs at 70% VO2max and 30°C, PBMC HSP70 was higher with acute glutamine than placebo before exercise (1.35 vs 1.00) and at 2 h post-exercise (1.65 vs 1.27); this demonstrates modulation of the exercise response but does not establish the exercise-only effect. A separate heat-stress run showed greater leukocyte HSP induction at 28°C than 18°C.",
+          "source_tools": [
+            {
+              "relevance": "Human endurance treadmill study with PBMC HSP70 quantitative values under glutamine/placebo conditions",
+              "tool_call_id": "call_Gz6vh9qlAdNnYzQio3wNnddf"
+            },
+            {
+              "relevance": "Human running study demonstrating ambient-temperature amplification of leukocyte HSP response",
+              "tool_call_id": "call_mKG7VqjpqRCPuNSUp6v2icI9"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: endurance exercise does modulate HSP expression in human leukocytes, with the best-supported pattern being an acute, time-dependent increase in HSP70/HSPA1A and sometimes HSP27/HSPB1 (mRNA early, protein later), amplified by heat and prolonged/exhaustive exercise. Chronic training may elevate basal HSP70/HSP72/HSP90 and/or prime the acute response, but can also normalize transient responses or blunt ex-vivo inducibility. Evidence for HSP90 and other HSPs is sparse, and reported magnitudes are heterogeneous; therefore the literature supports modulation, not a single universal direction or dose-response.",
+          "source_tools": [
+            {
+              "relevance": "Integrated evidence across direct acute and chronic human leukocyte studies",
+              "tool_call_id": "call_vzKCF8x75ugxkOPWSgu7ELK9"
+            },
+            {
+              "relevance": "Direct endurance running evidence for HSP27/HSP70",
+              "tool_call_id": "call_mKG7VqjpqRCPuNSUp6v2icI9"
+            },
+            {
+              "relevance": "Direct chronic-training evidence for HSP72/HSP90",
+              "tool_call_id": "call_uxPoHiz7Ec4uHV540nCCgSsK"
+            },
+            {
+              "relevance": "Evidence of conflicting/disease-specific direction",
+              "tool_call_id": "call_5RaikkWFcSHCG1h1U9XwTQ92"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_LlOaHejbaLZx9nKjkxIVH9KE",
+    "parent_tool_call_id": "call_B0Atm2BTAqABmhSnR4F0Qhyf",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "FINDING",
+          "name": "Acute leukocyte HSP induction",
+          "observations": [
+            "In 12 athletes running at 75% VO2max, whole-leukocyte HSP27 and inducible HSP70 mRNA/protein increased; induction was greater at 28°C than 18°C, with HSP27 especially heat-sensitive.",
+            "In a 6-hour ultramarathon, blood-mononuclear-cell Hsp70 mRNA increased immediately post-race, whereas Hsp27 mRNA did not change."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Endurance exercise and environmental heat effects on leukocyte HSP expression",
+              "tool_call_id": "call_mKG7VqjpqRCPuNSUp6v2icI9"
+            },
+            {
+              "relevance": "Ultramarathon effect on mononuclear-cell Hsp70 mRNA",
+              "tool_call_id": "call_9Hd9HSTcDOMWMQg0aClVEzu3"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Transient PBMC HSP response",
+          "observations": [
+            "After a first moderate aerobic exercise bout, PBMC HSP70 mRNA rose 1.59-fold and HSP27 mRNA 1.49-fold at 3 hours; protein rose by 24 hours, 3.40-fold for HSP70 and 1.81-fold for HSP27; values returned to basal levels after 5 days of training."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Quantified acute and training-related PBMC response",
+              "tool_call_id": "call_vzKCF8x75ugxkOPWSgu7ELK9"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Training adaptation of leukocyte HSPs",
+          "observations": [
+            "Ten days of exercise heat acclimation increased basal PBMC HSP72 by 17.7% and HSP90 by 21.1%, but blunted ex-vivo heat-induced HSP72 expression.",
+            "Across a year-long handball season, intracellular lymphocyte HSP70 increased in women with normal estradiol, while plasma HSP70 did not change."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Heat-acclimation effects on basal and inducible PBMC HSPs",
+              "tool_call_id": "call_uxPoHiz7Ec4uHV540nCCgSsK"
+            },
+            {
+              "relevance": "Seasonal training effect on intracellular lymphocyte HSP70",
+              "tool_call_id": "call_zwVXF09vCGFGjiBRB6OfNEtB"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Context-dependent HSP response",
+          "observations": [
+            "In older adults, acute maximal exercise induced PBMC HSP70 and HSP27 after 12 weeks of explosive resistance training but not in untrained controls; this supports training-dependent priming but is not an endurance protocol.",
+            "In chronic-fatigue-syndrome patients, PBMC HSP27 fell immediately after treadmill exercise and remained low at day 1; HSP60 and HSP90 also declined by day 7, unlike controls.",
+            "Glutamine supplementation increased PBMC HSP70 before and 2 hours after a 60-minute run at 70% VO2max in 30°C, showing that nutritional and environmental factors modify the response."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Training-dependent priming of PBMC HSPs",
+              "tool_call_id": "call_vX3kkudwp3eGFMixLqSYSdBw"
+            },
+            {
+              "relevance": "Disease-specific reversal or dysregulation of exercise HSP response",
+              "tool_call_id": "call_5RaikkWFcSHCG1h1U9XwTQ92"
+            },
+            {
+              "relevance": "Supplementation-dependent modulation during endurance exercise",
+              "tool_call_id": "call_Gz6vh9qlAdNnYzQio3wNnddf"
+            }
+          ]
+        },
+        {
+          "entity_type": "PROTEIN",
+          "name": "HSP70",
+          "observations": [
+            "Human endurance exercise studies most consistently report transient leukocyte or PBMC HSP70/HSP72 induction, with earlier mRNA and later protein changes; chronic training can increase basal levels or blunt inducibility."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Overall evidence synthesis",
+              "tool_call_id": "call_vzKCF8x75ugxkOPWSgu7ELK9"
+            },
+            {
+              "relevance": "Acute and heat-amplified leukocyte response",
+              "tool_call_id": "call_mKG7VqjpqRCPuNSUp6v2icI9"
+            },
+            {
+              "relevance": "Training adaptation",
+              "tool_call_id": "call_uxPoHiz7Ec4uHV540nCCgSsK"
+            }
+          ]
+        },
+        {
+          "entity_type": "PROTEIN",
+          "name": "HSP27",
+          "observations": [
+            "Human endurance exercise can increase leukocyte or PBMC HSP27, but the response is less consistent than HSP70 and depends on exercise duration, heat, disease, and sampling time."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Acute endurance and heat response",
+              "tool_call_id": "call_mKG7VqjpqRCPuNSUp6v2icI9"
+            },
+            {
+              "relevance": "Quantified PBMC response",
+              "tool_call_id": "call_vzKCF8x75ugxkOPWSgu7ELK9"
+            },
+            {
+              "relevance": "Disease-specific response",
+              "tool_call_id": "call_5RaikkWFcSHCG1h1U9XwTQ92"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Acute leukocyte HSP induction",
+          "relation_type": "SUPPORTS",
+          "to_entity": "HSP70"
+        },
+        {
+          "from_entity": "Acute leukocyte HSP induction",
+          "relation_type": "SUPPORTS",
+          "to_entity": "HSP27"
+        },
+        {
+          "from_entity": "Training adaptation of leukocyte HSPs",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "HSP70"
+        },
+        {
+          "from_entity": "Training adaptation of leukocyte HSPs",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "HSP27"
+        },
+        {
+          "from_entity": "Context-dependent HSP response",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "HSP70"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 6, \"entities\": [{\"name\": \"Acute leukocyte HSP induction\", \"entityType\": \"FINDING\", \"observations\": [\"In 12 athletes running at 75% VO2max, whole-leukocyte HSP27 and inducible HSP70 mRNA/protein increased; induction was greater at 28\\u00b0C than 18\\u00b0C, with HSP27 especially heat-sensitive.\", \"In a 6-hour ultramarathon, blood-mononuclear-cell Hsp70 mRNA increased immediately post-race, whereas Hsp27 mRNA did not change.\"]}, {\"name\": \"Transient PBMC HSP response\", \"entityType\": \"FINDING\", \"observations\": [\"After a first moderate aerobic exercise bout, PBMC HSP70 mRNA rose 1.59-fold and HSP27 mRNA 1.49-fold at 3 hours; protein rose by 24 hours, 3.40-fold for HSP70 and 1.81-fold for HSP27; values returned to basal levels after 5 days of training.\"]}, {\"name\": \"Training adaptation of leukocyte HSPs\", \"entityType\": \"FINDING\", \"observations\": [\"Ten days of exercise heat acclimation increased basal PBMC HSP72 by 17.7% and HSP90 by 21.1%, but blunted ex-vivo heat-induced HSP72 expression.\", \"Across a year-long handball season, intracellular lymphocyte HSP70 increased in women with normal estradiol, while plasma HSP70 did not change.\"]}, {\"name\": \"Context-dependent HSP response\", \"entityType\": \"FINDING\", \"observations\": [\"In older adults, acute maximal exercise induced PBMC HSP70 and HSP27 after 12 weeks of explosive resistance training but not in untrained controls; this supports training-dependent priming but is not an endurance protocol.\", \"In chronic-fatigue-syndrome patients, PBMC HSP27 fell immediately after treadmill exercise and remained low at day 1; HSP60 and HSP90 also declined by day 7, unlike controls.\", \"Glutamine supplementation increased PBMC HSP70 before and 2 hours after a 60-minute run at 70% VO2max in 30\\u00b0C, showing that nutritional and environmental factors modify the response.\"]}, {\"name\": \"HSP70\", \"entityType\": \"PROTEIN\", \"observations\": [\"Human endurance exercise studies most consistently report transient leukocyte or PBMC HSP70/HSP72 induction, with earlier mRNA and later protein changes; chronic training can increase basal levels or blunt inducibility.\"]}, {\"name\": \"HSP27\", \"entityType\": \"PROTEIN\", \"observations\": [\"Human endurance exercise can increase leukocyte or PBMC HSP27, but the response is less consistent than HSP70 and depends on exercise duration, heat, disease, and sampling time.\"]}]}, \"relations_created\": {\"count\": 5, \"relations\": [{\"from\": \"Acute leukocyte HSP induction\", \"to\": \"HSP70\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Acute leukocyte HSP induction\", \"to\": \"HSP27\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"Training adaptation of leukocyte HSPs\", \"to\": \"HSP70\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Training adaptation of leukocyte HSPs\", \"to\": \"HSP27\", \"relationType\": \"ASSOCIATED_WITH\"}, {\"from\": \"Context-dependent HSP response\", \"to\": \"HSP70\", \"relationType\": \"ASSOCIATED_WITH\"}]}}, \"provenance\": {\"tool_call_id\": \"call_LlOaHejbaLZx9nKjkxIVH9KE\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_B0Atm2BTAqABmhSnR4F0Qhyf\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

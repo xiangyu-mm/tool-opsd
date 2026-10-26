@@ -1,0 +1,3 @@
+Yes. In a controlled swine ischemia–reperfusion study, pigs given carperitide (synthetic ANP) had significantly higher PPARγ mRNA and protein in the ischemic myocardium than untreated controls (PMID: 27510704). The increase was not significant in marginal or non-ischemic tissue. This supports ANP-associated induction of PPARγ expression in ischemic heart tissue, but does not establish that PPARγ mediates ANP’s cardioprotective effects or that ANP directly activates PPARγ.
+
+FINAL DECISION: YES

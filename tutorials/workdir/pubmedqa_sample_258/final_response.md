@@ -1,0 +1,3 @@
+Yes. The primary study reported higher serum progranulin in 37 people with lipodystrophy than in 37 matched controls (median 82.9 vs 73.6 μg/L; *p* = 0.005). In a murine lipodystrophy model, progranulin mRNA was increased in visceral, subcutaneous, and brown adipose tissue, and in muscle, versus wild-type mice. The study abstract does not specify the patient subtypes or mouse-model genotype (PMID: 27497155).
+
+FINAL DECISION: YES

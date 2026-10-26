@@ -1,0 +1,3 @@
+The presentation is concerning for acute DVT. Because he is only four days out from evacuation of a subdural hematoma, therapeutic anticoagulation carries substantial intracranial bleeding risk. Confirm the clot and its extent with venous ultrasound; if acute proximal DVT is confirmed and anticoagulation remains contraindicated, a temporary/retrievable IVC filter is the appropriate listed option. Anticoagulation should be reconsidered with neurosurgery when it is safe, with a plan to retrieve the filter.
+
+FINAL ANSWER: B

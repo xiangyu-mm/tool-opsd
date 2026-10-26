@@ -1,0 +1,1 @@
+{"answer":"CCOC(=O)C(C)(C)Oc1ccc(OCc2cnc(-c3ccc(C(F)(F)F)cc3)cc2C(F)(F)F)cc1C"}

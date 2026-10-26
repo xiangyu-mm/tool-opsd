@@ -1,0 +1,353 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_DFlnpMjcqdjdCr0C6deQXSr7",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease",
+        "drug"
+      ],
+      "search_rounds_budget": 5,
+      "search_target": "Determine whether maternal undernutrition during pregnancy or lactation induces premature reproductive senescence or accelerated reproductive aging in adult female rat offspring. Find direct rat studies and extract evidence on age at reproductive senescence, estrous-cycle cessation/irregularity, ovarian reserve, follicle depletion, fertility, and hypothalamic-pituitary-gonadal function; distinguish direct evidence from indirect developmental programming findings and note conflicting results. Prioritize peer-reviewed PubMed literature and report PMID, exposure timing/severity, offspring sex/age, endpoints, and direction of effect."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_zIXvRzGOxMkgOzS7M9DW0yxy",
+    "parent_tool_call_id": "call_DFlnpMjcqdjdCr0C6deQXSr7",
+    "round": 1,
+    "tool_input": {
+      "task_name": "fetal programming menopause rat",
+      "boolean_query_text": "rat prenatal undernutrition reproductive senescence female offspring menopause",
+      "top_k": 30,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='rat prenatal undernutrition reproductive senescence female offspring menopause',\n        top_k=30,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 3 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='rat prenatal undernutrition reproductive senescence female offspring menopause',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/fetal_programming_menopause_rat.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/fetal_programming_menopause_rat.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/fetal_programming_menopause_rat.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 25439841\nTitle: Maternal undernutrition induces premature reproductive senescence in adult female rat offspring.\nSource: Fertility and sterility (2015)\nAbstract: OBJECTIVE: To determine the effects of maternal undernutrition (MUN) on the reproductive axis of aging offspring. DESIGN: Animal (rat) study. SETTING: Research laboratory. ANIMAL(S): Female Sprague-Dawley rats. INTERVENTION(S): Food restriction during the second half of pregnancy in rats. MAIN OUTCOME MEASURE(S): Circulating gonadotropins, antimüllerian hormone (AMH), ovarian morphology, estrous cyclicity, and gene expression studies in the hypothalamus and ovary in 1-day-old (P1) and aging adult offspring. RESULT(S): Offspring of MUN dams had low birth weight (LBW) and by adult age developed obesity. In addition, 80% of adult LBW offspring had disruption of estrous cycle by 8 months of age, with the majority of animals in persistent estrous. Ovarian morphology was consistent with acyclicity, with ovaries exhibiting large cystic structures and reduced corpora lutea. There was an elevation in circulating T, increased ovarian expression of enzymes involved in androgen synthesis, an increase in plasma LH/FSH levels, a reduction in E2 levels, and no changes in AMH in adult LBW offspring compared with in control offspring. Hypothalamic expression of leptin receptor (ObRb), estrogen rece ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 38068890\nTitle: Age-Dependent Changes in the Effects of Androgens on Female Metabolic and Body Weight Regulation Systems in Humans and Laboratory Animals\nSource: Int J Mol Sci (2023)\nAbstract: Similarly, <m>female</m> @SPECIES_10116 @@@<m>rats</m>@@@ exposed to <m>prenatal</m> @DISEASE_Malnutrition @DISEASE_MESH:D044342 @@@<m>undernutrition</m>@@@ show ovaries with large cystic structures, reduced corpora lutea, and premature <m>reproductive</m> <m>senescence</m>.\n--------------------------------------------------------------------------------\nPMID: 40136716\nTitle: Sexual Dimorphism in Cardiometabolic Diseases: From Development to Senescence and Therapeutic Approaches\nSource: Cells (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36782211\nTitle: Maternal obesity and programming of metabolic syndrome in the offspring: searching for mechanisms in the adipocyte progenitor pool\nSource: BMC Med (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35207581\nTitle: Resveratrol and Reproductive Health\nSource: Life (Basel) (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35268082\nTitle: The Problem of Malnutrition Associated with Major Depressive Disorder from a Sex-Gender Perspective\nSource: Nutrients (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 26854801\nTitle: Glucose intolerance develops prior to increased adiposity and accelerated cessation of estrous cyclicity in female growth-restricted rats\nSource: Pediatr Res (2016)\nAbstract: <m>Reproductive</m> <m>senescence</m> and cessation of estrous cyclicity occur about 18 months of age in <m>female</m> SD @SPECIES_10116 @@@<m>rats</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 30477143\nTitle: Oxidative Stress as Cause, Consequence, or Biomarker of Altered Female Reproduction and Development in the Space Environment\nSource: Int J Mol Sci (2018)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 29670080\nTitle: Starvation during pregnancy impairs fetal oogenesis and folliculogenesis in offspring in the mouse\nSource: Cell Death Dis (2018)\nAbstract: Food restriction during the second half of pregnancy in @SPECIES_10116 @@@<m>rats</m>@@@ resulted in premature <m>reproductive</m> <m>senescence</m> in <m>female</m> <m>offspring</m>.\n--------------------------------------------------------------------------------\nPMID: 34557302\nTitle: Reinterpreting patterns of variation in human thyroid function\nSource: Evol Med Public Health (2020)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_OvtzHejkclpIlZDT5awrQyPd",
+    "parent_tool_call_id": "call_zIXvRzGOxMkgOzS7M9DW0yxy",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULT|offspring|estrous|senescence|AMH|follicle|ovarian|LH|FSH|fertility|hypothalam|age|pregnancy|lactation",
+      "pmid": "25439841"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25439841')\noutput = format_paper_content_output(result, filter_keywords='RESULT|offspring|estrous|senescence|AMH|follicle|ovarian|LH|FSH|fertility|hypothalam|age|pregnancy|lactation')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (4):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULT|offspring|estrous|senescence|AMH|folli ... |fertility|hypothalam|age|pregnancy|lactation\n      \u001b[90mpmid:\u001b[0m 25439841\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULT|offspring|estrous|senescence|AMH|follicle|ovarian|apoptosis|vascular|age|pregnancy|lactation\n      \u001b[90mpmid:\u001b[0m 25810471\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULT|offspring|KNDy|ovarian|senescence|estrous|LH|FSH|hypothalam|age|undernutrition\n      \u001b[90mpmid:\u001b[0m 36408965\n\n  \u001b[1m\u001b[93m[4] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULT|offspring|estrous|reproductive|age|growth-restricted|fertility|ovarian\n      \u001b[90mpmid:\u001b[0m 26854801\n\n=== PMID: 25439841 ===\n\nTitle: Maternal undernutrition induces premature reproductive senescence in adult female rat offspring.\n\nJournal/Date: Fertility and sterility (2015)\n\nMeSH Keywords: Animals, Female, Hypothalamo-Hypophyseal System, Malnutrition, Menopause, Premature, Ovary, Pregnancy, Prenatal Exposure Delayed Effects\n\n\n--- ABSTRACT ---\n[OBJECTIVE]: To determine the effects of maternal undernutrition (MUN) on the reproductive axis of aging offspring.\n[DESIGN]: Animal (rat) study.\n[SETTING]: Research laboratory.\n[ANIMAL(S)]: Female Sprague-Dawley rats.\n[INTERVENTION(S)]: Food restriction during the second half of pregnancy in rats.\n[MAIN OUTCOME MEASURE(S)]: Circulating gonadotropins, antimüllerian hormone (AMH), ovarian morphology, estrous cyclicity, and gene expression studies in the hypothalamus and ovary in 1-day-old (P1) and aging adult offspring.\n[RESULT(S)]: Offspring of MUN dams had low birth weight (LBW) and by adult age developed obesity. In addition, 80% of adult LBW offspring had disruption of estrous cycle by 8 months of age, with the majority of animals in persistent estrous. Ovarian morphology was consistent with acyclicity, with ovaries exhibiting large cystic structures and reduced corpora lutea. There was an elevation in circulating T, increased ovarian expression of enzymes involved in androgen synthesis, an increase in plasma LH/FSH levels, a reduction in E2 levels, and no changes in AMH in adult LBW offspring compared with in control offspring. Hypothalamic expression of leptin receptor (ObRb), estrogen receptor-α (ER-α), and GnRH protein was altered in an age-dependent manner with increased ObRb and ER-α expression in P1 LBW hypothalami and a reversal of this expression pattern in adult LBW hypothalami.\n[CONCLUSION(S)]: Our data indicate that the maternal nutritional environment programs the reproductive potential of the offspring through alteration of the hypothalamic-pituitary-gonadal axis. The premature reproductive senescence in LBW offspring could be secondary to the development of obesity and hyperleptinemia in these animals in adult life.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nMUN dams gave birth to pups that had lower body weights (LBW) and decreased plasma leptin levels at 1 day of life (P1). When nursed by ad libitum fed dams, LBW offspring demonstrated rapid catch-up growth at 3 week, resulting in increased weight, percent body fat, and plasma leptin levels in the presence of insulin resistance in adults.\n\nTable 1 shows the plasma hormone levels. In the P1 offspring, there was a significant increase in plasma LH, a decrease in estradiol and no change in FSH levels in LBW offspring as compared with controls. In the adult female offspring during diestrus, there was persistent increase in LH and lower estradiol levels as compared to controls in the same phase of the cycle. Furthermore, LBW adult females showed increased FSH and testosterone levels thou...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 7,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_9EiMxDRbDY87xAjKL3MMUE9m",
+    "parent_tool_call_id": "call_zIXvRzGOxMkgOzS7M9DW0yxy",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULT|offspring|estrous|reproductive|age|growth-restricted|fertility|ovarian",
+      "pmid": "26854801"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('26854801')\noutput = format_paper_content_output(result, filter_keywords='RESULT|offspring|estrous|reproductive|age|growth-restricted|fertility|ovarian')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 26854801 ===\n\nTitle: Glucose intolerance develops prior to increased adiposity and accelerated cessation of estrous cyclicity in female growth-restricted rats.\n\nJournal/Date: Pediatric research (2016)\n\nMeSH Keywords: Adiposity, Animals, Body Composition, Estrus, Female, Fetal Growth Retardation, Glucose, Glucose Intolerance\n\n\n--- ABSTRACT ---\n[BACKGROUND]: The incidence of metabolic disease increases in early menopause. Low birth weight influences the age at menopause. Thus, this study tested the hypothesis that intrauterine growth restriction programs early reproductive aging and impaired glucose homeostasis in female rats.\n[METHODS]: Estrous cyclicity, body composition, and glucose homeostasis were determined in female control and growth-restricted rats at 6 and 12 mo of age; sex steroids at 12 mo.\n[RESULTS]: Glucose intolerance was present at 6 mo of age prior to cessation of estrous cyclicity and increased adiposity in female growth-restricted rats. However, female growth-restricted rats exhibited persistent estrus and a significant increase in adiposity, fasting glucose, and testosterone at 12 mo of age (P < 0.05). Insulin release in response to a glucose challenge was blunted in conjunction with a reduction in protein expression of pancreatic glucose transporter type 2 and estrogen receptor-α at 12 mo of age in female growth-restricted rats (P < 0.05).\n[CONCLUSION]: This study demonstrated that slow fetal growth programmed glucose intolerance that developed prior to early estrous acyclicity; yet, fasting glucose levels were elevated in conjunction with increased adiposity, accelerated cessation of estrous cyclicity and a shift toward testosterone excess at 12 mo of age in female growth-restricted rats.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nRESULTS\n\nEffect of intrauterine growth restriction on reproductive aging\n\nPreviously, we reported that uterine weight did not differ in growth-restricted rats relative to age-matched control counterparts at 12 months of age. To determine if sex steroids differed in normotensive female control rats relative to female growth-restricted rats that demonstrated a significant increase in blood pressure at 12 months of age, samples collected from this previous study were analyzed for circulating estradiol, testosterone, luteinizing hormone (LH) or follicle stimulating hormone (FSH) levels. Estradiol levels did not differ at 12 months of age upon comparison of growth-restricted rats relative to control (Figure 1, panel a). However, circulating testosterone levels were significantly elevated in the...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_7a6q7EDw2e1f0iHABv9Zoz1a",
+    "parent_tool_call_id": "call_9EiMxDRbDY87xAjKL3MMUE9m",
+    "round": 3,
+    "tool_input": {
+      "task_name": "maternal calorie restriction rat estrous",
+      "boolean_query_text": "maternal calorie restriction rat female offspring estrous cycle ovarian follicles adult",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='maternal calorie restriction rat female offspring estrous cycle ovarian follicles adult',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='maternal calorie restriction rat female offspring estrous cycle ovarian follicles adult',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/maternal_calorie_restriction_rat_estrous.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/maternal_calorie_restriction_rat_estrous.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/maternal_calorie_restriction_rat_estrous.csv'\nTotal results found: 21\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 29351580\nTitle: Maternal nutrient restriction impairs young adult offspring ovarian signaling resulting in reproductive dysfunction and follicle loss.\nSource: Biology of reproduction (2018)\nAbstract: Reproductive abnormalities are included as health complications in offspring exposed to poor prenatal nutrition. We have previously shown in a rodent model that offspring born to nutrient restriction during pregnancy are born small, enter puberty early, and display characteristics of early ovarian aging as adults. The present study investigated whether key proteins involved in follicle recruitment and growth mediate ovarian follicle loss. Pregnant rats were randomized to a standard diet throughout pregnancy and lactation (CON), or a calorie-restricted (50% of control) diet (UN) during pregnancy. Offspring reproductive phenotype was investigated at postnatal days 4, 27, and 65. Maternal UN resulted in young adult (P65) irregular estrous cyclicity due to persistent estrus, a significant loss of antral follicles, corpora lutea, and an increase in atretic follicles. This decrease in growing follicles in UN offspring appears to be due to increased apoptosis as seen by immunopositive staining of pro-apoptotic factor CASP3 (caspase 3) in ovaries of young adult offspring. UN prepubertal offspring had reduced expression levels of Fshr in antral follicles, which may contribute to a decrease  ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 36408965\nTitle: Long-term effects of prenatal undernutrition on female rat hypothalamic KNDy neurons\nSource: Endocr Connect (2022)\nAbstract: <m>Maternal</m> nutrient <m>restriction</m> impairs the <m>offspring's</m> <m>ovarian</m> function, such as delayed fetal follicular development in @SPECIES_9940 @@@sheep@@@, decreased antral <m>follicle</m> numbers in @SPECIES_10116 @@@<m>rats</m>@@@ and @SPECIES_9913 @@@cows@@@, and reduced <m>adult</m> @CHEMICAL_Progesterone @CHEMICAL_MESH:D011374 @@@progesterone@@@ levels later in life in @SPECIES_10116 @@@<m>rats</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 40810470\nTitle: A role for the antioxidants coenzyme Q10 and pyrroloquinoline quinone in mitigating obesity-associated reproductive dysfunction \nSource: Biol Reprod (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36004354\nTitle: The PNA mouse may be the best animal model of polycystic ovary syndrome\nSource: Front Endocrinol (Lausanne) (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36325489\nTitle: Developmental toxicant exposures and sex-specific effects on epigenetic programming and cardiovascular health across generations\nSource: Environ Epigenet (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38131197\nTitle: Metabolic hormones are integral regulators of female reproductive health and function\nSource: Biosci Rep (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37570248\nTitle: An Overview of the Health Effects of Bisphenol A from a One Health Perspective\nSource: Animals (Basel) (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 35631188\nTitle: Litter Size Reduction as a Model of Overfeeding during Lactation and Its Consequences for the Development of Metabolic Diseases in the Offspring\nSource: Nutrients (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 41272836\nTitle: Managing the negative regulation of Sirtuins in a murine model of premature ovarian failure: focusing on the key roles of antioxidants\nSource: J Ovarian Res (2025)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36836035\nTitle: Polycystic Ovary Syndrome: Challenges and Possible Solutions\nSource: J Clin Med (2023)\nAbstract: Animal studies have shown that supplementation with interleukin-22 (@GENE_IL22 @GENE_50929 @@@IL-22@@@) or @CHEMICAL_Glycodeoxycholic_Acid @CHEMICAL_MESH:D006002 @@@glycodeoxycholic acid@@@ (@CHEMICAL_Glycodeoxycholic_Acid @CHEMICAL_MESH:D006002 @@@GDCA@@@) ameliorates @DISEASE_Insulin_Resistance @DISEASE_MESH:D007333 @@@insulin resistance@@@ in @SPECIES_821 @@@B. vulgatus@@@ @SPECIES_10090 @@@mice@@@ and significantly corrects <m>estrous</m> <m>cycle</m> dysfunction, alters <m>ovarian</m> morphology, and improves abnormal hormone levels.\n--------------------------------------------------------------------------------\nPMID: 33551774\nTitle: Animal Models for Anorexia Nervosa:A Systematic Review\nSource: Front Hum Neurosci (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 39605943\nTitle: Mitochondria: the epigenetic regulators of ovarian aging and longevity\nSource: Front Endocrinol (Lausanne) (2024)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34209765\nTitle: Mitochondrial Sirtuins in Reproduction\nSource: Antioxidants (Basel) (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 36611967\nTitle: Endocrine Disrupting Chemicals in Polycystic Ovary Syndrome: The Relevant Role of the Theca and Granulosa Cells in the Pathogenesis of the Ovarian Dysfunction\nSource: Cells (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37636431\nTitle: The impact of dietary fructose on gut permeability, microbiota, abdominal adiposity, insulin signaling and reproductive function\nSource: Heliyon (2023)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_CoZZmv59DM8kJbWdJehsAVfH",
+    "parent_tool_call_id": "call_7a6q7EDw2e1f0iHABv9Zoz1a",
+    "round": 4,
+    "tool_input": {
+      "filter_keywords": "ABSTRACT|RESULTS|P65|estrous|follicles|corpora lutea|atretic|Fshr|AMH|fertility|apoptosis|pregnancy|lactation|calorie",
+      "pmid": "29351580"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('29351580')\noutput = format_paper_content_output(result, filter_keywords='ABSTRACT|RESULTS|P65|estrous|follicles|corpora lutea|atretic|Fshr|AMH|fertility|apoptosis|pregnancy|lactation|calorie')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (3):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m ABSTRACT|RESULTS|P65|estrous|follicles|corpor ... rtility|apoptosis|pregnancy|lactation|calorie\n      \u001b[90mpmid:\u001b[0m 29351580\n\n  \u001b[1m\u001b[93m[2] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m ABSTRACT|RESULTS|follicles|reserve|apoptosis|vascular|pregnancy|lactation|50%|adult\n      \u001b[90mpmid:\u001b[0m 25810471\n\n  \u001b[1m\u001b[93m[3] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m ABSTRACT|RESULTS|estrous|LH|FSH|KNDy|29 weeks|puberty|undernutrition\n      \u001b[90mpmid:\u001b[0m 36408965\n\n=== PMID: 29351580 ===\n\nTitle: Maternal nutrient restriction impairs young adult offspring ovarian signaling resulting in reproductive dysfunction and follicle loss.\n\nJournal/Date: Biology of reproduction (2018)\n\nMeSH Keywords: Animals, Apoptosis, Caloric Restriction, Caspase 3, Estrous Cycle, Female, Follicle Stimulating Hormone, Maternal Nutritional Physiological Phenomena\n\n\n--- ABSTRACT ---\nReproductive abnormalities are included as health complications in offspring exposed to poor prenatal nutrition. We have previously shown in a rodent model that offspring born to nutrient restriction during pregnancy are born small, enter puberty early, and display characteristics of early ovarian aging as adults. The present study investigated whether key proteins involved in follicle recruitment and growth mediate ovarian follicle loss. Pregnant rats were randomized to a standard diet throughout pregnancy and lactation (CON), or a calorie-restricted (50% of control) diet (UN) during pregnancy. Offspring reproductive phenotype was investigated at postnatal days 4, 27, and 65. Maternal UN resulted in young adult (P65) irregular estrous cyclicity due to persistent estrus, a significant loss of antral follicles, corpora lutea, and an increase in atretic follicles. This decrease in growing follicles in UN offspring appears to be due to increased apoptosis as seen by immunopositive staining of pro-apoptotic factor CASP3 (caspase 3) in ovaries of young adult offspring. UN prepubertal offspring had reduced expression levels of Fshr in antral follicles, which may contribute to a decrease in PI3K/AKT activation evident as a decrease in pAKT immunolocalization in prepubertal antral follicles. Moreover, neonatal ovaries of UN offspring show decreased levels of immunopositive staining for AMHR2 (anti-mullerian hormone receptor 2). Collectively, these data demonstrate that maternal UN during pregnancy impacts ovarian function in offspring as early as P65 and provides a model for understanding the mechanisms driving early life UN-induced follicle loss and reproductive dysfunction.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_jCJdEq5jjW8jImX0S5EJb7CE",
+    "parent_tool_call_id": "call_7a6q7EDw2e1f0iHABv9Zoz1a",
+    "round": 4,
+    "tool_input": {
+      "filter_keywords": "ABSTRACT|RESULTS|follicles|reserve|apoptosis|vascular|pregnancy|lactation|50%|adult",
+      "pmid": "25810471"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('25810471')\noutput = format_paper_content_output(result, filter_keywords='ABSTRACT|RESULTS|follicles|reserve|apoptosis|vascular|pregnancy|lactation|50%|adult')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 25810471 ===\n\nTitle: Early life exposure to undernutrition induces ER stress, apoptosis, and reduced vascularization in ovaries of adult rat offspring.\n\nJournal/Date: Biology of reproduction (2015)\n\nMeSH Keywords: Animals, Antioxidants, Apoptosis, Apoptosis Regulatory Proteins, Autophagy, Beclin-1, Caloric Restriction, Endoplasmic Reticulum Stress\n\n\n--- ABSTRACT ---\nMaternal nutritional restriction has been shown to induce impairments in a number of organ systems including the ovary. We have previously shown that maternal undernutrition induces fetal growth restriction and low birth weight, and results in an offspring ovarian phenotype characteristic of premature ovarian aging with reduced ovarian reserve. In the present study, we set out to investigate the underlying mechanisms that lead offspring of undernourished mothers to premature ovarian aging. Pregnant dams were randomized to 1) a standard diet throughout pregnancy and lactation (control), 2) a calorie-restricted (50% of control) diet during pregnancy, 3) a calorie-restricted (50% of control) diet during pregnancy and lactation, or 4) a calorie-restricted (50% of control) diet during lactation alone. The present study shows that early life undernutrition-induced reduction of adult ovarian follicles may be mediated by increased ovarian endoplasmic reticulum stress in a manner that increased follicular apoptosis but not autophagy. These changes were associated with a loss of ovarian vessel density and are consistent with an accelerated ovarian aging phenotype. Whether these changes are mediated specifically by a reduction in the local antioxidant environment is unclear, although our data suggest the possibility that ovarian melatonin may play a part in early life nutritional undernutrition and impaired offspring folliculogenesis.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_KJeHkpG74F0uRXiydISTaKF2",
+    "parent_tool_call_id": "call_7a6q7EDw2e1f0iHABv9Zoz1a",
+    "round": 4,
+    "tool_input": {
+      "filter_keywords": "ABSTRACT|RESULTS|estrous|LH|FSH|KNDy|29 weeks|puberty|undernutrition",
+      "pmid": "36408965"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('36408965')\noutput = format_paper_content_output(result, filter_keywords='ABSTRACT|RESULTS|estrous|LH|FSH|KNDy|29 weeks|puberty|undernutrition')\nprint(output)\n\n```\n\n### Output:\n```\n=== PMID: 36408965 ===\n\nTitle: Long-term effects of prenatal undernutrition on female rat hypothalamic KNDy neurons.\n\nJournal/Date: Endocrine connections (2023)\n\nMeSH Keywords: None listed\n\n\n--- ABSTRACT ---\nThe nutritional environment during development periods induces metabolic programming, leading to metabolic disorders and detrimental influences on human reproductive health. This study aimed to determine the long-term adverse effect of intrauterine malnutrition on the reproductive center kisspeptin-neurokinin B-dynorphin A (KNDy) neurons in the hypothalamic arcuate nucleus (ARC) of female offspring. Twelve pregnant rats were divided into ad-lib-fed (control, n = 6) and 50% undernutrition (UN, n = 6) groups. The UN group was restricted to 50% daily food intake of the control dams from gestation day 9 until term delivery. Differences between the two groups in terms of various maternal parameters, including body weight (BW), pregnancy duration, and litter size, as well as birth weight, puberty onset, estrous cyclicity, pulsatile luteinizing hormone (LH) secretion, and hypothalamic gene expression of offspring, were determined. Female offspring of UN dams exhibited low BW from birth to 3 weeks, whereas UN offspring showed signs of precocious puberty; hypothalamic Tac3 (a neurokinin B gene) expression was increased in prepubertal UN offspring, and the BW at the virginal opening was lower in UN offspring than that in the control group. Interestingly, the UN offspring showed significant decreases in the number of KNDy gene-expressing cells after 29 weeks of age, but the number of ARC kisspeptin-immunoreactive cells, pulsatile LH secretions, and estrous cyclicity were comparable between the groups. In conclusion, intrauterine undernutrition induced various changes in KNDy gene expression depending on the life stage. Thus, intrauterine undernutrition affected hypothalamic developmental programming in female rats.\n\n\n[FULL TEXT STATUS]: Open-access full text is AVAILABLE, but no passages matched the provided keywords. Displaying key section preview below.\n\n\n--- KEY SECTION PREVIEW ---\n\n[RESULTS]\nResults\n\nEstablishing a model of low birth weight infants by maternal food restriction\n\nThere were no significant differences in BW between the two maternal groups (control groups and UN groups) on GD9; however, maternal food restriction caused a significant decrease in maternal BW on GD21 (Table 1). The maternal BW changes in the UN group from GD9 to GD21 were significantly lower than those of the control group (P < 0.05, Table 1). The BW at PND1 decreased in UN female pups compared to the control because of maternal food restriction (P < 0.05, Table 1) but was unaffected by other factors such as the pregnancy period, sex ratio, and litter size (Table 1). The BW in UN pups was significantly lower than that of control from PND1 to 3-week-old rats (P < 0.05, Table 1 and Fig. 2A).\n\nEffect of...\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 14,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_H72lzKJi0lIIsP0NF1MbQ9Cn",
+    "parent_tool_call_id": "call_KJeHkpG74F0uRXiydISTaKF2",
+    "round": 5,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Direct evidence supports accelerated reproductive aging after severe prenatal maternal undernutrition in female rats. In PMID 25439841, food restriction during the second half of pregnancy produced low-birth-weight female Sprague-Dawley offspring; by 8 months, 80% had disrupted estrous cycles, mostly persistent estrus, with cystic ovaries and reduced corpora lutea. Adult offspring had increased LH/FSH and testosterone, reduced estradiol, while AMH was unchanged, and age-dependent alterations in hypothalamic ObRb, ER-alpha, and GnRH. The authors explicitly classified this as premature reproductive senescence, potentially mediated partly by later obesity/hyperleptinemia.",
+          "source_tools": [
+            {
+              "relevance": "Direct rat study with reproductive-senescence endpoint, cycle cessation/disruption, ovarian morphology, hormones, and HPG-axis measures",
+              "tool_call_id": "call_OvtzHejkclpIlZDT5awrQyPd"
+            }
+          ]
+        },
+        {
+          "finding": "A related direct rat study found earlier estrous dysfunction and follicle loss before conventional reproductive senescence. With 50% caloric restriction during pregnancy only, female offspring at P65 showed irregular cycles due to persistent estrus, fewer antral follicles and corpora lutea, more atretic follicles, increased ovarian CASP3 staining, reduced prepubertal antral-follicle Fshr and PI3K/AKT signaling, and reduced neonatal AMHR2. This is strong direct evidence of impaired ovarian reserve/follicle dynamics, but it did not measure fertility or age at final reproductive senescence.",
+          "source_tools": [
+            {
+              "relevance": "Direct rat offspring ovarian and estrous-cycle study with exposure severity/timing and mechanistic follicle endpoints",
+              "tool_call_id": "call_CoZZmv59DM8kJbWdJehsAVfH"
+            }
+          ]
+        },
+        {
+          "finding": "A mechanistic follow-up of the same general undernutrition model used 50% caloric restriction during pregnancy, during pregnancy plus lactation, or during lactation alone. In adult female offspring, reduced ovarian follicle number was associated with ovarian ER stress, increased follicular apoptosis, and reduced ovarian vessel density, interpreted as an accelerated ovarian-aging phenotype. The abstract does not provide the exact adult age, comparative magnitude by exposure window, AMH, fertility, or estrous-cycle results, so those points remain insufficiently resolved.",
+          "source_tools": [
+            {
+              "relevance": "Direct rat study comparing gestational, gestational-plus-lactational, and lactational undernutrition with adult ovarian reserve mechanisms",
+              "tool_call_id": "call_jCJdEq5jjW8jImX0S5EJb7CE"
+            }
+          ]
+        },
+        {
+          "finding": "The strongest evidence for HPG-axis programming is not uniformly senescent. In PMID 36408965, 50% maternal food restriction from gestational day 9 to term caused low birth weight and precocious puberty; after 29 weeks, KNDy gene-expressing cells decreased, but pulsatile LH secretion and estrous cyclicity were comparable with controls. Thus, hypothalamic developmental programming occurred without demonstrable accelerated reproductive senescence in that study.",
+          "source_tools": [
+            {
+              "relevance": "Direct rat study of hypothalamic KNDy neurons, puberty, LH pulsatility, and estrous cyclicity through adulthood",
+              "tool_call_id": "call_KJeHkpG74F0uRXiydISTaKF2"
+            }
+          ]
+        },
+        {
+          "finding": "A separate growth-restricted female-rat study supports an earlier transition toward reproductive acyclicity but provides indirect exposure linkage rather than a clearly described maternal diet protocol in the retrieved abstract. At 6 months, glucose intolerance preceded cycle cessation; at 12 months, growth-restricted rats had persistent estrus, increased adiposity, fasting glucose, and testosterone, with accelerated cessation of estrous cyclicity. This corroborates the phenotype but should be classified as developmental growth-restriction evidence rather than definitive maternal-undernutrition evidence.",
+          "source_tools": [
+            {
+              "relevance": "Direct female-rat reproductive-aging phenotype but exposure model is intrauterine growth restriction, not clearly specified maternal undernutrition in the retrieved record",
+              "tool_call_id": "call_9EiMxDRbDY87xAjKL3MMUE9m"
+            }
+          ]
+        },
+        {
+          "finding": "Overall conclusion: severe prenatal undernutrition in rats can induce premature reproductive senescence/accelerated reproductive aging, most consistently manifested as persistent estrus or early estrous irregularity, follicle depletion/atresia, ovarian cystic change, and disrupted LH/FSH-steroid feedback. Evidence for reduced fertility itself, exact age at permanent estrous cessation, and lactation-only effects is sparse in the retrieved PubMed records. The KNDy study is an important conflict/qualification because it found altered hypothalamic programming but no estrous or LH-pulsatility difference through the reported adult period.",
+          "source_tools": [
+            {
+              "relevance": "Synthesis supported by direct senescence study",
+              "tool_call_id": "call_OvtzHejkclpIlZDT5awrQyPd"
+            },
+            {
+              "relevance": "Synthesis supported by young-adult ovarian reserve study",
+              "tool_call_id": "call_CoZZmv59DM8kJbWdJehsAVfH"
+            },
+            {
+              "relevance": "Synthesis supported by exposure-window ovarian mechanism study",
+              "tool_call_id": "call_jCJdEq5jjW8jImX0S5EJb7CE"
+            },
+            {
+              "relevance": "Conflicting HPG-axis/estrous result",
+              "tool_call_id": "call_KJeHkpG74F0uRXiydISTaKF2"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 16,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_8RxiHQTRznIwySPeg69SLDVQ",
+    "parent_tool_call_id": "call_dWzOyYxp0KkCXbhQQIzOGULm",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE / PHENOTYPE",
+          "name": "Premature reproductive senescence",
+          "observations": [
+            "In female rats, severe prenatal maternal undernutrition can produce an accelerated reproductive-aging phenotype with persistent estrus, ovarian follicle loss or atresia, cystic ovarian change, and altered gonadotropin-steroid signaling.",
+            "Evidence is not uniform: one gestational-restriction study found altered KNDy neuroendocrine programming without abnormal adult estrous cyclicity or LH pulsatility."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Overall synthesis of supportive and conflicting rat evidence",
+              "tool_call_id": "call_OvtzHejkclpIlZDT5awrQyPd"
+            },
+            {
+              "relevance": "Overall synthesis of supportive and conflicting rat evidence",
+              "tool_call_id": "call_KJeHkpG74F0uRXiydISTaKF2"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25439841",
+          "observations": [
+            "Late-gestation maternal food restriction in Sprague-Dawley rats was followed by disrupted estrous cycles in 80% of female offspring by 8 months, mostly persistent estrus, with cystic ovarian structures, fewer corpora lutea, increased LH/FSH and testosterone, and reduced estradiol; AMH was unchanged."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct evidence explicitly classified as premature reproductive senescence",
+              "tool_call_id": "call_OvtzHejkclpIlZDT5awrQyPd"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:29351580",
+          "observations": [
+            "Maternal intake at 50% of control during pregnancy caused persistent-estrus irregular cycles, fewer antral follicles and corpora lutea, more atretic follicles, and increased ovarian CASP3 in female offspring at postnatal day 65."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct evidence of early ovarian dysfunction and follicle depletion",
+              "tool_call_id": "call_CoZZmv59DM8kJbWdJehsAVfH"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:25810471",
+          "observations": [
+            "Pregnancy, pregnancy-plus-lactation, or lactation-only 50% caloric restriction was associated in adult female offspring with fewer ovarian follicles, increased ovarian ER stress and follicular apoptosis, and reduced ovarian vessel density, interpreted as accelerated ovarian aging."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Mechanistic evidence for reduced ovarian reserve",
+              "tool_call_id": "call_jCJdEq5jjW8jImX0S5EJb7CE"
+            }
+          ]
+        },
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:36408965",
+          "observations": [
+            "Maternal food restriction to 50% from gestational day 9 to term caused low birth weight, precocious puberty, and altered KNDy-cell measures, but adult estrous cyclicity and pulsatile LH secretion remained comparable with controls through the reported follow-up."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Important negative or discordant result",
+              "tool_call_id": "call_KJeHkpG74F0uRXiydISTaKF2"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Prenatal restriction phenotype",
+          "observations": [
+            "The strongest direct evidence supports accelerated reproductive aging rather than proven permanent infertility: persistent estrus and ovarian pathology occur early, while exact age at irreversible reproductive cessation and adult fecundity are usually not measured."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Evidence-level qualification across direct studies",
+              "tool_call_id": "call_OvtzHejkclpIlZDT5awrQyPd"
+            },
+            {
+              "relevance": "Evidence-level qualification across direct studies",
+              "tool_call_id": "call_CoZZmv59DM8kJbWdJehsAVfH"
+            },
+            {
+              "relevance": "Evidence-level qualification across direct studies",
+              "tool_call_id": "call_jCJdEq5jjW8jImX0S5EJb7CE"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "PMID:25439841",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Premature reproductive senescence"
+        },
+        {
+          "from_entity": "PMID:29351580",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Premature reproductive senescence"
+        },
+        {
+          "from_entity": "PMID:25810471",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Premature reproductive senescence"
+        },
+        {
+          "from_entity": "PMID:36408965",
+          "relation_type": "INCONCLUSIVE_FOR",
+          "to_entity": "Premature reproductive senescence"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 6, \"entities\": [{\"name\": \"Premature reproductive senescence\", \"entityType\": \"DISEASE / PHENOTYPE\", \"observations\": [\"In female rats, severe prenatal maternal undernutrition can produce an accelerated reproductive-aging phenotype with persistent estrus, ovarian follicle loss or atresia, cystic ovarian change, and altered gonadotropin-steroid signaling.\", \"Evidence is not uniform: one gestational-restriction study found altered KNDy neuroendocrine programming without abnormal adult estrous cyclicity or LH pulsatility.\"]}, {\"name\": \"PMID:25439841\", \"entityType\": \"PAPER\", \"observations\": [\"Late-gestation maternal food restriction in Sprague-Dawley rats was followed by disrupted estrous cycles in 80% of female offspring by 8 months, mostly persistent estrus, with cystic ovarian structures, fewer corpora lutea, increased LH/FSH and testosterone, and reduced estradiol; AMH was unchanged.\"]}, {\"name\": \"PMID:29351580\", \"entityType\": \"PAPER\", \"observations\": [\"Maternal intake at 50% of control during pregnancy caused persistent-estrus irregular cycles, fewer antral follicles and corpora lutea, more atretic follicles, and increased ovarian CASP3 in female offspring at postnatal day 65.\"]}, {\"name\": \"PMID:25810471\", \"entityType\": \"PAPER\", \"observations\": [\"Pregnancy, pregnancy-plus-lactation, or lactation-only 50% caloric restriction was associated in adult female offspring with fewer ovarian follicles, increased ovarian ER stress and follicular apoptosis, and reduced ovarian vessel density, interpreted as accelerated ovarian aging.\"]}, {\"name\": \"PMID:36408965\", \"entityType\": \"PAPER\", \"observations\": [\"Maternal food restriction to 50% from gestational day 9 to term caused low birth weight, precocious puberty, and altered KNDy-cell measures, but adult estrous cyclicity and pulsatile LH secretion remained comparable with controls through the reported follow-up.\"]}, {\"name\": \"Prenatal restriction phenotype\", \"entityType\": \"FINDING\", \"observations\": [\"The strongest direct evidence supports accelerated reproductive aging rather than proven permanent infertility: persistent estrus and ovarian pathology occur early, while exact age at irreversible reproductive cessation and adult fecundity are usually not measured.\"]}]}, \"relations_created\": {\"count\": 4, \"relations\": [{\"from\": \"PMID:25439841\", \"to\": \"Premature reproductive senescence\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:29351580\", \"to\": \"Premature reproductive senescence\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:25810471\", \"to\": \"Premature reproductive senescence\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:36408965\", \"to\": \"Premature reproductive senescence\", \"relationType\": \"INCONCLUSIVE_FOR\"}]}}, \"provenance\": {\"tool_call_id\": \"call_8RxiHQTRznIwySPeg69SLDVQ\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_dWzOyYxp0KkCXbhQQIzOGULm\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

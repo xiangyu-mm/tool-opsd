@@ -1,0 +1,2 @@
+The SELFIES string corresponds to **`COC(CC1CO1)C#C`**. Its reported HOMO energy is **−0.2642 Hartree (Ha)**, from an InChIKey-matched QM9 record. The available record does not specify the calculation method, so that detail cannot be verified.  
+**Source:** chemistry search result `call_xthxlbk8J2RB0dxRegnEQUxH`.

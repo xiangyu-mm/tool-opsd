@@ -1,0 +1,169 @@
+[
+  {
+    "step": 0,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_7bbYmj07EckcBnDJYL33zqRQ",
+    "parent_tool_call_id": null,
+    "round": 1,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers"
+      ],
+      "search_rounds_budget": 3,
+      "search_target": "Determine whether postprandial chylomicrons and VLDL are lowered more effectively than chylomicron remnants after treatment with n-3 fatty acids in patients with severe hypertriacylglycerolemia. Find the relevant human study or studies, identify intervention, comparator, lipoprotein fractions, and quantitative or directional results sufficient to answer the yes/no question."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 1,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_7zyI5Oo6w9FABEDkbvGmE0cW",
+    "parent_tool_call_id": "call_7bbYmj07EckcBnDJYL33zqRQ",
+    "round": 1,
+    "tool_input": {
+      "task_name": "n3 lipoproteins",
+      "boolean_query_text": "severe hypertriglyceridemia postprandial chylomicrons VLDL chylomicron remnants n-3 fatty acids",
+      "top_k": 20,
+      "max_requests_per_second": 3,
+      "max_retries": 3
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='severe hypertriglyceridemia postprandial chylomicrons VLDL chylomicron remnants n-3 fatty acids',\n        top_k=20,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 2 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='severe hypertriglyceridemia postprandial chylomicrons VLDL chylomicron remnants n-3 fatty acids',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/workdir/n3_lipoproteins.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/n3_lipoproteins.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/workdir/n3_lipoproteins.csv'\nTotal results found: 21\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 10731497\nTitle: Postprandial chylomicrons and VLDLs in severe hypertriacylglycerolemia are lowered more effectively than are chylomicron remnants after treatment with n-3 fatty acids.\nSource: The American journal of clinical nutrition (2000)\nAbstract: BACKGROUND: n-3 Fatty acids lower plasma triacylglycerols not only in the fasting state but also in the postprandial state. However, it is not known whether chylomicrons, chylomicron remnants, and VLDLs are all affected equally or whether some lipoprotein species are lowered preferentially. OBJECTIVE: Lipoproteins, including large and small chylomicron remnants, were determined specifically with the aid of a newly developed method involving a combination of size-exclusion chromatography and fluorometric determination of retinyl palmitate, which served as a marker for exogenous fat. DESIGN: Twelve hypertriacylglycerolemic men were treated for 6 wk with 4 capsules containing 85% fish-oil concentrate/d; each capsule contained 850 mg n-3 fatty acid ethyl esters (49.1% eicosapentaenoic acid by wt and 32.2% docosahexaenoic acid by wt). Oral-fat-tolerance tests were performed before and after the treatment. Blood samples were drawn in the fasting state and until 8 h postprandially. RESULTS: Treatment with n-3 fatty acids reduced the fasting VLDL-triacylglycerol concentration by 44% (P < 0.05) and postprandial chylomicrons and VLDLs at 4, 6, and 8 h (P < 0.05) by 49-64% and 36-43%, respect ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 37445434\nTitle: Triglyceride-Rich Lipoprotein Metabolism: Key Regulators of Their Flux\nSource: J Clin Med (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38303975\nTitle: The chylomicron saga: time to focus on postprandial metabolism\nSource: Front Endocrinol (Lausanne) (2024)\nAbstract: Figure 2 provides a simplified overview of the key characteristics of enterocyte-mediated <m>chylomicron</m> production. The <m>chylomicron</m> assembly pathway, which transports all dietary fat (more than 70 g per day) except for short chain @CHEMICAL_Fatty_Acids @CHEMICAL_MESH:D005227 @@@<m>fatty</m> <m>acids</m>@@@, is far less well understood than the liver <m>VLDL</m> assembly pathways.\n--------------------------------------------------------------------------------\nPMID: 34065380\nTitle: Postprandial Lipid Metabolism in Normolipidemic Subjects and Patients with Mild to Moderate Hypertriglyceridemia: Effects of Test Meals Containing Saturated Fatty Acids, Mono-Unsaturated Fatty Acids, or Medium-Chain Fatty Acids\nSource: Nutrients (2021)\nAbstract: @SPECIES_9606 @@@Patients@@@ with Mild to Moderate @DISEASE_Hypertriglyceridemia @DISEASE_MESH:D015228 @@@<m>Hypertriglyceridemia</m>@@@ Normolipidemic Subjects <m>N</m> 8 5 Gender m/f 6/2 2/<m>3</m> Age years 43 +- 12 35 +- 5 Body mass index kg/m2 30 +- 4.0 ** 23 +- 3.5 Fasting @CHEMICAL_Triglycerides @CHEMICAL_MESH:D014280 @@@triglycerides@@@ mg/dL 284 +- 118 ** 108 +- 34 Total cholesterol mg/dL 216 +- 37 186 +- 27 HDL-cholesterol mg/dL 44 +- 12 ** 68 +- 19 LDL-cholesterol mg/dL 112 +- 35 96 +- 29 @GENE_LPA @GENE_4018 @@@Lipoprotein(a)@@@ mg/dL 14 +- 17 4.3 +- 1.9 Fasting @CHEMICAL_Glucose @CHEMICAL_MESH:D005947 @@@glucose@@@ mg/dL 96 +- 10 89 +- <m>3</m> HbA1c % 5.2 +- 0.4 * 5.6 +- 0.26 @GENE_CRP @GENE_1401 @@@C-reactive protein@@@ mg/dL 0.43 +- 0.38 0.32 +- 0.27 Fasting @GENE_INS @GENE_3630 @@@insulin@@@ microU/mL 23.9 +- 22.2 9.0 +- 2.6 HOMA-IR-index - 5.6 +- 5.0 2.1 +- 0.59\n--------------------------------------------------------------------------------\nPMID: 36901696\nTitle: Cholesterol Remnants, Triglyceride-Rich Lipoproteins and Cardiovascular Risk\nSource: Int J Mol Sci (2023)\nAbstract: <m>N</m> et al. 87,192 individuals from the Copenhagen General Population Study with 13 years follow-up RCs of >=1 mmol/L (39 mg/dL)band plasma triglycerides of >=2 mmol/L (177 mg/dL) associated with two-fold mortality from cardiovascular and other non-neoplastic causes.\n--------------------------------------------------------------------------------\nPMID: 39347913\nTitle: Beyond the Guidelines: Perspectives on Management of Pediatric Patients with Hypertriglyceridemia\nSource: Curr Atheroscler Rep (2024)\nAbstract: ...Omega-<m>3</m> polyunsaturated <m>fatty</m> <m>acids</m> (@CHEMICAL_Fatty_Acids @CHEMICAL_MESH:D005227 @@@FA@@@), at doses of 4 g daily, can reduce @CHEMICAL_Triglycerides @CHEMICAL_MESH:D014280 @@@TG@@@ concentrations by up to 30%, depending on baseline levels.\n--------------------------------------------------------------------------------\nPMID: 38928071\nTitle: Hypertriglyceridemia: Molecular and Genetic Landscapes\nSource: Int J Mol Sci (2024)\nAbstract: Specific soluble <m>N</m>-ethylmaleimide-sensitive factor attachment protein receptor (SNARE) proteins are responsible for the inclusion of VTV into Golgi.\n--------------------------------------------------------------------------------\nPMID: 37685728\nTitle: Sugar and Dyslipidemia: A Double-Hit, Perfect Storm\nSource: J Clin Med (2023)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 38841827\nTitle: Pancreatic and cardiometabolic complications of severe hypertriglyceridaemia\nSource: Curr Opin Lipidol (2024)\nAbstract: We pooled the results of @DISEASE_Pancreatic_Diseases @DISEASE_MESH:D010182 @@@pancreatic complications@@@ from earlier studies and found the prevalence of @DISEASE_Pancreatitis @DISEASE_MESH:D010195 @@@AP@@@ at 70.7% (<m>n</m> = 290/410) vs. 16.3% (<m>n</m> = 418/2562) and @DISEASE_Pancreatitis @DISEASE_MESH:D010195 @@@RAP@@@ at 54.6% (<m>n</m> = 202/370) vs. 15.1% (<m>n</m> = 49/324) in FCS as compared to @DISEASE_Syndrome @DISEASE_MESH:D013577 @@@MCS@@@ (Fig. 2).\n--------------------------------------------------------------------------------\nPMID: 35474985\nTitle: Eruptive xanthomas as a marker for metabolic disorders: A specific form of xanthoma that reflects hypertriglyceridemia\nSource: Clin Case Rep (2022)\nAbstract: Thus, high ANGPLT3 activity in @SPECIES_9606 @@@patients@@@ with @DISEASE_Hyperglycemia @DISEASE_MESH:D006943 @@@hyperglycemia@@@ or @DISEASE_Obesity @DISEASE_MESH:D009765 @@@obesity@@@ can induce elevations of serum <m>remnant</m> lipoproteins, <m>chylomicron</m>, or LDL, and <m>VLDL</m> levels. <m>Remnants</m> infiltrating into the vessel walls or skin are recognized and engulfed by macrophages.\n--------------------------------------------------------------------------------\nPMID: 34356847\nTitle: The Importance of Lipoprotein Lipase Regulation in Atherosclerosis\nSource: Biomedicines (2021)\nAbstract: @GENE_LPL @GENE_4023 @@@LPL@@@ is a 55 kDa glycoprotein consisting of an <m>N</m>-terminal alpha/beta-hydrolase domain and a C-terminal @GENE_PKD1 @GENE_5310 @@@Polycystin-1@@@, Lipoxygenase, Alpha-Toxin (PLAT) domain (Figure 2).\n--------------------------------------------------------------------------------\nPMID: 36152881\nTitle: A single-day mouse mesenteric lymph surgery in mice: an updated approach to study dietary lipid absorption, chylomicron secretion, and lymphocyte dynamics\nSource: J Lipid Res (2022)\nAbstract: Data are representative examples of three independent experiments with <m>n</m> = 2-<m>3</m> @SPECIES_10090 @@@mice@@@ per experiment.\n--------------------------------------------------------------------------------\nPMID: 34981790\nTitle: Addressing dyslipidemic risk beyond LDL-cholesterol\nSource: J Clin Invest (2022)\nAbstract: @CHEMICAL_Fish_Oils @CHEMICAL_MESH:D005395 @@@Fish oils@@@ (<m>n</m>-<m>3</m> long-chain polyunsaturated <m>fatty</m> <m>acids</m>).\n--------------------------------------------------------------------------------\nPMID: 34796210\nTitle: Dietary-Induced Elevations of Triglyceride-Rich Lipoproteins Promote Atherosclerosis in the Low-Density Lipoprotein Receptor Knockout Syrian Golden Hamster\nSource: Front Cardiovasc Med (2021)\nAbstract: Thirty @GENE_LDLR @GENE_16835 @@@LDLR@@@-/- @SPECIES_10026 @@@hamsters@@@ were divided into four groups: CD, <m>n</m> = 5; CD and @CHEMICAL_Ezetimibe @CHEMICAL_MESH:D000069438 @@@ezetimibe@@@ (CD + @CHEMICAL_Ezetimibe @CHEMICAL_MESH:D000069438 @@@EZE@@@), <m>n</m> = 5; HFD, <m>n</m> = 10; HFD and @CHEMICAL_Ezetimibe @CHEMICAL_MESH:D000069438 @@@ezetimibe@@@ (HFD + @CHEMICAL_Ezetimibe @CHEMICAL_MESH:D000069438 @@@EZE@@@), <m>n</m> = 10.\n--------------------------------------------------------------------------------\nPMID: 41484108\nTitle: Non-remnant triglyceride-rich lipoproteins due to lipoprotein lipase deficiency increase atherosclerosis in mice\nSource: Nat Commun (2026)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 2,
+    "agent": "search",
+    "tool_name": "fetch_paper_content",
+    "tool_call_id": "call_N4loRTZ9MrwLZQzOIMpB52OD",
+    "parent_tool_call_id": "call_7zyI5Oo6w9FABEDkbvGmE0cW",
+    "round": 2,
+    "tool_input": {
+      "filter_keywords": "RESULTS|chylomicrons|VLDL|remnants|CONCLUSIONS|percent|P < 0.05",
+      "pmid": "10731497"
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubmed_api import fetch_paper_content_by_pmid, format_paper_content_output\nresult = fetch_paper_content_by_pmid('10731497')\noutput = format_paper_content_output(result, filter_keywords='RESULTS|chylomicrons|VLDL|remnants|CONCLUSIONS|percent|P < 0.05')\nprint(output)\n\n```\n\n### Output:\n```\n====================================================================================================\n\u001b[1m\u001b[94m🤖 AI Assistant\u001b[0m\n====================================================================================================\n\n\u001b[93m📞 Tool Calls (1):\u001b[0m\n  \u001b[1m\u001b[93m[1] fetch_paper_content\u001b[0m\n      \u001b[90mfilter_keywords:\u001b[0m RESULTS|chylomicrons|VLDL|remnants|CONCLUSIONS|percent|P < 0.05\n      \u001b[90mpmid:\u001b[0m 10731497\n\n=== PMID: 10731497 ===\n\nTitle: Postprandial chylomicrons and VLDLs in severe hypertriacylglycerolemia are lowered more effectively than are chylomicron remnants after treatment with n-3 fatty acids.\n\nJournal/Date: The American journal of clinical nutrition (2000)\n\nMeSH Keywords: Adult, Chromatography, Gel, Chylomicrons, Diterpenes, Fasting, Fatty Acids, Omega-3, Fluorescence, Food\n\n\n--- ABSTRACT ---\n[BACKGROUND]: n-3 Fatty acids lower plasma triacylglycerols not only in the fasting state but also in the postprandial state. However, it is not known whether chylomicrons, chylomicron remnants, and VLDLs are all affected equally or whether some lipoprotein species are lowered preferentially.\n[OBJECTIVE]: Lipoproteins, including large and small chylomicron remnants, were determined specifically with the aid of a newly developed method involving a combination of size-exclusion chromatography and fluorometric determination of retinyl palmitate, which served as a marker for exogenous fat.\n[DESIGN]: Twelve hypertriacylglycerolemic men were treated for 6 wk with 4 capsules containing 85% fish-oil concentrate/d; each capsule contained 850 mg n-3 fatty acid ethyl esters (49.1% eicosapentaenoic acid by wt and 32.2% docosahexaenoic acid by wt). Oral-fat-tolerance tests were performed before and after the treatment. Blood samples were drawn in the fasting state and until 8 h postprandially.\n[RESULTS]: Treatment with n-3 fatty acids reduced the fasting VLDL-triacylglycerol concentration by 44% (P < 0.05) and postprandial chylomicrons and VLDLs at 4, 6, and 8 h (P < 0.05) by 49-64% and 36-43%, respectively. Chylomicron remnants were reduced only in the late postprandial phase: large chylomicron remnants by 19% at 6 h and by 43% at 8 h (P < 0.05) and small chylomicron remnants by 31% at 8 h (P < 0.05).\n[CONCLUSION]: n-3 Fatty acids effectively lower chylomicrons and VLDLs, but their effect on chylomicron remnants was observed only in the late postprandial phase.\n\n\n[FULL TEXT STATUS]: Open-access full text is NOT available on PMC/PubTator for this PMID. Analysis must rely solely on the Abstract above, or search for alternative PMIDs with full-text availability.\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 3,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_zqIUdvRv5hMXmes0TRqMqo0I",
+    "parent_tool_call_id": "call_N4loRTZ9MrwLZQzOIMpB52OD",
+    "round": 3,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "Yes. The directly relevant human study (PMID 10731497) enrolled 12 men with severe hypertriacylglycerolemia and compared oral-fat-tolerance responses before versus after 6 weeks of fish-oil n-3 fatty acid ethyl esters: four capsules/day of 85% fish-oil concentrate, 850 mg n-3 ethyl esters per capsule (49.1% EPA, 32.2% DHA by weight).",
+          "source_tools": [
+            {
+              "relevance": "Study design, population, intervention, and comparator",
+              "tool_call_id": "call_N4loRTZ9MrwLZQzOIMpB52OD"
+            }
+          ]
+        },
+        {
+          "finding": "Postprandial chylomicrons and VLDL were lowered more effectively than chylomicron remnants: chylomicrons fell 49–64% and VLDL fell 36–43% at 4, 6, and 8 hours (P<0.05), whereas large chylomicron remnants fell 19% at 6 hours and 43% at 8 hours, and small remnants fell 31% only at 8 hours (P<0.05).",
+          "source_tools": [
+            {
+              "relevance": "Quantitative fraction-specific outcomes",
+              "tool_call_id": "call_N4loRTZ9MrwLZQzOIMpB52OD"
+            }
+          ]
+        },
+        {
+          "finding": "The study also found a 44% reduction in fasting VLDL-triacylglycerol (P<0.05); its conclusion was that n-3 fatty acids effectively lower chylomicrons and VLDL, while effects on chylomicron remnants occur only in the late postprandial phase.",
+          "source_tools": [
+            {
+              "relevance": "Fasting and postprandial interpretation",
+              "tool_call_id": "call_N4loRTZ9MrwLZQzOIMpB52OD"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 4,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_nIUCvL7uHEfQLoaO5T1vgJx8",
+    "parent_tool_call_id": "call_7bbYmj07EckcBnDJYL33zqRQ",
+    "round": 2,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "PAPER",
+          "name": "PMID:10731497",
+          "observations": [
+            "In 12 men with severe hypertriacylglycerolemia, 6 weeks of fish-oil n-3 ethyl esters (~3.4 g/day; EPA 49.1%, DHA 32.2%) reduced postprandial chylomicrons by 49–64% at 4–8 hours and VLDL by 36–43% at 4–8 hours.",
+            "Large chylomicron remnants decreased 19% at 6 hours and 43% at 8 hours; small remnants decreased 31% only at 8 hours.",
+            "Fasting VLDL-triacylglycerol decreased 44%; the study concluded that chylomicron and VLDL lowering was earlier and more consistent than remnant lowering."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct human study supporting all comparative treatment-effect findings.",
+              "tool_call_id": "call_N4loRTZ9MrwLZQzOIMpB52OD"
+            }
+          ]
+        },
+        {
+          "entity_type": "CHEMICAL",
+          "name": "n-3 fatty acids",
+          "observations": [
+            "Fish-oil n-3 ethyl esters were administered for 6 weeks at approximately 3.4 g/day in the relevant severe hypertriacylglycerolemia study."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Intervention in the directly relevant human study.",
+              "tool_call_id": "call_N4loRTZ9MrwLZQzOIMpB52OD"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Postprandial lipoprotein lowering",
+          "observations": [
+            "In severe hypertriacylglycerolemia, n-3 fatty acids lowered postprandial chylomicrons and VLDL more effectively and earlier than chylomicron remnants: chylomicrons 49–64%, VLDL 36–43%, versus remnant reductions mainly at 6–8 hours."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Direct comparative conclusion from the study.",
+              "tool_call_id": "call_N4loRTZ9MrwLZQzOIMpB52OD"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "n-3 fatty acids",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Postprandial lipoprotein lowering"
+        },
+        {
+          "from_entity": "PMID:10731497",
+          "relation_type": "SUPPORTS",
+          "to_entity": "Postprandial lipoprotein lowering"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 3, \"entities\": [{\"name\": \"PMID:10731497\", \"entityType\": \"PAPER\", \"observations\": [\"In 12 men with severe hypertriacylglycerolemia, 6 weeks of fish-oil n-3 ethyl esters (~3.4 g/day; EPA 49.1%, DHA 32.2%) reduced postprandial chylomicrons by 49\\u201364% at 4\\u20138 hours and VLDL by 36\\u201343% at 4\\u20138 hours.\", \"Large chylomicron remnants decreased 19% at 6 hours and 43% at 8 hours; small remnants decreased 31% only at 8 hours.\", \"Fasting VLDL-triacylglycerol decreased 44%; the study concluded that chylomicron and VLDL lowering was earlier and more consistent than remnant lowering.\"]}, {\"name\": \"n-3 fatty acids\", \"entityType\": \"CHEMICAL\", \"observations\": [\"Fish-oil n-3 ethyl esters were administered for 6 weeks at approximately 3.4 g/day in the relevant severe hypertriacylglycerolemia study.\"]}, {\"name\": \"Postprandial lipoprotein lowering\", \"entityType\": \"FINDING\", \"observations\": [\"In severe hypertriacylglycerolemia, n-3 fatty acids lowered postprandial chylomicrons and VLDL more effectively and earlier than chylomicron remnants: chylomicrons 49\\u201364%, VLDL 36\\u201343%, versus remnant reductions mainly at 6\\u20138 hours.\"]}]}, \"relations_created\": {\"count\": 2, \"relations\": [{\"from\": \"n-3 fatty acids\", \"to\": \"Postprandial lipoprotein lowering\", \"relationType\": \"SUPPORTS\"}, {\"from\": \"PMID:10731497\", \"to\": \"Postprandial lipoprotein lowering\", \"relationType\": \"SUPPORTS\"}]}}, \"provenance\": {\"tool_call_id\": \"call_nIUCvL7uHEfQLoaO5T1vgJx8\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 2, \"parent_tool_call_id\": \"call_7bbYmj07EckcBnDJYL33zqRQ\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

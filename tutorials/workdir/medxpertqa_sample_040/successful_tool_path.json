@@ -1,0 +1,168 @@
+[
+  {
+    "step": 8,
+    "agent": "orchestrator",
+    "tool_name": "go_search_agent",
+    "tool_call_id": "call_wZtHQTi5YxRj94foaHsovF28",
+    "parent_tool_call_id": null,
+    "round": 2,
+    "tool_input": {
+      "knowledge_bases": [
+        "pubmed_papers",
+        "disease"
+      ],
+      "search_rounds_budget": 2,
+      "search_target": "Focus specifically on pregestational type 1 or type 2 diabetes with HbA1c around 10% in early pregnancy: identify the leading cause of perinatal mortality and quantify or characterize the risk of major congenital anomalies versus stillbirth, placental insufficiency, fetal macrosomia, neonatal hypoglycemia, and preterm birth. Determine which listed answer best fits an 8-week pregnancy with poor periconception glycemic control."
+    },
+    "status": "success",
+    "raw_output": null,
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 10,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_0Av163TNwMx2EudOQAT5w9Sb",
+    "parent_tool_call_id": "call_wZtHQTi5YxRj94foaHsovF28",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "pregestational diabetes HbA1c 10% early pregnancy congenital anomalies stillbirth perinatal mortality",
+      "relation_query": null,
+      "task_name": "diabetes outcomes",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='pregestational diabetes HbA1c 10% early pregnancy congenital anomalies stillbirth perinatal mortality',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='pregestational diabetes HbA1c 10% early pregnancy congenital anomalies stillbirth perinatal mortality',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/diabetes_outcomes.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/diabetes_outcomes.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/diabetes_outcomes.csv'\nTotal results found: 11\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 16856824\nTitle: Outcome of fetuses in women with pregestational diabetes mellitus.\nSource: Journal of perinatal medicine (2006)\nAbstract: OBJECTIVE: To investigate the effects of pregestational diabetes on pregnancy outcome. METHODS: Data of 126 women with pregestational diabetes prospectively collected and controlled in a single tertiary center. HbA(1C) levels at early pregnancy were registered. Adverse pregnancy outcome was defined as spontaneous abortion, congenital defect, stillbirth, or neonatal death. RESULTS: There were 10 spontaneous abortions (7.9%) and 17 fetuses with congenital anomalies (13.4%), including 8 major malformations (6.3%). Compared with pregnancies with a favorable outcome, a higher HbA(1C) concentration in early pregnancy was observed in pregnancies with adverse perinatal outcome [mean (SD): 6.3 (1.6) vs. 7.2 (1.7), P=0.001]. A positive correlation between increased maternal HbA(1C) levels and the rate of fetal malformations was observed, and the group of women with poor metabolic control (early maternal HbA(1c) concentration >7%) showed a 3 to 5-fold increase in the major malformation rate. Cardiovascular and genitourinary defects accounted for 58.8% of the anomalies, and the ultrasound examinations detected seven of them (41.2%). For major malformations, the detection rate was 50% (4/8). Pe ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 41354939\nTitle: Associations of modifiable preconception, pregnancy and postpartum factors with health outcomes for women with type 2 diabetes and their children: A systematic review and meta-analysis of observational studies\nSource: Diabet Med (2025)\nAbstract: <m>HbA1c</m>, blood pressure and obesity) and health behaviours (e.g. diet, physical activity, smoking, <m>pregnancy</m> planning and treatment adherence) during the preconception, <m>pregnancy</m> and/or postpartum period Comparison Not exposed or comparison group as defined by each study, or not applicable for studies that examine a continuous exposure Outcome Outcomes related to health conditions and health behaviours (see interventions/exposures) and clinical outcomes related to the mother (e.g. miscarriage, <m>stillbirth</m>, preeclampsia, mode of delivery and maternal <m>mortality</m>) and the offspring (e.g. birthweight, preterm birth, <m>congenital</m> <m>anomaly</m>, neonatal hypoglycaemia and <m>perinatal</m> <m>mortality</m>) during the preconception, <m>pregnancy</m>, birth or beyond Study design Observational studies (published in English)\n--------------------------------------------------------------------------------\nPMID: 34330786\nTitle: Risk of Major Congenital Malformations or Perinatal or Neonatal Death With Insulin Detemir Versus Other Basal Insulins in Pregnant Women With Preexisting Diabetes: The Real-World EVOLVE Study\nSource: Diabetes Care (2021)\nAbstract: Even small elevations in <m>HbA1c</m> levels in <m>early</m> <m>pregnancy</m> in @SPECIES_9606 @@@women@@@ with @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@<m>diabetes</m>@@@ can lead to a significantly increased risk of @DISEASE_163000 @DISEASE_OMIM:163000 @@@<m>congenital</m> malformations@@@.\n--------------------------------------------------------------------------------\nPMID: 41266559\nTitle: Fetal malformations in women with pregestational diabetes mellitus based on pre-pregnancy fasting plasma glucose levels\nSource: Sci Rep (2025)\nAbstract: @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@<m>Pregestational</m> <m>diabetes</m> mellitus@@@ (@DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@PGDM@@@), which refers to @DISEASE_Diabetes_Mellitus_Type_2 @DISEASE_MESH:D003924 @@@type 1 or 2 <m>diabetes</m>@@@ that existed before <m>pregnancy</m>, is a significant risk factor for @DISEASE_163000 @DISEASE_OMIM:163000 @@@<m>congenital</m> malformations@@@, particularly if @CHEMICAL_Blood_Glucose @CHEMICAL_MESH:D001786 @@@blood glucose@@@ levels are not well managed during the <m>early</m> stages of <m>pregnancy</m>.\n--------------------------------------------------------------------------------\nPMID: 39840159\nTitle: Pattern and Frequency of Congenital Heart Defects Among Infants of Diabetic Mothers\nSource: Cureus (2024)\nAbstract: Prepregnancy care for @SPECIES_9606 @@@women@@@ with <m>pregestational</m> @DISEASE_Diabetes_Mellitus_Type_2 @DISEASE_MESH:D003924 @@@type 1 or type 2 <m>diabetes</m> mellitus@@@ is effective in improving rates of <m>perinatal</m> morbidity and <m>mortality</m> and in reducing maternal <m>HbA1C</m>.\n--------------------------------------------------------------------------------\nPMID: 34984172\nTitle: Gestational and pregestational diabetes in pregnant women with cystic fibrosis\nSource: J Clin Transl Endocrinol (2021)\nAbstract: Like @DISEASE_Diabetes_Gestational @DISEASE_MESH:D016640 @@@GDM@@@, <m>pregestational</m> @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@<m>diabetes</m>@@@ carries elevated risk for <m>perinatal</m> <m>mortality</m>, but the risk is even higher.\n--------------------------------------------------------------------------------\nPMID: 37645646\nTitle: The role of technology in the care of diabetes mellitus in pregnancy: an expert review\nSource: AJOG Glob Rep (2023)\nAbstract: Major @DISEASE_Congenital_Abnormalities @DISEASE_MESH:D000013 @@@<m>congenital</m> <m>anomalies</m>@@@ are strongly linked to glycemic control <m>early</m> in <m>pregnancy</m> with a 20% risk of @DISEASE_163000 @DISEASE_OMIM:163000 @@@<m>congenital</m> malformations@@@ associated with a hemoglobin A1c (<m>HbA1c</m>) level of >=13%.\n--------------------------------------------------------------------------------\nPMID: 34512889\nTitle: Cardiac changes in infants of diabetic mothers \nSource: World J Diabetes (2021)\nAbstract: Infants born to mothers with <m>pregestational</m> @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@<m>diabetes</m>@@@ have higher risks of <m>mortality</m> and morbidity than <m>gestational</m> @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@DM@@@.\n--------------------------------------------------------------------------------\nPMID: 33803995\nTitle: Diabetes during Pregnancy: A Maternal Disease Complicating the Course of Pregnancy with Long-Term Deleterious Effects on the Offspring. A Clinical Review\nSource: Int J Mol Sci (2021)\nAbstract: Poorly controlled @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@PGDM@@@ before conception and during the first trimester of <m>pregnancy</m> is associated with increased rates of major @DISEASE_163000 @DISEASE_OMIM:163000 @@@<m>congenital</m> malformations@@@, spontaneous @DISEASE_Abortion_Habitual @DISEASE_MESH:D000026 @@@abortions@@@, and increased rate of @DISEASE_Stillbirth @DISEASE_MESH:D050497 @@@<m>stillbirth</m>@@@ and <m>perinatal</m> <m>mortality</m>.\n--------------------------------------------------------------------------------\nPMID: 37547311\nTitle: Management of type 2 diabetes in pregnancy: a narrative review\nSource: Front Endocrinol (Lausanne) (2023)\nAbstract: The incidence of @DISEASE_163000 @DISEASE_OMIM:163000 @@@<m>congenital</m> malformations@@@ is linearly associated with increasing <m>HbA1c</m> values in <m>early</m> <m>pregnancy</m>.\n--------------------------------------------------------------------------------\nPMID: 38641705\nTitle: Maternal and foetal complications of pregestational and gestational diabetes: a descriptive, retrospective cohort study\nSource: Sci Rep (2024)\nAbstract: <m>Gestational</m> and <m>pregestational</m> @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@<m>diabetes</m>@@@ can have deleterious effects during <m>pregnancy</m> and <m>perinatally</m>.\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 11,
+    "agent": "search",
+    "tool_name": "search_papers",
+    "tool_call_id": "call_Ousf5TY3MpkFF61IYB4GnHja",
+    "parent_tool_call_id": "call_wZtHQTi5YxRj94foaHsovF28",
+    "round": 1,
+    "tool_input": {
+      "boolean_query_text": "pregestational type 1 type 2 diabetes pregnancy leading cause perinatal mortality congenital malformations stillbirth macrosomia preterm neonatal hypoglycemia",
+      "relation_query": null,
+      "task_name": "perinatal risks",
+      "top_k": 10
+    },
+    "status": "success",
+    "raw_output": "### Executed Code:\n```python\n\nfrom biodsa.tools.pubmed.pubtator_api import pubtator_api_search_papers\nfrom biodsa.tools.pubmed.pubmed_api import pubmed_api_search_papers\nimport pandas as pd\n\ndf_list = []\nhas_relation_query = False\n\n# 1. PubMed Search (Best Relevance Sorting)\nif not has_relation_query:\n    pmid_df = pubmed_api_search_papers(\n        boolean_query_text='pregestational type 1 type 2 diabetes pregnancy leading cause perinatal mortality congenital malformations stillbirth macrosomia preterm neonatal hypoglycemia',\n        top_k=10,\n    )\n    if pmid_df is not None and not pmid_df.empty:\n        for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n            if col not in pmid_df.columns:\n                pmid_df[col] = \"\"\n        pmid_df = pmid_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n        df_list.append(pmid_df)\n\n# 2. PubTator3 Search (Entity highlighting, fallback)\npubtator_results = []\nfor page in range(1, 1 + 1):\n    search_results = pubtator_api_search_papers(\n        boolean_query_text='pregestational type 1 type 2 diabetes pregnancy leading cause perinatal mortality congenital malformations stillbirth macrosomia preterm neonatal hypoglycemia',\n        relation_query=None,\n        page=page,\n        max_retries=3,\n        max_requests_per_second=3.0\n    )\n    if search_results is not None and not search_results.empty:\n        pubtator_results.append(search_results)\n    else:\n        break\n\nif pubtator_results:\n    pubtator_df = pd.concat(pubtator_results)\n    if \"Highlighted_Text\" in pubtator_df.columns:\n        pubtator_df = pubtator_df.rename(columns={\"Highlighted_Text\": \"Abstract\"})\n    \n    for col in [\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]:\n        if col not in pubtator_df.columns:\n            pubtator_df[col] = \"\"\n    pubtator_df = pubtator_df[[\"PMID\", \"Title\", \"Journal\", \"Year\", \"Abstract\"]]\n    df_list.append(pubtator_df)\n\n# 3. Combine, Deduplicate and Format Clean Output\nif df_list:\n    final_df = pd.concat(df_list).reset_index(drop=True)\n    # Deduplicate by PMID, keeping the first occurrence (which guarantees PubMed relevance is maintained)\n    final_df = final_df.drop_duplicates(subset=[\"PMID\"], keep=\"first\")\n    \n    # Optional: Save to CSV for persistent logging\n    final_df.to_csv('/home/data4/xiangyu/BioDSA/workdir/perinatal_risks.csv', index=False)\n    print(f\"The search results are saved at '/home/data4/xiangyu/BioDSA/workdir/perinatal_risks.csv'\")\n    print(f\"Total results found: {len(final_df)}\\n\")\n    print(\"=\" * 80)\n    print(\"TOP RESULTS (Showing up to 15 most relevant):\")\n    print(\"=\" * 80)\n    \n    # FORMAT FOR LLM: Clean text layout rather than Markdown table\n    for idx, row in final_df.head(15).iterrows():\n        pmid = row.get('PMID', 'N/A')\n        title = row.get('Title', 'No Title')\n        journal = row.get('Journal', 'Unknown')\n        year = row.get('Year', 'Unknown')\n        abstract = str(row.get('Abstract', 'No Abstract Available'))\n        \n        # Clean abstract spaces and truncate at 1200 chars to save context window\n        abstract = \" \".join(abstract.split())\n        if len(abstract) > 1200:\n            abstract = abstract[:1200] + \" ... [Truncated]\"\n            \n        print(f\"PMID: {pmid}\")\n        print(f\"Title: {title}\")\n        print(f\"Source: {journal} ({year})\")\n        print(f\"Abstract: {abstract}\")\n        print(\"-\" * 80)\nelse:\n    print(\"No search results found. Please try again with different query. TIP: Try simpler keyword phrases.\")\n\n```\n\n### Output:\n```\nThe search results are saved at '/home/data4/xiangyu/BioDSA/workdir/perinatal_risks.csv'\nTotal results found: 10\n\n================================================================================\nTOP RESULTS (Showing up to 15 most relevant):\n================================================================================\nPMID: 33803995\nTitle: Diabetes during Pregnancy: A Maternal Disease Complicating the Course of Pregnancy with Long-Term Deleterious Effects on the Offspring. A Clinical Review\nSource: Int J Mol Sci (2021)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 34617682\nTitle: Pregnancy outcomes in women with type 1 diabetes in China during 2004 to 2014: A retrospective study (the CARNATION Study)\nSource: J Diabetes (2022)\nAbstract: ...Maternal, <m>neonatal</m>, and fetal adverse <m>pregnancy</m> outcomes of @SPECIES_9606 @@@women@@@ with @DISEASE_Diabetes_Mellitus_Type_1 @DISEASE_MESH:D003922 @@@<m>type</m> <m>1</m> <m>diabetes</m>@@@ compared to those of @SPECIES_9606 @@@women@@@ without @DISEASE_Diabetes_Mellitus_Type_1 @DISEASE_MESH:D003922 @@@<m>type</m> <m>1</m> <m>diabetes</m>@@@ in the participating centers during 2004 and 2014\n--------------------------------------------------------------------------------\nPMID: 34984172\nTitle: Gestational and pregestational diabetes in pregnant women with cystic fibrosis\nSource: J Clin Transl Endocrinol (2021)\nAbstract: Another study of 1649 <m>pregnancies</m> affected by <m>pregestational</m> @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@<m>diabetes</m>@@@ (@DISEASE_Diabetes_Mellitus_Type_2 @DISEASE_MESH:D003924 @@@<m>type</m> <m>2</m> and <m>type</m> <m>1</m> <m>diabetes</m>@@@) similarly documented a linear risk for most @DISEASE_163000 @DISEASE_OMIM:163000 @@@<m>congenital</m> <m>malformations</m>@@@ with higher risk beginning with A1c of 6% or higher, and with @DISEASE_Congenital_Abnormalities @DISEASE_MESH:D000013 @@@fetal <m>malformation</m>@@@ incidence progressively reaching 15% in the highest A1c categories.\n--------------------------------------------------------------------------------\nPMID: 33147099\nTitle: Dysglycemia in Pregnancy and Maternal/Fetal Outcomes\nSource: J Womens Health (Larchmt) (2021)\nAbstract: The most serious outcomes of @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@diabetic@@@ <m>pregnancies</m> are <m>neonatal</m> <m>mortality</m>, @DISEASE_Stillbirth @DISEASE_MESH:D050497 @@@<m>stillbirths</m>@@@, @DISEASE_Premature_Birth @DISEASE_MESH:D047928 @@@<m>preterm</m> delivery@@@ (before 37 weeks of <m>gestation</m>), excessive fetal growth, and @DISEASE_Congenital_Abnormalities @DISEASE_MESH:D000013 @@@<m>congenital</m> abnormalities@@@.\n--------------------------------------------------------------------------------\nPMID: 39840172\nTitle: Infants of Diabetic Mothers and Associated Complications in the Neonatal Intensive Care Unit\nSource: Cureus (2024)\nAbstract: Unknown 74 60.2 Uncontrolled DM 14 11.4 <m>Congenital</m> heart disease 10 8.1 <m>Congenital</m> anomalies 10 8.1 Prematurity 4 3.3 Molar <m>pregnancy</m> <m>2</m> 1.6 Neurological anomalies <m>2</m> 1.6 Preeclampsia <m>2</m> 1.6 Vascular abnormality <m>2</m> 1.6 Ectopic <m>pregnancy</m> <m>1</m> .8 Ruptured membrane <m>1</m> .8 Syndromic <m>1</m> .8\n--------------------------------------------------------------------------------\nPMID: 37645646\nTitle: The role of technology in the care of diabetes mellitus in pregnancy: an expert review\nSource: AJOG Glob Rep (2023)\nAbstract: Both <m>pregestational</m> and @DISEASE_Diabetes_Gestational @DISEASE_MESH:D016640 @@@<m>gestational</m> <m>diabetes</m> mellitus@@@ increase the risk for adverse <m>perinatal</m> outcomes, including @DISEASE_Pre_Eclampsia @DISEASE_MESH:D011225 @@@preeclampsia@@@, @DISEASE_Premature_Birth @DISEASE_MESH:D047928 @@@<m>preterm</m> delivery@@@, @DISEASE_Fetal_Macrosomia @DISEASE_MESH:D005320 @@@<m>macrosomia</m>@@@, cesarean delivery, <m>neonatal</m> @DISEASE_Hypoglycemia @DISEASE_MESH:D007003 @@@<m>hypoglycemia</m>@@@, and @DISEASE_Stillbirth @DISEASE_MESH:D050497 @@@<m>stillbirth</m>@@@.\n--------------------------------------------------------------------------------\nPMID: 35041752\nTitle: A Clinical Update on Gestational Diabetes Mellitus\nSource: Endocr Rev (2022)\nAbstract: None\n--------------------------------------------------------------------------------\nPMID: 37018736\nTitle: Maternal diabetes mellitus and birth defects in Taiwan: A 5-year nationwide population-based cohort study\nSource: J Chin Med Assoc (2023)\nAbstract: @DISEASE_Abnormalities_Drug_Induced @DISEASE_MESH:D000014 @@@Birth defects@@@ (@DISEASE_Abnormalities_Drug_Induced @DISEASE_MESH:D000014 @@@BDs@@@) are the main <m>causes</m> of <m>mortality</m> and disability in infants and children. Associations between @DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@maternal <m>diabetes</m> mellitus@@@ (@DISEASE_Diabetes_Mellitus @DISEASE_MESH:D003920 @@@DM@@@), including @DISEASE_Diabetes_Gestational @DISEASE_MESH:D016640 @@@<m>gestational</m> DM@@@ (@DISEASE_Diabetes_Gestational @DISEASE_MESH:D016640 @@@GDM@@@) and <m>pregestational</m> @DISEASE_Diabetes_Mellitus_Type_2 @DISEASE_MESH:D003924 @@@DM (<m>type</m> <m>1</m> or <m>type</m> <m>2</m>@@@), and the risk of @DISEASE_Abnormalities_Drug_Induced @DISEASE_MESH:D000014 @@@BDs@@@ have been reported.\n--------------------------------------------------------------------------------\nPMID: 36515497\nTitle: Intermittently scanned continuous glucose monitoring is associated with lower spontaneous abortion rate compared with conventional blood glucose monitoring in pregnant women with type 1 diabetes: An observational study\nSource: Diab Vasc Dis Res (2022)\nAbstract: ...Adverse <m>pregnancy</m> outcomes isCGM (n = 77) BGM (n = 76) p During <m>pregnancy</m> Weight gain, kg 12.1 +- 4.8 12.64 +- 5.5 .62 Progression of @DISEASE_Hypertensive_Retinopathy @DISEASE_MESH:D058437 @@@retinopathy@@@, % 28/69 (40.6) 14/58 (24.1) .11 Progression of @DISEASE_Proteinuria @DISEASE_MESH:D011507 @@@proteinuria@@@, % 14/70 (20) 5/57 (8.8) .13 Progression of @DISEASE_Hypertension @DISEASE_MESH:D006973 @@@hypertension@@@, % 11/70 (15.7) 5/57 (8.8) .36 @DISEASE_Pre_Eclampsia @DISEASE_MESH:D011225 @@@Preeclampsia,%@@@ 12/70 (17.1) 4/57 (7) .15 @DISEASE_Ketosis @DISEASE_MESH:D007662 @@@Ketoacidosis@@@, % 5/72 (6,9) <m>2</m>/60 (3) .25 Spontaneous abortion, % 4/76 (5.3) 15/75 (20) .0129 <m>Stillbirth</m>, % 3/73 (4.1) <m>2</m>/60 (3.3) <m>1</m> At delivery <m>Gestational</m> age at delivery, weeks 36.6 +- 3.5 36.4 +- 4.9 .8 Prematurity <37 WG, % 16/72 (22.2) 14/60 (23.7) .8 Prematurity <34 WG, % 7/72 (9.7) 4/60 (6.6) .5 Cesarean section, % 31/70 (44) 26/58 (44.8) <m>1</m> Emergency cesarean section, % 21/31 (67.7) 12/26 (46.15) .17 Hemorrhage during delivery, % 21/67 (31.3) 19/54 (35.2) .8 <m>Newborns</m> Birth weight, grams 3561.59 +- 772 3490.84 +- 817 .63 Male sex, % ... [Truncated]\n--------------------------------------------------------------------------------\nPMID: 40235646\nTitle: Gestational diabetes mellitus - more than the eye can see - a warning sign for future maternal health with transgenerational impact\nSource: Front Clin Diabetes Healthc (2025)\nAbstract: None\n--------------------------------------------------------------------------------\n\n```\n\n",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 12,
+    "agent": "search",
+    "tool_name": "report_key_findings",
+    "tool_call_id": "call_Hd3F8YFpmy9V39yxFPqbBW6Y",
+    "parent_tool_call_id": "call_Ousf5TY3MpkFF61IYB4GnHja",
+    "round": 2,
+    "tool_input": {
+      "key_findings": [
+        {
+          "finding": "For pregestational type 1 or type 2 diabetes with poor periconception control, major congenital malformations—especially cardiovascular and genitourinary defects—are the best-fitting leading cause of perinatal mortality among the listed choices. At 8 weeks, organogenesis is ongoing, so HbA1c around 10% is particularly concerning for embryopathy; the competing risks of macrosomia and neonatal hypoglycemia are predominantly later-pregnancy/neonatal consequences, while placental insufficiency and stillbirth are later gestational complications.",
+          "source_tools": [
+            {
+              "relevance": "Direct early-pregnancy cohort: congenital anomalies occurred in 13.4%, major malformations in 6.3%, and early HbA1c >7% was associated with a 3–5-fold increase in major malformation rate; cardiovascular/genitourinary defects comprised 58.8% of anomalies.",
+              "tool_call_id": "call_0Av163TNwMx2EudOQAT5w9Sb"
+            },
+            {
+              "relevance": "Clinical review states poorly controlled preconception/first-trimester pregestational diabetes increases major congenital malformations, stillbirth, and perinatal mortality.",
+              "tool_call_id": "call_0Av163TNwMx2EudOQAT5w9Sb"
+            }
+          ]
+        },
+        {
+          "finding": "The congenital-anomaly risk rises approximately linearly with early-pregnancy HbA1c; published summaries report fetal malformation incidence reaching about 15% in the highest HbA1c categories and about 20% when HbA1c is ≥13%, so HbA1c near 10% represents a substantially elevated risk rather than a modest one. Exact risk at precisely 10% is not established by the retrieved evidence.",
+          "source_tools": [
+            {
+              "relevance": "Review of pregnancies with pregestational diabetes reports a linear relationship between HbA1c and malformations, with incidence progressively reaching 15% in the highest HbA1c categories.",
+              "tool_call_id": "call_Ousf5TY3MpkFF61IYB4GnHja"
+            },
+            {
+              "relevance": "Expert review reports approximately 20% congenital-malformation risk at HbA1c ≥13%, supporting marked dose-response escalation with poor early control.",
+              "tool_call_id": "call_0Av163TNwMx2EudOQAT5w9Sb"
+            }
+          ]
+        },
+        {
+          "finding": "Pregestational diabetes also increases stillbirth, preterm birth, excessive fetal growth/macrosomia, and neonatal hypoglycemia, but these are broad downstream adverse outcomes and do not displace congenital malformations as the most appropriate answer for an 8-week pregnancy with poor periconception glycemic control.",
+          "source_tools": [
+            {
+              "relevance": "Dysglycemia review lists neonatal mortality, stillbirth, preterm delivery, excessive fetal growth, and congenital abnormalities as serious diabetic-pregnancy outcomes.",
+              "tool_call_id": "call_Ousf5TY3MpkFF61IYB4GnHja"
+            },
+            {
+              "relevance": "Expert review specifically links diabetes in pregnancy with preterm delivery, macrosomia, neonatal hypoglycemia, and stillbirth.",
+              "tool_call_id": "call_Ousf5TY3MpkFF61IYB4GnHja"
+            }
+          ]
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "Key findings recorded successfully.",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  },
+  {
+    "step": 13,
+    "agent": "orchestrator",
+    "tool_name": "add_to_graph",
+    "tool_call_id": "call_ewqbnqZnx6SZRk0vaFdIWC7g",
+    "parent_tool_call_id": "call_wZtHQTi5YxRj94foaHsovF28",
+    "round": 3,
+    "tool_input": {
+      "entities": [
+        {
+          "entity_type": "DISEASE / PHENOTYPE",
+          "name": "Pregestational diabetes",
+          "observations": [
+            "Poor periconception glycemic control increases risks of fetal major congenital anomalies, stillbirth, preterm birth, macrosomia, and neonatal hypoglycemia."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Summary of search evidence on diabetic pregnancy outcomes.",
+              "tool_call_id": "call_0Av163TNwMx2EudOQAT5w9Sb"
+            }
+          ]
+        },
+        {
+          "entity_type": "FINDING",
+          "name": "Diabetic embryopathy risk",
+          "observations": [
+            "At approximately 8 weeks, HbA1c 10.1% during organogenesis is associated with substantially increased risk of major fetal malformations, especially cardiovascular and genitourinary defects.",
+            "Major congenital anomalies are the best-fitting cause of perinatal mortality among the listed choices in this scenario."
+          ],
+          "source_tools": [
+            {
+              "relevance": "Search evidence linking poor early glycemic control to congenital anomalies and distinguishing later complications.",
+              "tool_call_id": "call_0Av163TNwMx2EudOQAT5w9Sb"
+            },
+            {
+              "relevance": "Evidence that malformation risk rises with early-pregnancy HbA1c and that other complications are predominantly later.",
+              "tool_call_id": "call_Ousf5TY3MpkFF61IYB4GnHja"
+            }
+          ]
+        }
+      ],
+      "observations": null,
+      "relations": [
+        {
+          "from_entity": "Pregestational diabetes",
+          "relation_type": "ASSOCIATED_WITH",
+          "to_entity": "Diabetic embryopathy risk"
+        }
+      ]
+    },
+    "status": "success",
+    "raw_output": "{\"success\": true, \"results\": {\"entities_created\": {\"count\": 2, \"entities\": [{\"name\": \"Pregestational diabetes\", \"entityType\": \"DISEASE / PHENOTYPE\", \"observations\": [\"Poor periconception glycemic control increases risks of fetal major congenital anomalies, stillbirth, preterm birth, macrosomia, and neonatal hypoglycemia.\"]}, {\"name\": \"Diabetic embryopathy risk\", \"entityType\": \"FINDING\", \"observations\": [\"At approximately 8 weeks, HbA1c 10.1% during organogenesis is associated with substantially increased risk of major fetal malformations, especially cardiovascular and genitourinary defects.\", \"Major congenital anomalies are the best-fitting cause of perinatal mortality among the listed choices in this scenario.\"]}]}, \"relations_created\": {\"count\": 1, \"relations\": [{\"from\": \"Pregestational diabetes\", \"to\": \"Diabetic embryopathy risk\", \"relationType\": \"ASSOCIATED_WITH\"}]}}, \"provenance\": {\"tool_call_id\": \"call_ewqbnqZnx6SZRk0vaFdIWC7g\", \"tool_name\": \"add_to_graph\", \"agent\": \"orchestrator\", \"round\": 3, \"parent_tool_call_id\": \"call_wZtHQTi5YxRj94foaHsovF28\"}}",
+    "result_entity_names": [],
+    "used_in_final_answer": false
+  }
+]

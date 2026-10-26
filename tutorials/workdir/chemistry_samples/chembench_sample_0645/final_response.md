@@ -1,0 +1,1 @@
+{"answer": "Cc1noc(CCn2cc[nH]c2=O)n1"}
